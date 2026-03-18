@@ -1,0 +1,16 @@
+ex04 - Discover Movies & Quotes
+========================================
+
+Mode: trending
+Movies discovered: 3
+
+Movies found:
+  1. War Machine (2026)
+  2. Zootopia 2 (2025)
+  3. Hoppers (2026)
+
+Quotes extracted: 78
+
+Total movies in DB: 3
+Total quotes in DB: 78
+Quotes with timestamps: 0

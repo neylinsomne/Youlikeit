@@ -1,0 +1,12 @@
+2026-03-15 07:41:19,360 | INFO | Found 3 movies without subtitles
+2026-03-15 07:41:19,360 | INFO |   #1 War Machine (quotes=18, score=796.0341)
+2026-03-15 07:41:19,361 | INFO |   #2 Zootopia 2 (quotes=30, score=470.8567)
+2026-03-15 07:41:19,361 | INFO |   #3 Hoppers (quotes=30, score=462.1191)
+2026-03-15 07:41:19,696 | INFO | Downloading subtitles for: War Machine (TMDB:1265609)
+2026-03-15 07:41:20,227 | WARNING |   No valid subtitles found for War Machine
+2026-03-15 07:41:20,228 | INFO | Downloading subtitles for: Zootopia 2 (TMDB:1084242)
+2026-03-15 07:41:22,385 | INFO |   OpenSubtitles: downloaded
+2026-03-15 07:41:22,395 | INFO |   Saved: data/raw/srt/Zootopia_2_1084242.srt
+2026-03-15 07:41:22,396 | INFO | Downloading subtitles for: Hoppers (TMDB:1327819)
+2026-03-15 07:41:23,015 | WARNING |   No valid subtitles found for Hoppers
+2026-03-15 07:41:23,018 | INFO | Report saved to outputs/logs/ex05_subtitles_report.txt

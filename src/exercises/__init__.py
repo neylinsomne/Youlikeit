@@ -1,0 +1,17 @@
+from exercises import (  # noqa: F401
+    ex00_check_connections,
+    ex01_search_and_open,
+    ex02_video_metadata,
+    ex03_channel_rss_monitor,
+    ex04_discover_movies,
+    ex05_download_subtitles,
+    ex06_match_quotes,
+    ex07_search_scenes,
+    ex08_growth_pack,
+    ex09_curate_groups,
+    ex10_classify_quotes,
+    ex11_cut_video,
+    ex12_upload,
+    ex13_trend_graph,
+    ex14_davinci_edit,
+)
