@@ -14,4 +14,6 @@ from exercises import (  # noqa: F401
     ex12_upload,
     ex13_trend_graph,
     ex14_davinci_edit,
+    ex15_review_server,
+    ex16_shotcut_edit,
 )

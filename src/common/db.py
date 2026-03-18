@@ -73,6 +73,33 @@ CREATE TABLE IF NOT EXISTS youtube_existing (
     FOREIGN KEY (movie_id) REFERENCES movies(id)
 );
 
+CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    short_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',  -- pending, approved, rejected, needs_edit
+    reviewer_notes TEXT,            -- qué hizo bien o mal
+    rating INTEGER,                -- 1-5 estrellas
+    -- Frame-level issues (JSON array of {frame_ms, issue_type, description})
+    frame_issues TEXT,
+    -- What the reviewer thinks should change
+    suggested_category TEXT,
+    suggested_emotion TEXT,
+    suggested_edit_style TEXT,
+    -- Metadata
+    reviewed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (short_id) REFERENCES shorts(id)
+);
+
+CREATE TABLE IF NOT EXISTS review_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    short_id INTEGER NOT NULL,
+    action TEXT NOT NULL,           -- created, submitted_review, approved, rejected, uploaded, reedited
+    details TEXT,                   -- JSON with context
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (short_id) REFERENCES shorts(id)
+);
+
 CREATE TABLE IF NOT EXISTS url_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     movie_title TEXT NOT NULL,

@@ -17,6 +17,8 @@ from exercises import (
     ex12_upload,
     ex13_trend_graph,
     ex14_davinci_edit,
+    ex15_review_server,
+    ex16_shotcut_edit,
 )
 
 
@@ -36,6 +38,8 @@ EXERCISES = {
     "ex12": "Subir Short a YouTube (Data API v3)",
     "ex13": "Grafo de tendencias (canciones + hashtags + temas + emociones)",
     "ex14": "Edicion DaVinci Resolve (templates + spec + MCP)",
+    "ex15": "Dashboard de revision (aprobar/rechazar + feedback + frame issues)",
+    "ex16": "Edicion Shotcut (MLT XML + render CLI, gratis)",
 }
 
 
@@ -85,6 +89,11 @@ def build_parser() -> argparse.ArgumentParser:
     # ex14
     parser.add_argument("--template", default="auto", help="Template: auto, villain, romance, motivational, comedy, action, dramatic, horror (ex14)")
     parser.add_argument("--render", action="store_true", help="Lanzar render en DaVinci automaticamente (ex14)")
+    # ex15
+    parser.add_argument("--host", default="127.0.0.1", help="Host del servidor review (ex15)")
+    parser.add_argument("--port", type=int, default=8000, help="Puerto del servidor review (ex15)")
+    # ex16
+    parser.add_argument("--render-cli", action="store_true", help="Renderizar con melt CLI sin abrir Shotcut (ex16)")
 
     return parser
 
@@ -187,6 +196,19 @@ def main() -> None:
             query=args.query,
             template=args.template,
             do_render=args.render,
+        )
+    elif args.exercise == "ex15":
+        out = ex15_review_server.run(
+            settings,
+            host=args.host,
+            port=args.port,
+        )
+    elif args.exercise == "ex16":
+        out = ex16_shotcut_edit.run(
+            settings,
+            query=args.query,
+            template=args.template,
+            render_cli=args.render_cli,
         )
     else:
         raise ValueError("Ejercicio no soportado")
