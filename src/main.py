@@ -24,6 +24,8 @@ from exercises import (
     ex19_analytics,
     ex20_competitor_analysis,
     ex21_auto_adjust,
+    ex22_ab_testing,
+    ex23_stats_goals,
 )
 
 
@@ -50,6 +52,8 @@ EXERCISES = {
     "ex19": "Analytics de videos propios (views, likes, engagement, retention)",
     "ex20": "Analisis de competencia (scraping + VLM thumbnails)",
     "ex21": "Auto-ajuste de pesos y preferencias (ciclo de aprendizaje)",
+    "ex22": "A/B testing automatizado (crear, evaluar, aplicar ganador)",
+    "ex23": "Analisis estadistico + metas (regresion, varianza, information gain)",
 }
 
 
@@ -119,6 +123,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--with-vlm", action="store_true", help="Analizar thumbnails con VLM Gemini (ex20)")
     # ex21
     parser.add_argument("--min-samples", type=int, default=3, help="Minimo de muestras para ajustar (ex21)")
+    # ex22
+    parser.add_argument("--ab-action", default="auto", help="A/B action: auto, create, evaluate, list (ex22)")
+    parser.add_argument("--param", default="", help="Parametro a testear (ex22)")
+    parser.add_argument("--variant-a", default="", help="Variante A (ex22)")
+    parser.add_argument("--variant-b", default="", help="Variante B (ex22)")
+    parser.add_argument("--ab-hypothesis", default="", help="Hipotesis del test (ex22)")
+    # ex23
+    parser.add_argument("--set-goal", default="", help="Metrica para nueva meta (ex23)")
+    parser.add_argument("--goal-target", type=float, default=0, help="Valor objetivo de la meta (ex23)")
+    parser.add_argument("--deadline", default="", help="Fecha limite ISO (ex23)")
 
     return parser
 
@@ -271,6 +285,23 @@ def main() -> None:
         out = ex21_auto_adjust.run(
             settings,
             min_samples=args.min_samples,
+        )
+    elif args.exercise == "ex22":
+        out = ex22_ab_testing.run(
+            settings,
+            action=args.ab_action,
+            param=args.param,
+            variant_a=args.variant_a,
+            variant_b=args.variant_b,
+            hypothesis=args.ab_hypothesis,
+            min_samples=args.min_samples,
+        )
+    elif args.exercise == "ex23":
+        out = ex23_stats_goals.run(
+            settings,
+            set_goal_metric=args.set_goal,
+            set_goal_target=args.goal_target,
+            deadline=args.deadline,
         )
     else:
         raise ValueError("Ejercicio no soportado")

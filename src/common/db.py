@@ -169,6 +169,89 @@ CREATE TABLE IF NOT EXISTS learning_log (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    role TEXT DEFAULT 'reviewer',     -- admin, reviewer, agent
+    display_name TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    agent_name TEXT,                  -- 'claude:ab_tester', 'claude:comment_analyst', 'system'
+    action TEXT NOT NULL,             -- create, update, delete, approve, reject, test_start, test_end
+    entity_type TEXT NOT NULL,        -- short, quote, review, ab_test, goal, knowledge
+    entity_id INTEGER,
+    old_value TEXT,                   -- JSON snapshot before change
+    new_value TEXT,                   -- JSON snapshot after change
+    reason TEXT,                      -- why this action was taken
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS ab_tests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    hypothesis TEXT,                  -- "hashtags de emocion > hashtags de genero"
+    status TEXT DEFAULT 'running',    -- running, completed, cancelled
+    variant_a TEXT NOT NULL,          -- JSON: config for variant A
+    variant_b TEXT NOT NULL,          -- JSON: config for variant B
+    metric TEXT DEFAULT 'engagement_rate',  -- what we measure
+    -- Results
+    variant_a_results TEXT,           -- JSON: {n, mean, std, values}
+    variant_b_results TEXT,
+    winner TEXT,                      -- 'a', 'b', 'inconclusive'
+    p_value REAL,                     -- statistical significance
+    effect_size REAL,                 -- Cohen's d
+    confidence_interval TEXT,         -- JSON: [lower, upper]
+    -- Config
+    min_samples INTEGER DEFAULT 5,
+    significance_level REAL DEFAULT 0.05,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    created_by INTEGER,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    metric TEXT NOT NULL,             -- views_avg, engagement_rate, followers, uploads_count
+    target_value REAL NOT NULL,
+    current_value REAL DEFAULT 0,
+    baseline_value REAL DEFAULT 0,    -- where we started
+    deadline TEXT,                    -- ISO date
+    status TEXT DEFAULT 'active',     -- active, achieved, missed, revised
+    trend_slope REAL,                 -- from linear regression
+    projected_date TEXT,              -- when trend says we'll hit target
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_base (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,           -- insight, rule, pattern, mistake, success
+    topic TEXT NOT NULL,              -- hashtags, timing, editing, audience, content
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    confidence REAL DEFAULT 0.5,      -- 0-1, how sure we are
+    source TEXT,                      -- analytics, ab_test, review, competitor, manual
+    source_id INTEGER,                -- reference to the source entity
+    times_validated INTEGER DEFAULT 0,
+    times_contradicted INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- Seed default admin user
+INSERT OR IGNORE INTO users (username, role, display_name) VALUES ('admin', 'admin', 'Admin');
+INSERT OR IGNORE INTO users (username, role, display_name) VALUES ('claude:ab_tester', 'agent', 'Claude A/B Tester');
+INSERT OR IGNORE INTO users (username, role, display_name) VALUES ('claude:analyst', 'agent', 'Claude Analyst');
+INSERT OR IGNORE INTO users (username, role, display_name) VALUES ('claude:reviewer', 'agent', 'Claude Comment Reviewer');
+
 CREATE INDEX IF NOT EXISTS idx_quotes_movie ON quotes(movie_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(text);
 CREATE INDEX IF NOT EXISTS idx_movies_tmdb ON movies(tmdb_id);
@@ -176,6 +259,12 @@ CREATE INDEX IF NOT EXISTS idx_url_cache_movie ON url_cache(movie_title);
 CREATE INDEX IF NOT EXISTS idx_analytics_short ON analytics(short_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_platform ON analytics(platform);
 CREATE INDEX IF NOT EXISTS idx_competitor_hashtags ON competitor_videos(hashtags);
+CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_log(agent_name);
+CREATE INDEX IF NOT EXISTS idx_knowledge_topic ON knowledge_base(topic);
+CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge_base(category);
+CREATE INDEX IF NOT EXISTS idx_ab_tests_status ON ab_tests(status);
 """
 
 

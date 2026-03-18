@@ -87,6 +87,8 @@ Invoke-Exercise "ex17" @("--query", "`"$Query`"", "--platform", "both", "--count
 Invoke-Exercise "ex19" @("--days-back", "30")
 Invoke-Exercise "ex20" @("--query", "`"$Query`"", "--max-results", "15")
 Invoke-Exercise "ex21" @("--min-samples", "3")
+Invoke-Exercise "ex22" @("--ab-action", "auto")
+Invoke-Exercise "ex23" @()
 
 Write-Log "Flow completed successfully."
 Write-Log "Output logs: $logFile"

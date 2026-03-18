@@ -21,4 +21,6 @@ from exercises import (  # noqa: F401
     ex19_analytics,
     ex20_competitor_analysis,
     ex21_auto_adjust,
+    ex22_ab_testing,
+    ex23_stats_goals,
 )
