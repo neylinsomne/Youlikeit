@@ -19,6 +19,11 @@ from exercises import (
     ex14_davinci_edit,
     ex15_review_server,
     ex16_shotcut_edit,
+    ex17_publish_strategy,
+    ex18_narration,
+    ex19_analytics,
+    ex20_competitor_analysis,
+    ex21_auto_adjust,
 )
 
 
@@ -40,6 +45,11 @@ EXERCISES = {
     "ex14": "Edicion DaVinci Resolve (templates + spec + MCP)",
     "ex15": "Dashboard de revision (aprobar/rechazar + feedback + frame issues)",
     "ex16": "Edicion Shotcut (MLT XML + render CLI, gratis)",
+    "ex17": "Estrategia de publicacion (cruce video + tendencias + hashtags + cancion)",
+    "ex18": "Narracion reflexiva (Fish Audio S1-Mini TTS + guion LLM)",
+    "ex19": "Analytics de videos propios (views, likes, engagement, retention)",
+    "ex20": "Analisis de competencia (scraping + VLM thumbnails)",
+    "ex21": "Auto-ajuste de pesos y preferencias (ciclo de aprendizaje)",
 }
 
 
@@ -92,8 +102,23 @@ def build_parser() -> argparse.ArgumentParser:
     # ex15
     parser.add_argument("--host", default="127.0.0.1", help="Host del servidor review (ex15)")
     parser.add_argument("--port", type=int, default=8000, help="Puerto del servidor review (ex15)")
+    parser.add_argument("--lang", default="es", help="Idioma del dashboard: es, en, pt (ex15)")
     # ex16
     parser.add_argument("--render-cli", action="store_true", help="Renderizar con melt CLI sin abrir Shotcut (ex16)")
+    # ex17
+    parser.add_argument("--platform", default="both", help="Plataforma: youtube, tiktok, both (ex17)")
+    # ex18
+    parser.add_argument("--narration-style", default="reflective", help="Estilo: reflective, poetic, dramatic, casual, minimal (ex18)")
+    parser.add_argument("--voice-ref", default="", help="Ruta a audio de referencia para voice cloning (ex18)")
+    parser.add_argument("--fish-url", default="", help="URL del servidor Fish Speech (ex18)")
+    parser.add_argument("--no-llm", action="store_true", help="No usar LLM para guion, usar templates (ex18)")
+    # ex19
+    parser.add_argument("--days-back", type=int, default=30, help="Dias hacia atras para analytics (ex19)")
+    # ex20
+    parser.add_argument("--hashtags", default="", help="Hashtags separados por coma para buscar competencia (ex20)")
+    parser.add_argument("--with-vlm", action="store_true", help="Analizar thumbnails con VLM Gemini (ex20)")
+    # ex21
+    parser.add_argument("--min-samples", type=int, default=3, help="Minimo de muestras para ajustar (ex21)")
 
     return parser
 
@@ -202,6 +227,7 @@ def main() -> None:
             settings,
             host=args.host,
             port=args.port,
+            lang=args.lang,
         )
     elif args.exercise == "ex16":
         out = ex16_shotcut_edit.run(
@@ -209,6 +235,42 @@ def main() -> None:
             query=args.query,
             template=args.template,
             render_cli=args.render_cli,
+        )
+    elif args.exercise == "ex17":
+        out = ex17_publish_strategy.run(
+            settings,
+            query=args.query,
+            platform=args.platform,
+            country_code=args.country_code,
+            lang=args.lang,
+        )
+    elif args.exercise == "ex18":
+        out = ex18_narration.run(
+            settings,
+            query=args.query,
+            lang=args.lang,
+            style=args.narration_style,
+            voice_ref=args.voice_ref,
+            fish_url=args.fish_url,
+            use_llm=not args.no_llm,
+        )
+    elif args.exercise == "ex19":
+        out = ex19_analytics.run(
+            settings,
+            days_back=args.days_back,
+        )
+    elif args.exercise == "ex20":
+        out = ex20_competitor_analysis.run(
+            settings,
+            query=args.query,
+            hashtags_str=args.hashtags,
+            max_results=args.max_results,
+            with_vlm=args.with_vlm,
+        )
+    elif args.exercise == "ex21":
+        out = ex21_auto_adjust.run(
+            settings,
+            min_samples=args.min_samples,
         )
     else:
         raise ValueError("Ejercicio no soportado")

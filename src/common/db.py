@@ -108,10 +108,74 @@ CREATE TABLE IF NOT EXISTS url_cache (
     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS analytics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    short_id INTEGER NOT NULL,
+    platform TEXT NOT NULL,           -- youtube, tiktok
+    platform_video_id TEXT,           -- YouTube video ID or TikTok video ID
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    comments INTEGER DEFAULT 0,
+    shares INTEGER DEFAULT 0,
+    retention_avg REAL DEFAULT 0,     -- 0-100 avg % watched
+    retention_3s REAL DEFAULT 0,      -- % viewers still at 3s (hook effectiveness)
+    ctr REAL DEFAULT 0,               -- click-through rate from impressions
+    impressions INTEGER DEFAULT 0,
+    -- Derived metrics
+    engagement_rate REAL DEFAULT 0,   -- (likes+comments+shares) / views
+    viral_ratio REAL DEFAULT 0,       -- shares / views (how shareable)
+    -- Context
+    hashtags_used TEXT,               -- JSON array of hashtags actually used
+    song_used TEXT,                   -- song selected on platform
+    upload_time TEXT,                 -- when it was posted
+    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (short_id) REFERENCES shorts(id)
+);
+
+CREATE TABLE IF NOT EXISTS competitor_videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL,
+    platform_video_id TEXT UNIQUE,
+    channel_name TEXT,
+    title TEXT,
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    comments INTEGER DEFAULT 0,
+    duration_s REAL DEFAULT 0,
+    hashtags TEXT,                     -- JSON array
+    song TEXT,
+    -- Analysis from VLM or heuristic
+    detected_theme TEXT,
+    detected_style TEXT,              -- edit style: rapid_cut, slowmo, etc
+    detected_hook_type TEXT,          -- text, action, question, shock
+    text_on_screen INTEGER DEFAULT 0, -- 1 if has text overlay
+    face_present INTEGER DEFAULT 0,   -- 1 if face is visible
+    -- Scoring
+    engagement_rate REAL DEFAULT 0,
+    estimated_quality INTEGER DEFAULT 0,  -- 1-10
+    -- Learning
+    what_works TEXT,                   -- JSON: insights extracted
+    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS learning_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle INTEGER DEFAULT 1,          -- learning cycle number
+    metric TEXT NOT NULL,              -- what was measured
+    old_value REAL,                   -- previous value
+    new_value REAL,                   -- new value
+    adjustment TEXT,                  -- what was changed
+    reason TEXT,                      -- why
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_quotes_movie ON quotes(movie_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_text ON quotes(text);
 CREATE INDEX IF NOT EXISTS idx_movies_tmdb ON movies(tmdb_id);
 CREATE INDEX IF NOT EXISTS idx_url_cache_movie ON url_cache(movie_title);
+CREATE INDEX IF NOT EXISTS idx_analytics_short ON analytics(short_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_platform ON analytics(platform);
+CREATE INDEX IF NOT EXISTS idx_competitor_hashtags ON competitor_videos(hashtags);
 """
 
 

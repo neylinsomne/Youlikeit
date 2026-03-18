@@ -16,4 +16,9 @@ from exercises import (  # noqa: F401
     ex14_davinci_edit,
     ex15_review_server,
     ex16_shotcut_edit,
+    ex17_publish_strategy,
+    ex18_narration,
+    ex19_analytics,
+    ex20_competitor_analysis,
+    ex21_auto_adjust,
 )

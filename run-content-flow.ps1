@@ -79,7 +79,14 @@ Invoke-Exercise "ex07" @("--query", "`"$Query`"", "--max-results", "$MaxResults"
 Invoke-Exercise "ex09" @("--query", "`"$Query`"", "--max-results", "$MaxResults", "--group-size", "$GroupSize")
 Invoke-Exercise "ex11" @("--query", "`"$Query`"", "--burn-subs")
 Invoke-Exercise "ex08" @("--query", "`"$Query`"", "--country-code", "$CountryCode", "--period-days", "$PeriodDays")
+Invoke-Exercise "ex18" @("--query", "`"$Query`"", "--lang", "es", "--narration-style", "reflective")
 Invoke-Exercise "ex13" @("--query", "`"$Query`"")
+Invoke-Exercise "ex17" @("--query", "`"$Query`"", "--platform", "both", "--country-code", "$CountryCode")
+
+# Learning cycle (runs after publish, feeds back into next cycle)
+Invoke-Exercise "ex19" @("--days-back", "30")
+Invoke-Exercise "ex20" @("--query", "`"$Query`"", "--max-results", "15")
+Invoke-Exercise "ex21" @("--min-samples", "3")
 
 Write-Log "Flow completed successfully."
 Write-Log "Output logs: $logFile"
