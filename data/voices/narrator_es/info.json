@@ -1,0 +1,8 @@
+{
+  "lang": "es",
+  "source": "Don Quijote - Cervantes (LibriVox)",
+  "license": "Public Domain",
+  "url": "https://archive.org/download/donquijote_2507_librivox/donquijote_000_cervantes_64kb.mp3",
+  "format": "mp3",
+  "note": "Fish Speech S1-Mini accepts MP3 as reference audio. For best quality, convert to WAV 44100Hz mono: ffmpeg -i sample.mp3 -ar 44100 -ac 1 -t 20 sample.wav"
+}

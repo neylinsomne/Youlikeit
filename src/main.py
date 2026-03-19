@@ -30,8 +30,14 @@ from exercises import (
     ex25_algorithm_signals,
     ex26_audience_demographics,
     ex27_geo_optimization,
+    ex28_dashboard_server,
+    ex29_api_layer,
+    ex30_frontend,
     ex31_lesson_taxonomy,
+    ex32_lesson_performance,
+    ex33_curriculum_planner,
     ex34_oauth_manager,
+    ex35_data_export,
 )
 
 
@@ -64,8 +70,14 @@ EXERCISES = {
     "ex25": "Random Forest: qué señales importan para el algoritmo",
     "ex26": "ETL demographics + segmentación DBSCAN (audiencia)",
     "ex27": "Optimización geográfica de contenido (ANOVA por país)",
+    "ex28": "Dashboard analítico completo (htmx + Canvas JS)",
+    "ex29": "API REST unificada (auth token, roles, paginación)",
+    "ex30": "Frontend de gestión multi-página (htmx responsive)",
     "ex31": "Taxonomía pedagógica (tipo de aprendizaje + lección de vida)",
+    "ex32": "Rendimiento de lecciones por tipo pedagógico (ANOVA + Cohen's d)",
+    "ex33": "Planificador de curriculum con diversidad pedagógica",
     "ex34": "Verificar OAuth de YouTube (upload + analytics scopes)",
+    "ex35": "Exportar BD a CSV/JSON + backup + reporte del canal",
 }
 
 
@@ -156,6 +168,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dbscan-min-samples", type=int, default=3, help="DBSCAN min_samples (ex26)")
     # ex34
     parser.add_argument("--check-oauth", action="store_true", help="Verificar estado de OAuth (ex34)")
+    # ex33
+    parser.add_argument("--plan-size", type=int, default=10, help="Entradas en el plan de curriculum (ex33)")
+    # ex35
+    parser.add_argument("--format", default="csv", choices=["csv", "json"], help="Formato de exportación (ex35)")
+    # ex28 / ex29 / ex30 (port ya existe vía ex15)
 
     return parser
 
@@ -353,10 +370,40 @@ def main() -> None:
             batch_size=args.batch_size,
             provider=args.provider,
         )
+    elif args.exercise == "ex28":
+        out = ex28_dashboard_server.run(
+            settings,
+            host=args.host,
+            port=args.port,
+        )
+    elif args.exercise == "ex29":
+        out = ex29_api_layer.run(
+            settings,
+            host=args.host,
+            port=args.port if args.port != 8000 else 8001,
+        )
+    elif args.exercise == "ex30":
+        out = ex30_frontend.run(
+            settings,
+            host=args.host,
+            port=args.port if args.port != 8000 else 8002,
+        )
+    elif args.exercise == "ex32":
+        out = ex32_lesson_performance.run(settings)
+    elif args.exercise == "ex33":
+        out = ex33_curriculum_planner.run(
+            settings,
+            plan_size=args.plan_size,
+        )
     elif args.exercise == "ex34":
         out = ex34_oauth_manager.run(
             settings,
             check=args.check_oauth,
+        )
+    elif args.exercise == "ex35":
+        out = ex35_data_export.run(
+            settings,
+            fmt=args.format,
         )
     else:
         raise ValueError("Ejercicio no soportado")

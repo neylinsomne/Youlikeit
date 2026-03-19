@@ -27,6 +27,12 @@ from exercises import (  # noqa: F401
     ex25_algorithm_signals,
     ex26_audience_demographics,
     ex27_geo_optimization,
+    ex28_dashboard_server,
+    ex29_api_layer,
+    ex30_frontend,
     ex31_lesson_taxonomy,
+    ex32_lesson_performance,
+    ex33_curriculum_planner,
     ex34_oauth_manager,
+    ex35_data_export,
 )
