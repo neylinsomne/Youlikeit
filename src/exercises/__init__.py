@@ -23,5 +23,7 @@ from exercises import (  # noqa: F401
     ex21_auto_adjust,
     ex22_ab_testing,
     ex23_stats_goals,
+    ex24_retention_curves,
+    ex26_audience_demographics,
     ex34_oauth_manager,
 )

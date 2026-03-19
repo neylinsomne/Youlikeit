@@ -26,6 +26,8 @@ from exercises import (
     ex21_auto_adjust,
     ex22_ab_testing,
     ex23_stats_goals,
+    ex24_retention_curves,
+    ex26_audience_demographics,
     ex34_oauth_manager,
 )
 
@@ -55,6 +57,8 @@ EXERCISES = {
     "ex21": "Auto-ajuste de pesos y preferencias (ciclo de aprendizaje)",
     "ex22": "A/B testing automatizado (crear, evaluar, aplicar ganador)",
     "ex23": "Analisis estadistico + metas (regresion, varianza, information gain)",
+    "ex24": "ETL retención segundo a segundo (cliffs, hooks, plateaus)",
+    "ex26": "ETL demographics + segmentación DBSCAN (audiencia)",
     "ex34": "Verificar OAuth de YouTube (upload + analytics scopes)",
 }
 
@@ -135,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--set-goal", default="", help="Metrica para nueva meta (ex23)")
     parser.add_argument("--goal-target", type=float, default=0, help="Valor objetivo de la meta (ex23)")
     parser.add_argument("--deadline", default="", help="Fecha limite ISO (ex23)")
+    # ex34
+    # ex24
+    parser.add_argument("--video-id", default="", help="ID de video para retention (ex24)")
+    # ex26
+    parser.add_argument("--dbscan-min-samples", type=int, default=3, help="DBSCAN min_samples (ex26)")
     # ex34
     parser.add_argument("--check-oauth", action="store_true", help="Verificar estado de OAuth (ex34)")
 
@@ -306,6 +315,18 @@ def main() -> None:
             set_goal_metric=args.set_goal,
             set_goal_target=args.goal_target,
             deadline=args.deadline,
+        )
+    elif args.exercise == "ex24":
+        out = ex24_retention_curves.run(
+            settings,
+            video_id=args.video_id,
+            days_back=args.days_back,
+        )
+    elif args.exercise == "ex26":
+        out = ex26_audience_demographics.run(
+            settings,
+            days_back=args.days_back,
+            min_samples=args.dbscan_min_samples,
         )
     elif args.exercise == "ex34":
         out = ex34_oauth_manager.run(
