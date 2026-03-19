@@ -11,6 +11,7 @@ chromadb>=0.5.0
 networkx>=3.2.0
 fastapi>=0.115.0
 uvicorn>=0.32.0
-# ex12 - YouTube upload (optional, only needed for upload step)
-# google-api-python-client>=2.100.0
-# google-auth-oauthlib>=1.1.0
+# YouTube upload (ex12) + analytics (ex24, ex26)
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.2.0

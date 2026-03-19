@@ -259,12 +259,117 @@ CREATE INDEX IF NOT EXISTS idx_url_cache_movie ON url_cache(movie_title);
 CREATE INDEX IF NOT EXISTS idx_analytics_short ON analytics(short_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_platform ON analytics(platform);
 CREATE INDEX IF NOT EXISTS idx_competitor_hashtags ON competitor_videos(hashtags);
+-- Phase 2: Retention curves (ex24)
+CREATE TABLE IF NOT EXISTS retention_curves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analytics_id INTEGER NOT NULL,
+    second INTEGER NOT NULL,
+    audience_retention REAL NOT NULL,
+    quote_id INTEGER,
+    category TEXT,
+    edit_style TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (analytics_id) REFERENCES analytics(id),
+    FOREIGN KEY (quote_id) REFERENCES quotes(id)
+);
+
+-- Phase 2: Retention events (ex24)
+CREATE TABLE IF NOT EXISTS retention_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analytics_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,          -- cliff, plateau, recovery, hook_pass
+    second_start INTEGER NOT NULL,
+    second_end INTEGER,
+    magnitude REAL,
+    content_at_event TEXT,            -- JSON: {quote_id, category, emotion, scene_type}
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (analytics_id) REFERENCES analytics(id)
+);
+
+-- Phase 2: Audience demographics (ex26)
+CREATE TABLE IF NOT EXISTS audience_demographics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_date TEXT NOT NULL,
+    dimension TEXT NOT NULL,           -- age_group, gender, country
+    dimension_value TEXT NOT NULL,     -- "25-34", "female", "CO"
+    viewer_percentage REAL NOT NULL,
+    watch_time_minutes REAL DEFAULT 0,
+    views INTEGER DEFAULT 0,
+    avg_engagement REAL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Phase 2: Audience segments from DBSCAN (ex26)
+CREATE TABLE IF NOT EXISTS audience_segments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    segment_name TEXT NOT NULL,
+    core_points TEXT NOT NULL,         -- JSON: list of core point indices
+    size INTEGER DEFAULT 0,
+    noise_count INTEGER DEFAULT 0,     -- outliers detected
+    characteristics TEXT,              -- JSON: what defines this segment
+    preferred_categories TEXT,         -- JSON: top content categories
+    preferred_times TEXT,              -- JSON: best upload times
+    eps_used REAL,                    -- DBSCAN eps parameter used
+    min_samples_used INTEGER,         -- DBSCAN min_samples used
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Phase 2: API authentication tokens (ex29)
+CREATE TABLE IF NOT EXISTS user_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Phase 2: Curriculum plan (ex33)
+CREATE TABLE IF NOT EXISTS curriculum_plan (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    position INTEGER NOT NULL,
+    suggested_query TEXT NOT NULL,
+    target_learning_type TEXT,
+    target_category TEXT,
+    target_emotion TEXT,
+    rationale TEXT,
+    status TEXT DEFAULT 'planned',     -- planned, in_progress, completed, skipped
+    short_id INTEGER,
+    planned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (short_id) REFERENCES shorts(id)
+);
+
+-- Phase 2: Random Forest model snapshots (ex25)
+CREATE TABLE IF NOT EXISTS model_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_type TEXT NOT NULL,          -- random_forest, dbscan, linear_regression
+    target TEXT NOT NULL,              -- engagement_rate, impressions, retention_avg
+    feature_importances TEXT,          -- JSON: {feature: importance_score}
+    r_squared REAL,
+    r_squared_cv REAL,                -- cross-validated R²
+    residual_pattern TEXT,            -- JSON: {has_pattern, description}
+    variance_explained REAL,
+    variance_unexplained REAL,
+    n_samples INTEGER,
+    n_features INTEGER,
+    hyperparameters TEXT,             -- JSON: {n_trees, max_depth, ...}
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_log(agent_name);
 CREATE INDEX IF NOT EXISTS idx_knowledge_topic ON knowledge_base(topic);
 CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge_base(category);
 CREATE INDEX IF NOT EXISTS idx_ab_tests_status ON ab_tests(status);
+CREATE INDEX IF NOT EXISTS idx_retention_analytics ON retention_curves(analytics_id);
+CREATE INDEX IF NOT EXISTS idx_retention_second ON retention_curves(second);
+CREATE INDEX IF NOT EXISTS idx_retention_events_type ON retention_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_demographics_date ON audience_demographics(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_demographics_dim ON audience_demographics(dimension, dimension_value);
+CREATE INDEX IF NOT EXISTS idx_user_tokens ON user_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_curriculum_status ON curriculum_plan(status);
+CREATE INDEX IF NOT EXISTS idx_model_snapshots_type ON model_snapshots(model_type);
 """
 
 
@@ -274,7 +379,29 @@ def get_db(data_dir: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _migrate_columns(conn)
     return conn
+
+
+def _migrate_columns(conn: sqlite3.Connection):
+    """Add columns to existing tables (ALTER TABLE IF NOT EXISTS workaround)."""
+    migrations = [
+        # Phase 2: Lesson taxonomy columns on quotes (ex31)
+        ("quotes", "learning_type", "TEXT"),
+        ("quotes", "life_lesson", "TEXT"),
+        ("quotes", "curriculum_area", "TEXT"),
+        # Phase 2: Extra analytics columns (ex24)
+        ("analytics", "retention_curve_fetched", "INTEGER DEFAULT 0"),
+        ("analytics", "watch_time_minutes", "REAL DEFAULT 0"),
+        ("analytics", "avg_view_duration_s", "REAL DEFAULT 0"),
+        ("analytics", "subscriber_gained", "INTEGER DEFAULT 0"),
+        ("analytics", "subscriber_lost", "INTEGER DEFAULT 0"),
+    ]
+    for table, column, col_type in migrations:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
 
 def insert_movie(conn: sqlite3.Connection, **kwargs) -> int:

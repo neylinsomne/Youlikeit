@@ -26,6 +26,7 @@ from exercises import (
     ex21_auto_adjust,
     ex22_ab_testing,
     ex23_stats_goals,
+    ex34_oauth_manager,
 )
 
 
@@ -54,6 +55,7 @@ EXERCISES = {
     "ex21": "Auto-ajuste de pesos y preferencias (ciclo de aprendizaje)",
     "ex22": "A/B testing automatizado (crear, evaluar, aplicar ganador)",
     "ex23": "Analisis estadistico + metas (regresion, varianza, information gain)",
+    "ex34": "Verificar OAuth de YouTube (upload + analytics scopes)",
 }
 
 
@@ -133,6 +135,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--set-goal", default="", help="Metrica para nueva meta (ex23)")
     parser.add_argument("--goal-target", type=float, default=0, help="Valor objetivo de la meta (ex23)")
     parser.add_argument("--deadline", default="", help="Fecha limite ISO (ex23)")
+    # ex34
+    parser.add_argument("--check-oauth", action="store_true", help="Verificar estado de OAuth (ex34)")
 
     return parser
 
@@ -302,6 +306,11 @@ def main() -> None:
             set_goal_metric=args.set_goal,
             set_goal_target=args.goal_target,
             deadline=args.deadline,
+        )
+    elif args.exercise == "ex34":
+        out = ex34_oauth_manager.run(
+            settings,
+            check=args.check_oauth,
         )
     else:
         raise ValueError("Ejercicio no soportado")

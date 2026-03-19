@@ -23,4 +23,5 @@ from exercises import (  # noqa: F401
     ex21_auto_adjust,
     ex22_ab_testing,
     ex23_stats_goals,
+    ex34_oauth_manager,
 )

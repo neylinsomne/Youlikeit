@@ -30,53 +30,17 @@ from common.logger import build_logger
 
 def _find_client_secrets() -> Path | None:
     """Look for Google OAuth client_secrets.json in common locations."""
-    candidates = [
-        Path("client_secrets.json"),
-        Path("client_secret.json"),
-        Path(os.getenv("GOOGLE_CLIENT_SECRETS", "client_secrets.json")),
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    return None
+    from exercises.ex34_oauth_manager import find_client_secrets
+    return find_client_secrets()
 
 
 def _get_authenticated_service(secrets_path: Path, log):
     """
     Build an authenticated YouTube API service using OAuth 2.0.
-
-    First run opens the browser for consent. Subsequent runs use cached token.
+    Delegates to ex34_oauth_manager for unified token management.
     """
-    try:
-        from google.auth.transport.requests import Request
-        from google.oauth2.credentials import Credentials
-        from google_auth_oauthlib.flow import InstalledAppFlow
-        from googleapiclient.discovery import build
-    except ImportError:
-        log.error(
-            "Google API libraries not installed. Run:\n"
-            "  pip install google-api-python-client google-auth-oauthlib"
-        )
-        return None
-
-    SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-    token_path = secrets_path.parent / "youtube_token.json"
-
-    creds = None
-    if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(secrets_path), SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        token_path.write_text(creds.to_json(), encoding="utf-8")
-        log.info("YouTube token saved/refreshed.")
-
-    return build("youtube", "v3", credentials=creds)
+    from exercises.ex34_oauth_manager import get_youtube_service
+    return get_youtube_service(secrets_path=secrets_path, log=log)
 
 
 def _load_growth_pack(output_dir: Path, query: str) -> dict:
