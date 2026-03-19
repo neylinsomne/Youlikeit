@@ -401,6 +401,16 @@ def run(
     # ── EXTRACT ──
     tracker.extract_start()
     state = _extract_current_state(conn)
+
+    # Enrich with Google Trends (what cinema topics are hot right now)
+    try:
+        from common.trends import suggest_trending_queries
+        trending = suggest_trending_queries()
+        if trending:
+            state["trending_topics"] = trending
+            log.info("Google Trends: %d trending cinema topics found", len(trending))
+    except Exception:
+        pass
     tracker.extract_done({
         "performance_types": len(state["performance"]),
         "classified_quotes": sum(state["distribution"].values()),

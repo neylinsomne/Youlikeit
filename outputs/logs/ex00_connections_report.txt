@@ -1,0 +1,14 @@
+Connection check report
+======================
+
+YOUTUBE_API_KEY: OK | AIza...9nns
+OPENAI_API_KEY: MISSING | (vacio)
+FISH_API_KEY: MISSING | (vacio)
+PEXELS_API_KEY: MISSING | (vacio)
+TMDB_API_KEY: OK | be72...e49b
+OPENSUBTITLES_API_KEY: OK | Yym2...xwN4
+SUBDL_API_KEY: MISSING | (vacio)
+
+Notas:
+- Este chequeo valida presencia de variables, no consumo de cuota/API.
+- Guarda tus claves en .env y nunca las subas al repositorio.

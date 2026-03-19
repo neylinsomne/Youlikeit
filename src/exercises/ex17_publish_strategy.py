@@ -520,6 +520,23 @@ def run(
     manifest = _gather_manifest(settings.output_dir, query)
     reviews = _gather_review_history(conn, query)
 
+    # Google Trends: is this topic hot right now?
+    google_trends = {}
+    try:
+        from common.trends import get_topic_interest, get_cinema_trends
+        google_trends = get_topic_interest(query, geo=country_code)
+        if google_trends.get("is_hot"):
+            log.info("Google Trends: '%s' is HOT (%s, interest=%d). Good time to publish!",
+                     query, google_trends["trend_direction"], google_trends["current_interest"])
+        else:
+            trending_now = get_cinema_trends(geo=country_code, limit=5)
+            if trending_now:
+                suggestions = [t["topic"] for t in trending_now[:3]]
+                log.info("Google Trends: '%s' is not trending. Consider: %s", query, ", ".join(suggestions))
+                google_trends["alternative_topics"] = suggestions
+    except Exception as e:
+        log.info("Google Trends not available: %s", e)
+
     if not growth_pack:
         log.warning("No growth pack found. Run ex08 first for better results.")
     if not video_info.get("found"):
@@ -565,6 +582,7 @@ def run(
         "channel_profile": channel_profile,
         "video": video_info,
         "platform_strategies": strategies,
+        "google_trends": google_trends,
         "edge_weight_context": edge_ctx.to_dict(),
         "review_status": "pending",
         "reviewer_notes": None,
@@ -615,6 +633,17 @@ def run(
         lines.append(f"  Checklist:")
         for item in strat.get("checklist", []):
             lines.append(f"    [ ] {item}")
+        lines.append("")
+
+    if google_trends:
+        lines.append("--- GOOGLE TRENDS ---")
+        lines.append(f"  Topic: {google_trends.get('topic', query)}")
+        lines.append(f"  Interest: {google_trends.get('current_interest', '?')}/100")
+        lines.append(f"  Direction: {google_trends.get('trend_direction', '?')}")
+        lines.append(f"  Hot right now: {'YES — publish ASAP' if google_trends.get('is_hot') else 'No'}")
+        alt = google_trends.get("alternative_topics", [])
+        if alt:
+            lines.append(f"  Trending alternatives: {', '.join(alt)}")
         lines.append("")
 
     lines.append("--- EDGE WEIGHT CONTEXT (extensible) ---")

@@ -21,6 +21,8 @@ import math
 from datetime import datetime
 from pathlib import Path
 
+from scipy import stats as sp_stats
+
 from common.config import Settings
 from common.db import get_db
 from common.logger import build_logger
@@ -28,7 +30,7 @@ from common.websocket_hub import ETLTracker
 
 
 # ---------------------------------------------------------------------------
-# Statistics (reuse from ex23)
+# Statistics
 # ---------------------------------------------------------------------------
 
 def _mean(vals: list[float]) -> float:
@@ -36,40 +38,31 @@ def _mean(vals: list[float]) -> float:
 
 
 def _anova_f(groups: dict[str, list[float]]) -> dict:
-    """One-way ANOVA: is the difference between groups significant?"""
+    """One-way ANOVA with exact p-value via scipy."""
     all_vals = []
     for vals in groups.values():
         all_vals.extend(vals)
 
-    if len(all_vals) < 3 or len(groups) < 2:
-        return {"f_ratio": 0, "eta_squared": 0, "significant": False}
+    valid = {k: v for k, v in groups.items() if len(v) >= 2}
+
+    if len(all_vals) < 3 or len(valid) < 2:
+        return {"f_ratio": 0, "eta_squared": 0, "p_value": 1.0, "significant": False}
 
     grand_mean = _mean(all_vals)
-    k = len(groups)
-    n_total = len(all_vals)
+    ss_between = sum(len(v) * (_mean(v) - grand_mean) ** 2 for v in valid.values())
+    ss_total = sum((x - grand_mean) ** 2 for x in all_vals)
+    eta_sq = ss_between / ss_total if ss_total > 0 else 0
 
-    ss_between = sum(len(v) * (_mean(v) - grand_mean) ** 2 for v in groups.values() if v)
-    ss_within = sum(sum((x - _mean(v)) ** 2 for x in v) for v in groups.values() if len(v) >= 2)
-
-    df_b = k - 1
-    df_w = n_total - k
-
-    if df_w <= 0 or df_b <= 0 or ss_within == 0:
-        return {"f_ratio": 0, "eta_squared": 0, "significant": False}
-
-    f_ratio = (ss_between / df_b) / (ss_within / df_w)
-    eta_sq = ss_between / (ss_between + ss_within)
-
-    # Rough significance: F > 4.0 with df > 5 is usually p < 0.05
-    significant = f_ratio > 3.0 and n_total > 10
+    f_stat, p_value = sp_stats.f_oneway(*valid.values())
 
     return {
-        "f_ratio": round(f_ratio, 4),
+        "f_ratio": round(float(f_stat), 4),
+        "p_value": round(float(p_value), 6),
         "eta_squared": round(eta_sq, 4),
         "variance_explained_pct": round(eta_sq * 100, 1),
-        "significant": significant,
-        "n_groups": k,
-        "n_total": n_total,
+        "significant": float(p_value) < 0.05,
+        "n_groups": len(valid),
+        "n_total": len(all_vals),
     }
 
 
@@ -231,8 +224,9 @@ def run(settings: Settings) -> Path:
     profiles, anova = _transform_country_profiles(data, conn)
     tracker.transform_done({"countries": len(profiles), "anova_significant": anova.get("significant", False)})
 
-    log.info("Geo: %d countries. ANOVA significant: %s (F=%.2f, η²=%.3f)",
-             len(profiles), anova.get("significant"), anova.get("f_ratio", 0), anova.get("eta_squared", 0))
+    log.info("Geo: %d countries. ANOVA significant: %s (F=%.2f, p=%.4f, η²=%.3f)",
+             len(profiles), anova.get("significant"), anova.get("f_ratio", 0),
+             anova.get("p_value", 1), anova.get("eta_squared", 0))
 
     # Load
     tracker.load_start()
@@ -250,7 +244,7 @@ def run(settings: Settings) -> Path:
         "ex27 - Geographic Content Optimization",
         "=" * 50,
         f"Countries analyzed: {len(profiles)}",
-        f"ANOVA: F={anova.get('f_ratio', 0):.2f}, η²={anova.get('eta_squared', 0):.3f}",
+        f"ANOVA: F={anova.get('f_ratio', 0):.2f}, p={anova.get('p_value', 1):.4f}, η²={anova.get('eta_squared', 0):.3f}",
         f"Geography explains {anova.get('variance_explained_pct', 0)}% of engagement variance",
         f"Statistically significant: {'YES' if anova.get('significant') else 'NO'}",
         "",

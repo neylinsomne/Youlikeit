@@ -37,6 +37,8 @@ from common.logger import build_logger
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 WIKIQUOTE_API = "https://en.wikiquote.org/w/api.php"
+OMDB_BASE = "https://www.omdbapi.com"
+TRAKT_BASE = "https://api.trakt.tv"
 
 # TMDB genre IDs
 GENRE_MAP = {
@@ -154,6 +156,100 @@ def discover_now_playing(api_key: str, pages: int = 2) -> list[dict]:
 def discover_search(api_key: str, query: str, pages: int = 2) -> list[dict]:
     """Search by title, actor, director, etc."""
     return _tmdb_get(api_key, "/search/movie", {"query": query}, pages)
+
+
+# ── OMDb: enrich with IMDb/RT/Metacritic ratings (1000 req/day free) ──
+
+
+def enrich_with_omdb(movies: list[dict], log=None) -> list[dict]:
+    """Add IMDb, Rotten Tomatoes, and Metacritic ratings from OMDb."""
+    import os
+    api_key = os.getenv("OMDB_API_KEY", "")
+    if not api_key:
+        return movies
+
+    for movie in movies:
+        title = movie.get("title", "")
+        year = movie.get("year", "")
+        try:
+            resp = requests.get(OMDB_BASE, params={
+                "apikey": api_key, "t": title, "y": year, "type": "movie",
+            }, timeout=8)
+            if resp.status_code != 200:
+                continue
+            data = resp.json()
+            if data.get("Response") != "True":
+                continue
+
+            movie["imdb_rating"] = data.get("imdbRating", "N/A")
+            movie["imdb_id"] = data.get("imdbID", "")
+            movie["rotten_tomatoes"] = ""
+            movie["metacritic"] = data.get("Metascore", "N/A")
+            for rating in data.get("Ratings", []):
+                if rating["Source"] == "Rotten Tomatoes":
+                    movie["rotten_tomatoes"] = rating["Value"]
+
+            if log:
+                log.info("  OMDb: %s → IMDb=%s RT=%s MC=%s",
+                         title, movie["imdb_rating"],
+                         movie["rotten_tomatoes"], movie["metacritic"])
+        except Exception:
+            continue
+
+    return movies
+
+
+# ── Trakt: what people are watching RIGHT NOW (1000 req/5min free) ────
+
+
+def discover_trakt_trending(limit: int = 20, log=None) -> list[dict]:
+    """
+    Get movies trending on Trakt (what people are actually watching now).
+    Complements TMDB trending which is based on page views, not viewing.
+    """
+    import os
+    client_id = os.getenv("TRAKT_CLIENT_ID", "")
+    if not client_id:
+        return []
+
+    try:
+        resp = requests.get(
+            f"{TRAKT_BASE}/movies/trending",
+            headers={
+                "Content-Type": "application/json",
+                "trakt-api-version": "2",
+                "trakt-api-key": client_id,
+            },
+            params={"limit": limit},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return []
+
+        movies = []
+        for item in resp.json():
+            m = item.get("movie", {})
+            ids = m.get("ids", {})
+            tmdb_id = ids.get("tmdb")
+            if not tmdb_id:
+                continue
+            movies.append({
+                "tmdb_id": tmdb_id,
+                "title": m.get("title", ""),
+                "original_title": m.get("title", ""),
+                "year": m.get("year", 0),
+                "genre": "",
+                "popularity": item.get("watchers", 0) * 10,
+                "poster_path": "",
+                "overview": m.get("overview", ""),
+            })
+            if log:
+                log.info("  Trakt trending: %s (%d) [%d watchers]",
+                         m.get("title"), m.get("year", 0), item.get("watchers", 0))
+        return movies
+
+    except Exception:
+        return []
 
 
 # ── Wikiquote: frases celebres ────────────────────────────────────────
@@ -333,6 +429,15 @@ def run(
             report_path.write_text("\n".join(report_lines), encoding="utf-8")
             conn.close()
             return report_path
+
+        # Add Trakt trending (what people are actually watching now)
+        trakt_movies = discover_trakt_trending(limit=15, log=log)
+        if trakt_movies:
+            log.info(f"  Trakt: {len(trakt_movies)} trending movies added")
+            all_movies.extend(trakt_movies)
+
+        # Enrich with OMDb ratings (IMDb, Rotten Tomatoes, Metacritic)
+        all_movies = enrich_with_omdb(all_movies[:max_movies * 2], log=log)
 
         log.info(f"  Total raw results: {len(all_movies)}")
     else:

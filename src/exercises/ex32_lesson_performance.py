@@ -15,8 +15,13 @@ Preguntas que responde:
   3. ¿Hay tipos de lección que causan más "cliffs" (caídas de retención)?
   4. ¿La emoción + tipo de lección interactúan? (e.g., ethics+anger vs ethics+sadness)
 
-Usa ANOVA de una vía (desde cero) para significancia estadística.
-Cohen's d para tamaño del efecto.
+Pipeline estadístico:
+  1. Shapiro-Wilk → ¿los datos son normales?
+  2. Si sí → ANOVA (scipy.stats.f_oneway) + eta²
+     Si no → Kruskal-Wallis (alternativa no paramétrica)
+  3. Si significativo → post-hoc pairwise con corrección Bonferroni
+  4. Cohen's d para tamaño del efecto en cada par significativo
+  5. Intervalos de confianza al 95%
 
 Uso:
   python src/main.py ex32
@@ -29,6 +34,8 @@ import math
 from datetime import datetime
 from pathlib import Path
 
+from scipy import stats as sp_stats
+
 from common.config import Settings
 from common.db import get_db
 from common.logger import build_logger
@@ -36,7 +43,7 @@ from common.websocket_hub import ETLTracker
 
 
 # ---------------------------------------------------------------------------
-# Statistical helpers (sin sklearn/scipy)
+# Statistical helpers
 # ---------------------------------------------------------------------------
 
 def _mean(values: list[float]) -> float:
@@ -55,7 +62,7 @@ def _std(values: list[float]) -> float:
 
 
 def _cohens_d(group_a: list[float], group_b: list[float]) -> float:
-    """Effect size: Cohen's d between two groups."""
+    """Effect size: Cohen's d (pooled std) between two groups."""
     if len(group_a) < 2 or len(group_b) < 2:
         return 0.0
     m1, m2 = _mean(group_a), _mean(group_b)
@@ -67,152 +74,148 @@ def _cohens_d(group_a: list[float], group_b: list[float]) -> float:
     return (m1 - m2) / pooled_std
 
 
-def _one_way_anova(groups: dict[str, list[float]]) -> dict:
-    """
-    One-way ANOVA from scratch.
+def _effect_label(d: float) -> str:
+    ad = abs(d)
+    if ad >= 0.8:
+        return "large"
+    if ad >= 0.5:
+        return "medium"
+    if ad >= 0.2:
+        return "small"
+    return "negligible"
 
-    Returns: {f_statistic, p_approx, significant, groups_n, grand_mean}
 
-    p_approx uses the F-distribution approximation via the incomplete beta
-    function. For small samples this is approximate but sufficient for
-    our use case (deciding if lesson type matters for retention).
+def _confidence_interval_95(values: list[float]) -> tuple[float, float]:
+    """95% CI for the mean using t-distribution."""
+    if len(values) < 2:
+        return (_mean(values), _mean(values))
+    n = len(values)
+    m = _mean(values)
+    se = _std(values) / math.sqrt(n)
+    t_crit = sp_stats.t.ppf(0.975, df=n - 1)
+    return (round(m - t_crit * se, 4), round(m + t_crit * se, 4))
+
+
+def _test_normality(values: list[float]) -> tuple[bool, float]:
+    """Shapiro-Wilk normality test. Returns (is_normal, p_value)."""
+    if len(values) < 8:
+        return True, 1.0  # Too few samples — assume normal (conservative)
+    _, p = sp_stats.shapiro(values)
+    return p > 0.05, round(p, 4)
+
+
+def _omnibus_test(groups: dict[str, list[float]]) -> dict:
     """
+    Proper omnibus test with assumption checking.
+
+    1. Check normality per group (Shapiro-Wilk)
+    2. If normal → one-way ANOVA (parametric) + eta²
+       If not → Kruskal-Wallis (non-parametric)
+    3. Report both F/H statistic, p-value, effect size
+    """
+    valid = {k: v for k, v in groups.items() if len(v) >= 2}
     all_values = []
-    for vals in groups.values():
-        all_values.extend(vals)
+    for v in valid.values():
+        all_values.extend(v)
 
-    if len(all_values) < 3 or len(groups) < 2:
-        return {"f_statistic": 0, "p_approx": 1.0, "significant": False,
-                "groups_n": {k: len(v) for k, v in groups.items()},
-                "grand_mean": _mean(all_values)}
+    if len(all_values) < 3 or len(valid) < 2:
+        return {
+            "test": "none", "statistic": 0, "p_value": 1.0,
+            "significant": False, "eta_squared": 0,
+            "groups_n": {k: len(v) for k, v in groups.items()},
+            "grand_mean": round(_mean(all_values), 4),
+        }
 
+    # Check normality in each group
+    normality_ok = True
+    normality_details = {}
+    for name, vals in valid.items():
+        is_normal, p = _test_normality(vals)
+        normality_details[name] = {"normal": is_normal, "shapiro_p": p}
+        if not is_normal:
+            normality_ok = False
+
+    lists = list(valid.values())
+
+    if normality_ok:
+        # Parametric: one-way ANOVA (exact p-value via scipy)
+        f_stat, p_value = sp_stats.f_oneway(*lists)
+        test_name = "anova"
+        statistic = float(f_stat)
+    else:
+        # Non-parametric: Kruskal-Wallis
+        h_stat, p_value = sp_stats.kruskal(*lists)
+        test_name = "kruskal_wallis"
+        statistic = float(h_stat)
+
+    p_value = float(p_value)
+
+    # Effect size: eta² = SS_between / SS_total
     grand_mean = _mean(all_values)
-    k = len(groups)  # number of groups
-    n_total = len(all_values)
-
-    # Between-group sum of squares (SSB)
-    ssb = sum(
-        len(vals) * (_mean(vals) - grand_mean) ** 2
-        for vals in groups.values()
-        if vals
+    ss_between = sum(
+        len(v) * (_mean(v) - grand_mean) ** 2
+        for v in valid.values()
     )
-
-    # Within-group sum of squares (SSW)
-    ssw = sum(
-        sum((x - _mean(vals)) ** 2 for x in vals)
-        for vals in groups.values()
-        if vals
-    )
-
-    df_between = k - 1
-    df_within = n_total - k
-
-    if df_within <= 0 or ssw == 0:
-        return {"f_statistic": 0, "p_approx": 1.0, "significant": False,
-                "groups_n": {k_: len(v) for k_, v in groups.items()},
-                "grand_mean": grand_mean}
-
-    msb = ssb / df_between
-    msw = ssw / df_within
-    f_stat = msb / msw
-
-    # Approximate p-value using the relationship between F and Beta distributions
-    # P(F > f) ≈ 1 - I_x(a, b) where x = a*f/(a*f+b), a = df1/2, b = df2/2
-    # For simplicity, use a threshold-based approach
-    # F critical values (approx) for common df combinations at alpha=0.05
-    p_approx = _f_to_p_approx(f_stat, df_between, df_within)
+    ss_total = sum((x - grand_mean) ** 2 for x in all_values)
+    eta_sq = ss_between / ss_total if ss_total > 0 else 0
 
     return {
-        "f_statistic": round(f_stat, 4),
-        "p_approx": round(p_approx, 4),
-        "significant": p_approx < 0.05,
-        "df_between": df_between,
-        "df_within": df_within,
-        "ssb": round(ssb, 4),
-        "ssw": round(ssw, 4),
-        "groups_n": {k_: len(v) for k_, v in groups.items()},
+        "test": test_name,
+        "statistic": round(statistic, 4),
+        "p_value": round(p_value, 6),
+        "significant": p_value < 0.05,
+        "eta_squared": round(eta_sq, 4),
+        "variance_explained_pct": round(eta_sq * 100, 1),
+        "normality_assumed": normality_ok,
+        "normality_details": normality_details,
+        "groups_n": {k: len(v) for k, v in valid.items()},
         "grand_mean": round(grand_mean, 4),
+        "n_total": len(all_values),
     }
 
 
-def _f_to_p_approx(f: float, df1: int, df2: int) -> float:
+def _pairwise_posthoc(groups: dict[str, list[float]], alpha: float = 0.05) -> list[dict]:
     """
-    Approximate p-value for F-statistic using the regularized incomplete
-    beta function via continued fraction expansion.
+    Pairwise comparisons with Bonferroni correction.
+
+    For each pair of groups with n >= 2:
+      - Welch's t-test (does not assume equal variances)
+      - Cohen's d effect size
+      - Bonferroni-adjusted p-value
     """
-    if f <= 0:
-        return 1.0
-    x = df2 / (df2 + df1 * f)
-    a = df2 / 2.0
-    b = df1 / 2.0
-    # I_x(a, b) = regularized incomplete beta function
-    return _regularized_beta(x, a, b)
+    valid = {k: v for k, v in groups.items() if len(v) >= 2}
+    names = sorted(valid.keys())
+    n_comparisons = len(names) * (len(names) - 1) // 2
 
+    if n_comparisons == 0:
+        return []
 
-def _regularized_beta(x: float, a: float, b: float, max_iter: int = 200) -> float:
-    """Regularized incomplete beta function via Lentz's continued fraction."""
-    if x <= 0:
-        return 0.0
-    if x >= 1:
-        return 1.0
+    results = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a_name, b_name = names[i], names[j]
+            a_vals, b_vals = valid[a_name], valid[b_name]
 
-    # Use the log-beta for the prefactor
-    ln_prefix = (
-        a * math.log(x) + b * math.log(1 - x)
-        - math.log(a)
-        - _log_beta(a, b)
-    )
-    prefix = math.exp(ln_prefix)
+            t_stat, p_raw = sp_stats.ttest_ind(a_vals, b_vals, equal_var=False)
+            p_adj = min(1.0, p_raw * n_comparisons)  # Bonferroni
 
-    # Continued fraction (Lentz's method)
-    tiny = 1e-30
-    f_cf = 1.0 + tiny
-    c = f_cf
-    d = 0.0
+            d = _cohens_d(a_vals, b_vals)
 
-    for m in range(1, max_iter + 1):
-        # Even step
-        numerator = _beta_cf_coeff(m, a, b, x, even=True)
-        d = 1.0 + numerator * d
-        if abs(d) < tiny:
-            d = tiny
-        d = 1.0 / d
-        c = 1.0 + numerator / c
-        if abs(c) < tiny:
-            c = tiny
-        f_cf *= c * d
+            results.append({
+                "group_a": a_name,
+                "group_b": b_name,
+                "t_statistic": round(float(t_stat), 4),
+                "p_raw": round(float(p_raw), 6),
+                "p_adjusted": round(p_adj, 6),
+                "significant": p_adj < alpha,
+                "cohens_d": round(d, 3),
+                "effect": _effect_label(d),
+                "mean_a": round(_mean(a_vals), 2),
+                "mean_b": round(_mean(b_vals), 2),
+            })
 
-        # Odd step
-        numerator = _beta_cf_coeff(m, a, b, x, even=False)
-        d = 1.0 + numerator * d
-        if abs(d) < tiny:
-            d = tiny
-        d = 1.0 / d
-        c = 1.0 + numerator / c
-        if abs(c) < tiny:
-            c = tiny
-        delta = c * d
-        f_cf *= delta
-
-        if abs(delta - 1.0) < 1e-10:
-            break
-
-    return prefix * (f_cf - 1.0)
-
-
-def _beta_cf_coeff(m: int, a: float, b: float, x: float, even: bool) -> float:
-    """Coefficients for the continued fraction expansion of I_x(a,b)."""
-    if even:
-        k = m
-        return (k * (b - k) * x) / ((a + 2 * k - 1) * (a + 2 * k))
-    else:
-        k = m - 1
-        return -((a + k) * (a + b + k) * x) / ((a + 2 * k) * (a + 2 * k + 1))
-
-
-def _log_beta(a: float, b: float) -> float:
-    """Log of Beta function: ln(B(a,b)) = ln(Γ(a)) + ln(Γ(b)) - ln(Γ(a+b))."""
-    return math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+    results.sort(key=lambda x: x["p_adjusted"])
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -467,51 +470,54 @@ def _transform_interactions(enriched: list[dict]) -> list[dict]:
     return results
 
 
-def _transform_anova_tests(groups_by_lt: dict) -> dict:
-    """Run ANOVA tests on retention and engagement by learning_type."""
-    # ANOVA on retention
+def _transform_statistical_tests(groups_by_lt: dict) -> dict:
+    """
+    Full statistical pipeline on retention and engagement by learning_type.
+
+    1. Omnibus test (ANOVA or Kruskal-Wallis depending on normality)
+    2. Post-hoc pairwise comparisons with Bonferroni correction
+    3. 95% confidence intervals per group
+    """
+    # Omnibus on retention
     retention_groups = {
         lt: g["retention_values"]
         for lt, g in groups_by_lt.items()
         if len(g["retention_values"]) >= 2
     }
-    anova_retention = _one_way_anova(retention_groups)
+    omnibus_retention = _omnibus_test(retention_groups)
 
-    # ANOVA on engagement
+    # Omnibus on engagement
     engagement_groups = {
         lt: g["engagement_values"]
         for lt, g in groups_by_lt.items()
         if len(g["engagement_values"]) >= 2
     }
-    anova_engagement = _one_way_anova(engagement_groups)
+    omnibus_engagement = _omnibus_test(engagement_groups)
 
-    # Pairwise Cohen's d for top vs bottom learning types (by retention)
-    sorted_types = sorted(
-        groups_by_lt.items(),
-        key=lambda x: x[1]["avg_retention"],
-        reverse=True,
-    )
-    pairwise = []
-    if len(sorted_types) >= 2:
-        top_lt, top_g = sorted_types[0]
-        bot_lt, bot_g = sorted_types[-1]
-        if top_g["retention_values"] and bot_g["retention_values"]:
-            d = _cohens_d(top_g["retention_values"], bot_g["retention_values"])
-            pairwise.append({
-                "comparison": f"{top_lt} vs {bot_lt}",
-                "cohens_d": round(d, 3),
-                "effect": (
-                    "large" if abs(d) >= 0.8 else
-                    "medium" if abs(d) >= 0.5 else
-                    "small" if abs(d) >= 0.2 else
-                    "negligible"
-                ),
-            })
+    # Post-hoc pairwise (only if omnibus is significant)
+    posthoc_retention = []
+    if omnibus_retention.get("significant"):
+        posthoc_retention = _pairwise_posthoc(retention_groups)
+
+    posthoc_engagement = []
+    if omnibus_engagement.get("significant"):
+        posthoc_engagement = _pairwise_posthoc(engagement_groups)
+
+    # 95% CIs per group
+    cis = {}
+    for lt, g in groups_by_lt.items():
+        cis[lt] = {}
+        if len(g["retention_values"]) >= 2:
+            cis[lt]["retention_ci"] = _confidence_interval_95(g["retention_values"])
+        if len(g["engagement_values"]) >= 2:
+            cis[lt]["engagement_ci"] = _confidence_interval_95(g["engagement_values"])
 
     return {
-        "anova_retention": anova_retention,
-        "anova_engagement": anova_engagement,
-        "pairwise_effects": pairwise,
+        "omnibus_retention": omnibus_retention,
+        "omnibus_engagement": omnibus_engagement,
+        "posthoc_retention": posthoc_retention,
+        "posthoc_engagement": posthoc_engagement,
+        "confidence_intervals": cis,
     }
 
 
@@ -519,7 +525,7 @@ def _transform_anova_tests(groups_by_lt: dict) -> dict:
 # LOAD
 # ---------------------------------------------------------------------------
 
-def _load_insights(conn, groups_by_lt: dict, anova: dict, interactions: list[dict]):
+def _load_insights(conn, groups_by_lt: dict, test_results: dict, interactions: list[dict]):
     """Save insights to knowledge_base."""
     # Best and worst learning types
     sorted_types = sorted(
@@ -531,6 +537,7 @@ def _load_insights(conn, groups_by_lt: dict, anova: dict, interactions: list[dic
 
     if with_data:
         best_lt, best_g = with_data[0]
+        ci = test_results.get("confidence_intervals", {}).get(best_lt, {})
         conn.execute("""
             INSERT INTO knowledge_base (category, topic, title, content, confidence, source)
             VALUES ('insight', 'pedagogy', ?, ?, ?, 'lesson_performance')
@@ -542,6 +549,7 @@ def _load_insights(conn, groups_by_lt: dict, anova: dict, interactions: list[dic
                 "avg_engagement": best_g["avg_engagement"],
                 "sample_size": best_g["with_metrics"],
                 "hook_pass_rate": best_g["hook_pass_rate"],
+                "retention_95ci": ci.get("retention_ci"),
             }, ensure_ascii=False),
             min(0.9, 0.5 + best_g["with_metrics"] * 0.05),
         ))
@@ -562,15 +570,29 @@ def _load_insights(conn, groups_by_lt: dict, anova: dict, interactions: list[dic
             min(0.9, 0.5 + worst_g["with_metrics"] * 0.05),
         ))
 
-    # ANOVA result
-    if anova.get("anova_retention", {}).get("significant"):
+    # Omnibus test result
+    omnibus = test_results.get("omnibus_retention", {})
+    if omnibus.get("significant"):
+        test_name = omnibus["test"].upper()
         conn.execute("""
             INSERT INTO knowledge_base (category, topic, title, content, confidence, source)
             VALUES ('insight', 'pedagogy', ?, ?, 0.8, 'lesson_performance')
         """, (
-            "Lesson type significantly affects retention (ANOVA p < 0.05)",
-            json.dumps(anova["anova_retention"], ensure_ascii=False),
+            f"Lesson type significantly affects retention ({test_name} p={omnibus['p_value']:.4f})",
+            json.dumps(omnibus, ensure_ascii=False, default=str),
         ))
+
+    # Significant pairwise differences
+    for ph in test_results.get("posthoc_retention", []):
+        if ph["significant"] and abs(ph["cohens_d"]) >= 0.2:
+            conn.execute("""
+                INSERT INTO knowledge_base (category, topic, title, content, confidence, source)
+                VALUES ('insight', 'pedagogy', ?, ?, ?, 'lesson_performance')
+            """, (
+                f"{ph['group_a']} vs {ph['group_b']}: d={ph['cohens_d']:.2f} ({ph['effect']})",
+                json.dumps(ph, ensure_ascii=False),
+                min(0.9, 0.5 + (1.0 - ph["p_adjusted"]) * 0.4),
+            ))
 
     # Best interaction
     if interactions:
@@ -626,8 +648,8 @@ def run(settings: Settings) -> Path:
     interactions = _transform_interactions(enriched)
     tracker.transform_progress(3, 4, "interactions")
 
-    anova = _transform_anova_tests(groups_by_lt)
-    tracker.transform_progress(4, 4, "ANOVA tests")
+    test_results = _transform_statistical_tests(groups_by_lt)
+    tracker.transform_progress(4, 4, "statistical tests")
 
     tracker.transform_done({
         "learning_types": len(groups_by_lt),
@@ -637,7 +659,7 @@ def run(settings: Settings) -> Path:
 
     # ── LOAD ──
     tracker.load_start()
-    _load_insights(conn, groups_by_lt, anova, interactions)
+    _load_insights(conn, groups_by_lt, test_results, interactions)
     conn.commit()
     tracker.load_done({"insights_saved": True})
 
@@ -646,6 +668,8 @@ def run(settings: Settings) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     report_path = out_dir / f"ex32_lesson_performance_{ts}.txt"
+
+    cis = test_results.get("confidence_intervals", {})
 
     lines = [
         "ex32 - Lesson Performance Report",
@@ -663,11 +687,14 @@ def run(settings: Settings) -> Path:
     )
     for lt, g in sorted_lt:
         bar = "█" * max(1, int(g["avg_retention"] / 5))
+        ci_str = ""
+        ci_data = cis.get(lt, {}).get("retention_ci")
+        if ci_data:
+            ci_str = f"  CI=[{ci_data[0]:.1f},{ci_data[1]:.1f}]"
         lines.append(
             f"  {lt:25s}  n={g['count']:3d}  "
-            f"ret={g['avg_retention']:5.1f}%  "
+            f"ret={g['avg_retention']:5.1f}% ±{g['std_retention']:.1f}{ci_str}  "
             f"eng={g['avg_engagement']:.4f}  "
-            f"views={g['avg_views']:7.0f}  "
             f"cliffs={g['avg_cliffs']:.1f}  "
             f"hook={g['hook_pass_rate']:4.0f}%  {bar}"
         )
@@ -695,28 +722,50 @@ def run(settings: Settings) -> Path:
             f"n={ix['n']:3d}  ret={ix['avg_retention']:5.1f}% ± {ix['std_retention']:.1f}"
         )
 
+    # --- Statistical Tests (proper) ---
     lines.append("")
     lines.append("─── Statistical Tests ───")
-    ar = anova.get("anova_retention", {})
-    lines.append(f"  ANOVA (retention by learning_type):")
-    lines.append(f"    F = {ar.get('f_statistic', 0):.4f},  p ≈ {ar.get('p_approx', 1):.4f}")
-    lines.append(f"    Significant: {'YES' if ar.get('significant') else 'NO'} (α = 0.05)")
 
-    ae = anova.get("anova_engagement", {})
-    lines.append(f"  ANOVA (engagement by learning_type):")
-    lines.append(f"    F = {ae.get('f_statistic', 0):.4f},  p ≈ {ae.get('p_approx', 1):.4f}")
-    lines.append(f"    Significant: {'YES' if ae.get('significant') else 'NO'} (α = 0.05)")
+    or_ = test_results.get("omnibus_retention", {})
+    test_label = or_.get("test", "none").replace("_", " ").upper()
+    lines.append(f"  Omnibus test (retention ~ learning_type): {test_label}")
+    lines.append(f"    Statistic = {or_.get('statistic', 0):.4f},  p = {or_.get('p_value', 1):.6f}")
+    lines.append(f"    Significant: {'YES' if or_.get('significant') else 'NO'} (α = 0.05)")
+    lines.append(f"    η² = {or_.get('eta_squared', 0):.4f} ({or_.get('variance_explained_pct', 0):.1f}% variance explained)")
+    lines.append(f"    Normality assumed: {'YES' if or_.get('normality_assumed') else 'NO → used Kruskal-Wallis'}")
 
-    for pw in anova.get("pairwise_effects", []):
-        lines.append(f"  Cohen's d ({pw['comparison']}): {pw['cohens_d']:.3f} ({pw['effect']})")
+    oe = test_results.get("omnibus_engagement", {})
+    test_label_e = oe.get("test", "none").replace("_", " ").upper()
+    lines.append(f"  Omnibus test (engagement ~ learning_type): {test_label_e}")
+    lines.append(f"    Statistic = {oe.get('statistic', 0):.4f},  p = {oe.get('p_value', 1):.6f}")
+    lines.append(f"    Significant: {'YES' if oe.get('significant') else 'NO'} (α = 0.05)")
+
+    # Post-hoc
+    ph_ret = test_results.get("posthoc_retention", [])
+    if ph_ret:
+        sig_pairs = [p for p in ph_ret if p["significant"]]
+        lines.append("")
+        lines.append(f"  Post-hoc pairwise (Bonferroni, {len(ph_ret)} comparisons):")
+        if sig_pairs:
+            for p in sig_pairs:
+                lines.append(
+                    f"    {p['group_a']:20s} vs {p['group_b']:20s}  "
+                    f"p_adj={p['p_adjusted']:.4f}  d={p['cohens_d']:+.2f} ({p['effect']})  "
+                    f"({p['mean_a']:.1f}% vs {p['mean_b']:.1f}%)"
+                )
+        else:
+            lines.append("    No pairwise differences survive Bonferroni correction")
 
     lines.append("")
     lines.append("─── What We Don't Know ───")
     no_metrics = len(enriched) - len(with_metrics)
     lines.append(f"  Quotes without metrics: {no_metrics} ({no_metrics/len(enriched)*100:.0f}%)")
-    if not ar.get("significant"):
-        lines.append("  ANOVA not significant: lesson type may NOT affect retention with current data")
+    if not or_.get("significant"):
+        lines.append("  Omnibus test not significant: lesson type may NOT affect retention with current data")
         lines.append("  → Need more published shorts with diverse learning types")
+    if or_.get("eta_squared", 0) < 0.06 and or_.get("significant"):
+        lines.append(f"  η² = {or_['eta_squared']:.3f} (small effect) → statistically significant but practically weak")
+        lines.append("  → The difference exists but may not justify changing content strategy")
     small_groups = [lt for lt, g in groups_by_lt.items() if g["with_metrics"] < 3]
     if small_groups:
         lines.append(f"  Small sample groups (<3): {', '.join(small_groups)}")
@@ -726,7 +775,8 @@ def run(settings: Settings) -> Path:
 
     tracker.complete({
         "learning_types": len(groups_by_lt),
-        "anova_significant": ar.get("significant", False),
+        "omnibus_significant": or_.get("significant", False),
+        "test_used": or_.get("test", "none"),
     })
 
     conn.close()

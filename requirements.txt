@@ -9,9 +9,16 @@ pysubs2>=1.7.0
 rapidfuzz>=3.6.0
 chromadb>=0.5.0
 networkx>=3.2.0
+scipy>=1.14.0
 fastapi>=0.115.0
 uvicorn>=0.32.0
 # YouTube upload (ex12) + analytics (ex24, ex26)
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.2.0
+# LLM local (fallback offline para ex10, ex18, ex31)
+airllm>=2.11.0
+# Subtítulos locales (fallback cuando se acaban las 20 descargas/día)
+openai-whisper>=20240930
+# Google Trends para contenido trend-aware (ex17, ex33)
+pytrends>=4.9.0

@@ -5,7 +5,13 @@ Flujo:
   1. Lee peliculas sin subtitulos de la BD
   2. Intenta OpenSubtitles API (20 descargas/dia gratis)
   3. Fallback: SubDL API (20 descargas/dia gratis)
-  4. Guarda el .srt en data/raw/srt/ y registra en BD
+  4. Fallback: Whisper (local GPU, sin limite, genera desde audio)
+  5. Guarda el .srt en data/raw/srt/ y registra en BD
+
+Whisper elimina el cuello de botella de 20 descargas/dia:
+  - Descarga el audio del trailer/clip con yt-dlp
+  - Whisper transcribe con timestamps exactos
+  - Genera .srt directamente, sin API externa
 
 Uso:
   python main.py ex05
@@ -154,6 +160,95 @@ def save_srt(content: str, srt_dir: Path, movie_title: str, tmdb_id: int) -> Pat
     return srt_path
 
 
+# ── Whisper local transcription (unlimited, no API key) ──────────────
+
+
+def _whisper_transcribe(title: str, tmdb_id: int, srt_dir: Path, log) -> str | None:
+    """
+    Download trailer audio via yt-dlp, transcribe with Whisper.
+
+    Returns SRT content as string, or None if it fails.
+    This is the unlimited fallback — no API key, no daily limit.
+    """
+    import subprocess
+    import tempfile
+
+    try:
+        import whisper
+    except ImportError:
+        return None
+
+    # 1. Search YouTube for the movie trailer
+    search_query = f"{title} official trailer"
+    audio_path = None
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio_file = Path(tmpdir) / "audio.wav"
+
+            # yt-dlp: download audio only, first result from search
+            result = subprocess.run(
+                [
+                    "yt-dlp",
+                    f"ytsearch1:{search_query}",
+                    "--extract-audio",
+                    "--audio-format", "wav",
+                    "--audio-quality", "5",
+                    "--max-downloads", "1",
+                    "--no-playlist",
+                    "--output", str(audio_file).replace(".wav", ".%(ext)s"),
+                    "--quiet",
+                ],
+                capture_output=True, text=True, timeout=60,
+            )
+
+            # Find the downloaded file (yt-dlp may change extension)
+            wav_files = list(Path(tmpdir).glob("audio.*"))
+            if not wav_files:
+                log.warning(f"  Whisper: no audio downloaded for '{title}'")
+                return None
+
+            audio_path = wav_files[0]
+
+            # 2. Transcribe with Whisper
+            model_size = os.getenv("WHISPER_MODEL", "base")
+            model = whisper.load_model(model_size)
+            result = whisper.transcribe(model, str(audio_path), language="en")
+
+            # 3. Convert to SRT format
+            segments = result.get("segments", [])
+            if not segments:
+                return None
+
+            srt_lines = []
+            for i, seg in enumerate(segments, 1):
+                start = _seconds_to_srt_time(seg["start"])
+                end = _seconds_to_srt_time(seg["end"])
+                text = seg["text"].strip()
+                srt_lines.append(f"{i}")
+                srt_lines.append(f"{start} --> {end}")
+                srt_lines.append(text)
+                srt_lines.append("")
+
+            return "\n".join(srt_lines)
+
+    except subprocess.TimeoutExpired:
+        log.warning(f"  Whisper: yt-dlp timeout for '{title}'")
+        return None
+    except Exception as e:
+        log.warning(f"  Whisper: error for '{title}': {e}")
+        return None
+
+
+def _seconds_to_srt_time(seconds: float) -> str:
+    """Convert seconds to SRT timestamp format: HH:MM:SS,mmm"""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    ms = int((seconds % 1) * 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
 # ── Entry point ───────────────────────────────────────────────────────
 
 
@@ -195,18 +290,28 @@ def run(settings: Settings, max_downloads: int = 10) -> Path:
     os_client = OpenSubtitlesClient(os_api_key, os_username, os_password) if os_api_key else None
     subdl_client = SubDLClient(subdl_api_key) if subdl_api_key else None
 
-    if not os_client and not subdl_client:
-        log.error("No subtitle API keys found. Set OPENSUBTITLES_API_KEY or SUBDL_API_KEY in .env")
-        report_lines.append("ERROR: No subtitle API keys configured.")
-        report_lines.append("Set OPENSUBTITLES_API_KEY or SUBDL_API_KEY in your .env file.")
-        report_lines.append("")
-        report_lines.append("To get free API keys:")
-        report_lines.append("  OpenSubtitles: https://www.opensubtitles.com/consumers")
-        report_lines.append("  SubDL: https://subdl.com/panel/api")
+    # Check if Whisper is available as fallback
+    whisper_available = False
+    try:
+        import whisper as _whisper_check
+        whisper_available = True
+    except ImportError:
+        pass
+
+    if not os_client and not subdl_client and not whisper_available:
+        log.error("No subtitle source available. Set OPENSUBTITLES_API_KEY, SUBDL_API_KEY, or pip install openai-whisper")
+        report_lines.append("ERROR: No subtitle source configured.")
+        report_lines.append("Options (any one):")
+        report_lines.append("  1. Set OPENSUBTITLES_API_KEY in .env (20/day free)")
+        report_lines.append("  2. Set SUBDL_API_KEY in .env (20/day free)")
+        report_lines.append("  3. pip install openai-whisper (unlimited, local GPU)")
         report_path = settings.output_dir / "logs" / "ex05_subtitles_report.txt"
         report_path.write_text("\n".join(report_lines), encoding="utf-8")
         conn.close()
         return report_path
+
+    if not os_client and not subdl_client:
+        log.info("No API keys configured. Using Whisper (local GPU) for all subtitles.")
 
     downloaded = 0
     failed = 0
@@ -245,6 +350,16 @@ def run(settings: Settings, max_downloads: int = 10) -> Path:
                     log.info(f"  SubDL: downloaded")
             except Exception as e:
                 log.warning(f"  SubDL failed: {e}")
+
+        # Fallback to Whisper: download trailer audio, transcribe locally
+        if not srt_content and whisper_available:
+            try:
+                srt_content = _whisper_transcribe(title, tmdb_id, srt_dir, log)
+                if srt_content:
+                    source = "whisper"
+                    log.info(f"  Whisper: transcribed from trailer")
+            except Exception as e:
+                log.warning(f"  Whisper failed: {e}")
 
         if srt_content and validate_srt(srt_content):
             srt_path = save_srt(srt_content, srt_dir, title, tmdb_id)

@@ -245,51 +245,12 @@ Respond in JSON array format:
 
 Only narration segments, not the clips. Keep it SHORT - this is a 30 second video."""
 
-    # Try Groq first, then Gemini
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    # Use unified LLM provider (airllm → Groq → Gemini)
+    from common.llm_provider import LLMProvider
+    llm = LLMProvider()
+    result = llm.generate_json(prompt, task_type="narration", max_tokens=500)
 
-    result = None
-
-    if groq_key:
-        try:
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.8,
-                    "max_tokens": 500,
-                },
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"]
-                # Extract JSON from response
-                match = re.search(r"\[.*\]", content, re.DOTALL)
-                if match:
-                    result = json.loads(match.group())
-        except Exception:
-            pass
-
-    if not result and gemini_key:
-        try:
-            resp = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                headers={"Content-Type": "application/json"},
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                content = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                match = re.search(r"\[.*\]", content, re.DOTALL)
-                if match:
-                    result = json.loads(match.group())
-        except Exception:
-            pass
-
-    if not result:
+    if not result or not isinstance(result, list):
         # Fallback to heuristic
         return _generate_script_heuristic(clips, query, lang, style, emotion)
 
@@ -588,7 +549,9 @@ def run(
     log.info("Found %d clips, dominant emotion: %s", len(clips), emotion)
 
     # 2) Generate narration script
-    if use_llm and (os.getenv("GROQ_API_KEY") or os.getenv("GEMINI_API_KEY")):
+    from common.llm_provider import LLMProvider
+    _llm_check = LLMProvider()
+    if use_llm and _llm_check.is_available():
         log.info("Generating script with LLM...")
         segments = _generate_script_llm(clips, query, lang, style, emotion)
     else:

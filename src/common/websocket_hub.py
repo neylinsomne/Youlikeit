@@ -59,6 +59,7 @@ def notify(source: str, stage: str, data: dict | None = None):
     _event_buffer.append(event)
 
     # Try to push to connected WebSocket clients
+    global _ws_clients
     if _ws_clients:
         msg = json.dumps(event, ensure_ascii=False)
         disconnected = set()

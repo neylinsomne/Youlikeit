@@ -9,7 +9,7 @@ Objetivo:
 
 APIs gratuitas soportadas (en orden de prioridad):
   1. Groq  (llama3-8b): 30 req/min, gratis, rapido
-  2. Gemini (gemini-2.0-flash): 15 req/min gratis
+  2. Gemini (gemini-2.5-flash): 15 req/min gratis
   3. Ollama local: sin limite, necesita GPU
 
 Uso:
@@ -78,9 +78,9 @@ def _call_groq(prompt: str, api_key: str) -> str:
 
 
 def _call_gemini(prompt: str, api_key: str) -> str:
-    """Call Gemini API (free: 15 req/min, gemini-2.0-flash)."""
+    """Call Gemini API (free: 15 req/min, gemini-2.5-flash)."""
     resp = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
         headers={"Content-Type": "application/json"},
         json={"contents": [{"parts": [{"text": prompt}]}]},
         timeout=30,
@@ -320,44 +320,26 @@ def run(
 
     log.info(f"Classifying {len(quotes)} quotes...")
 
-    # Detect provider
+    # Detect provider - unified LLM provider with project context
+    from common.llm_provider import LLMProvider
+    llm = LLMProvider(settings, conn=conn, preferred_provider=provider if provider != "auto" else "auto")
+
     call_fn = None
     provider_name = provider
 
-    if provider == "auto":
-        groq_key = os.getenv("GROQ_API_KEY", "")
-        gemini_key = os.getenv("GEMINI_API_KEY", "")
-
-        if groq_key:
-            call_fn = lambda p: _call_groq(p, groq_key)
-            provider_name = "groq"
-        elif gemini_key:
-            call_fn = lambda p: _call_gemini(p, gemini_key)
-            provider_name = "gemini"
-        else:
-            # Try Ollama
-            try:
-                requests.get("http://localhost:11434/api/tags", timeout=3)
-                call_fn = lambda p: _call_ollama(p, ollama_model)
-                provider_name = "ollama"
-            except Exception:
-                provider_name = "heuristic"
-    elif provider == "groq":
-        key = os.getenv("GROQ_API_KEY", "")
-        if key:
-            call_fn = lambda p, k=key: _call_groq(p, k)
-        else:
-            log.warning("GROQ_API_KEY not set, falling back to heuristic")
-            provider_name = "heuristic"
-    elif provider == "gemini":
-        key = os.getenv("GEMINI_API_KEY", "")
-        if key:
-            call_fn = lambda p, k=key: _call_gemini(p, k)
-        else:
-            log.warning("GEMINI_API_KEY not set, falling back to heuristic")
-            provider_name = "heuristic"
+    if provider == "heuristic":
+        provider_name = "heuristic"
     elif provider == "ollama":
         call_fn = lambda p: _call_ollama(p, ollama_model)
+        provider_name = "ollama"
+    elif llm.is_available():
+        # Use unified provider (airllm → groq → gemini cascade)
+        call_fn = lambda p: llm.generate(p, task_type="classification", max_tokens=300)
+        available = llm.available_providers()
+        provider_name = available[0] if available else "heuristic"
+        if not available:
+            call_fn = None
+            provider_name = "heuristic"
     else:
         provider_name = "heuristic"
 

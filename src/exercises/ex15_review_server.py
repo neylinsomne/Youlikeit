@@ -136,6 +136,18 @@ I18N = {
 
 # ── HTML Template ────────────────────────────────────────────────────
 
+def _render_lang_buttons(lang: str) -> str:
+    """Render language switcher buttons (extracted for Python 3.10 compat)."""
+    buttons = []
+    for l in I18N.keys():
+        active = " active" if l == lang else ""
+        buttons.append(
+            '<button class="lang-btn' + active + '" '
+            "onclick=\"switchLang('" + l + "')\">" + l.upper() + "</button>"
+        )
+    return "".join(buttons)
+
+
 def _build_html(lang: str = "es") -> str:
     """Build the review HTML with i18n strings injected."""
     t = I18N.get(lang, I18N["es"])
@@ -244,7 +256,7 @@ def _build_html(lang: str = "es") -> str:
             <h1>{t['title']}</h1>
             <div class="lang-switcher">
                 <label>{t['lang_label']}:</label>
-                {''.join(f'<button class="lang-btn {" active" if l == lang else ""}" onclick="switchLang(\\'{l}\\')">{l.upper()}</button>' for l in I18N.keys())}
+                {_render_lang_buttons(lang)}
             </div>
         </div>
         <div class="stats" id="stats"></div>

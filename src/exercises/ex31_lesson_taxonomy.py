@@ -182,18 +182,13 @@ def _classify_heuristic(quote: dict) -> dict:
     }
 
 
-def _classify_llm_batch(quotes: list[dict], provider: str = "auto") -> list[dict]:
-    """Classify quotes using LLM (Groq or Gemini)."""
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
+def _classify_llm_batch(quotes: list[dict], provider: str = "auto", conn=None, settings=None) -> list[dict]:
+    """Classify quotes using unified LLM provider (airllm → Groq → Gemini)."""
+    from common.llm_provider import LLMProvider
+    llm = LLMProvider(settings, conn=conn, preferred_provider=provider if provider != "auto" else "auto")
 
-    if provider == "auto":
-        if groq_key:
-            provider = "groq"
-        elif gemini_key:
-            provider = "gemini"
-        else:
-            return [_classify_heuristic(q) for q in quotes]
+    if not llm.is_available():
+        return [_classify_heuristic(q) for q in quotes]
 
     # Build prompt
     quotes_text = "\n".join(
@@ -224,46 +219,9 @@ Rules:
 - Write life_lesson in Spanish
 - Be concise"""
 
-    result = None
+    result = llm.generate_json(prompt, task_type="lesson", max_tokens=1000)
 
-    if provider == "groq" and groq_key:
-        try:
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.5,
-                    "max_tokens": 1000,
-                },
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"]
-                match = re.search(r"\[.*\]", content, re.DOTALL)
-                if match:
-                    result = json.loads(match.group())
-        except Exception:
-            pass
-
-    if not result and provider == "gemini" and gemini_key:
-        try:
-            resp = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                headers={"Content-Type": "application/json"},
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                content = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                match = re.search(r"\[.*\]", content, re.DOTALL)
-                if match:
-                    result = json.loads(match.group())
-        except Exception:
-            pass
-
-    if not result:
+    if not result or not isinstance(result, list):
         return [_classify_heuristic(q) for q in quotes]
 
     # Map LLM results to quotes
@@ -345,7 +303,7 @@ def run(
         if provider == "heuristic":
             clfs = [_classify_heuristic(q) for q in batch]
         else:
-            clfs = _classify_llm_batch(batch, provider)
+            clfs = _classify_llm_batch(batch, provider, conn=conn, settings=settings)
 
         all_classifications.extend(clfs)
 

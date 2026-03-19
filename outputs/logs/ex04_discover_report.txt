@@ -1,0 +1,18 @@
+ex04 - Discover Movies & Quotes
+========================================
+
+Mode: trending
+Movies discovered: 5
+
+Movies found:
+  1. Project Hail Mary (2026)
+  2. War Machine (2026)
+  3. "Wuthering Heights" (2026)
+  4. Scream 7 (2026)
+  5. Zootopia 2 (2025)
+
+Quotes extracted: 130
+
+Total movies in DB: 5
+Total quotes in DB: 130
+Quotes with timestamps: 0
