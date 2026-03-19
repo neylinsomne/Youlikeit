@@ -27,7 +27,10 @@ from exercises import (
     ex22_ab_testing,
     ex23_stats_goals,
     ex24_retention_curves,
+    ex25_algorithm_signals,
     ex26_audience_demographics,
+    ex27_geo_optimization,
+    ex31_lesson_taxonomy,
     ex34_oauth_manager,
 )
 
@@ -58,7 +61,10 @@ EXERCISES = {
     "ex22": "A/B testing automatizado (crear, evaluar, aplicar ganador)",
     "ex23": "Analisis estadistico + metas (regresion, varianza, information gain)",
     "ex24": "ETL retención segundo a segundo (cliffs, hooks, plateaus)",
+    "ex25": "Random Forest: qué señales importan para el algoritmo",
     "ex26": "ETL demographics + segmentación DBSCAN (audiencia)",
+    "ex27": "Optimización geográfica de contenido (ANOVA por país)",
+    "ex31": "Taxonomía pedagógica (tipo de aprendizaje + lección de vida)",
     "ex34": "Verificar OAuth de YouTube (upload + analytics scopes)",
 }
 
@@ -142,6 +148,10 @@ def build_parser() -> argparse.ArgumentParser:
     # ex34
     # ex24
     parser.add_argument("--video-id", default="", help="ID de video para retention (ex24)")
+    # ex25
+    parser.add_argument("--n-trees", type=int, default=30, help="Arboles en Random Forest (ex25)")
+    parser.add_argument("--max-depth", type=int, default=5, help="Profundidad maxima del arbol (ex25)")
+    parser.add_argument("--target", default="impressions", help="Variable objetivo: impressions, views (ex25)")
     # ex26
     parser.add_argument("--dbscan-min-samples", type=int, default=3, help="DBSCAN min_samples (ex26)")
     # ex34
@@ -322,11 +332,26 @@ def main() -> None:
             video_id=args.video_id,
             days_back=args.days_back,
         )
+    elif args.exercise == "ex25":
+        out = ex25_algorithm_signals.run(
+            settings,
+            target=args.target,
+            n_trees=args.n_trees,
+            max_depth=args.max_depth,
+        )
     elif args.exercise == "ex26":
         out = ex26_audience_demographics.run(
             settings,
             days_back=args.days_back,
             min_samples=args.dbscan_min_samples,
+        )
+    elif args.exercise == "ex27":
+        out = ex27_geo_optimization.run(settings)
+    elif args.exercise == "ex31":
+        out = ex31_lesson_taxonomy.run(
+            settings,
+            batch_size=args.batch_size,
+            provider=args.provider,
         )
     elif args.exercise == "ex34":
         out = ex34_oauth_manager.run(

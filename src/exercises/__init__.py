@@ -24,6 +24,9 @@ from exercises import (  # noqa: F401
     ex22_ab_testing,
     ex23_stats_goals,
     ex24_retention_curves,
+    ex25_algorithm_signals,
     ex26_audience_demographics,
+    ex27_geo_optimization,
+    ex31_lesson_taxonomy,
     ex34_oauth_manager,
 )
