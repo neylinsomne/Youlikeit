@@ -147,7 +147,129 @@ def _find_latest_manifest(manifests_dir: Path, query: str = "") -> Path | None:
     return candidates[0] if candidates else None
 
 
-# ── YouTube search + download ────────────────────────────────────────
+# ── Local movie file search ─────────────────────────────────────────
+
+
+def _find_local_movie(movie_title: str, year: int = 0, log=None) -> Path | None:
+    """
+    Search for a movie file in MOVIES_DIR by title.
+
+    Searches for common video formats (.mp4, .mkv, .avi, .mov, .webm).
+    Matches by fuzzy title comparison to handle naming variations like:
+      "The Godfather (1972).mkv"
+      "Godfather.1972.BluRay.mkv"
+      "the_godfather.mp4"
+    Also searches subdirectories for series:
+      "Breaking Bad/S01E01.mkv"
+    """
+    movies_dir = os.getenv("MOVIES_DIR", "")
+    if not movies_dir:
+        return None
+
+    movies_path = Path(movies_dir)
+    if not movies_path.exists():
+        return None
+
+    # Normalize title for matching
+    title_lower = movie_title.lower().strip()
+    # Remove common prefixes/suffixes
+    title_clean = re.sub(r"[^a-z0-9\s]", "", title_lower).strip()
+    title_words = set(title_clean.split())
+
+    video_exts = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"}
+    best_match = None
+    best_score = 0
+
+    for video_file in movies_path.rglob("*"):
+        if video_file.suffix.lower() not in video_exts:
+            continue
+        if not video_file.is_file():
+            continue
+
+        fname = video_file.stem.lower()
+        fname_clean = re.sub(r"[^a-z0-9\s]", " ", fname).strip()
+        fname_words = set(fname_clean.split())
+
+        # Score: how many title words appear in the filename
+        common = title_words & fname_words
+        if not common:
+            continue
+
+        score = len(common) / max(len(title_words), 1)
+
+        # Bonus for year match
+        if year and str(year) in fname:
+            score += 0.3
+
+        # Bonus for exact title in filename
+        if title_clean in fname_clean:
+            score += 0.5
+
+        if score > best_score:
+            best_score = score
+            best_match = video_file
+
+    if best_match and best_score >= 0.5:
+        if log:
+            log.info("  Local source: %s (score=%.2f)", best_match.name, best_score)
+        return best_match
+
+    return None
+
+
+def _cut_from_local(
+    movie_path: Path,
+    start_ms: int,
+    end_ms: int,
+    output_path: Path,
+    log,
+    context_before_ms: int = 2000,
+    context_after_ms: int = 2000,
+) -> bool:
+    """
+    Cut a clip from a local movie file using FFmpeg.
+
+    This is the precise cut — timestamps from .srt match the actual movie file
+    perfectly, so there's zero mismatch.
+    """
+    start_s = max(0, start_ms - context_before_ms) / 1000.0
+    end_s = (end_ms + context_after_ms) / 1000.0
+    duration = end_s - start_s
+
+    if duration <= 0 or duration > 120:
+        if log:
+            log.warning("  Invalid duration: %.1fs (start=%.1f, end=%.1f)", duration, start_s, end_s)
+        return False
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{start_s:.3f}",
+        "-i", str(movie_path),
+        "-t", f"{duration:.3f}",
+        "-c:v", "copy",     # No re-encode for speed (re-encode later in normalize)
+        "-c:a", "copy",
+        "-avoid_negative_ts", "make_zero",
+        str(output_path),
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1000:
+            if log:
+                log.info("  Cut from local: %.1fs-%.1fs (%.1fs) → %s",
+                         start_s, end_s, duration, output_path.name)
+            return True
+        if log:
+            log.warning("  FFmpeg cut failed: %s", result.stderr[:200])
+    except Exception as e:
+        if log:
+            log.warning("  Cut error: %s", e)
+    return False
+
+
+# ── YouTube search + download (fallback) ───────────────────────────
 
 
 def _search_youtube_url(movie_title: str, quote_text: str, conn=None) -> str | None:
@@ -519,13 +641,38 @@ def run(
         quote_text = clip.get("quote", "")
         start_ms = clip.get("start_ms", 0)
         end_ms = clip.get("end_ms", 0)
+        year = clip.get("year", 0)
+        ctx_before = clip.get("context_before_ms", 2000)
+        ctx_after = clip.get("context_after_ms", 2000)
         safe_movie = re.sub(r"[^a-zA-Z0-9_-]+", "_", movie_title)[:30]
         clip_name = f"clip_{i:02d}_{safe_movie}"
         raw_path = work_dir / f"{clip_name}_raw.mp4"
 
-        if raw_path.exists():
+        if raw_path.exists() and raw_path.stat().st_size > 1000:
             return i, clip_name, raw_path, "cached"
 
+        # Priority 1: Local movie file (exact timestamps, best quality)
+        # Checks MOVIES_DIR for downloaded movies. If not found,
+        # tries to download via qBittorrent + Torrentio (free).
+        tmdb_id = clip.get("tmdb_id", 0)
+        if start_ms and end_ms:
+            try:
+                from common.movie_source import download_movie, find_local_movie
+
+                # Check local first, then try downloading
+                local = find_local_movie(movie_title, year=year)
+                if not local and tmdb_id:
+                    local = download_movie(tmdb_id, movie_title, year=year, log=log, wait=False)
+
+                if local:
+                    ok = _cut_from_local(local, start_ms, end_ms, raw_path, log,
+                                         context_before_ms=ctx_before, context_after_ms=ctx_after)
+                    if ok:
+                        return i, clip_name, raw_path, "local"
+            except Exception as e:
+                log.warning("  Movie source error: %s", e)
+
+        # Priority 2: YouTube search + download (fallback, timestamps may not match)
         url = _search_youtube_url(movie_title, quote_text, conn)
         if not url:
             return i, clip_name, None, "no source"

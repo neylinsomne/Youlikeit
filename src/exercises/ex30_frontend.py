@@ -170,6 +170,43 @@ def _html(title, content, page):
 # Page builders
 # ---------------------------------------------------------------------------
 
+def _build_trends_carousel(conn) -> str:
+    """Build a scrollable carousel of trending cinema topics."""
+    try:
+        cur = conn.execute("""
+            SELECT topic, interest, rising, snapshot_date
+            FROM trending_topics
+            WHERE snapshot_date >= date('now', '-7 days')
+            ORDER BY snapshot_date DESC, interest DESC
+            LIMIT 20
+        """)
+        trends = [dict(r) for r in cur.fetchall()]
+    except Exception:
+        trends = []
+
+    if not trends:
+        return ""
+
+    items = ""
+    for t in trends:
+        fire = " 🔥" if t["rising"] else ""
+        items += (
+            f'<div style="flex:0 0 auto;padding:0.5rem 1rem;background:var(--accent);'
+            f'color:#fff;border-radius:20px;font-size:0.8rem;white-space:nowrap">'
+            f'{t["topic"]}{fire} <span style="opacity:0.7">({t["interest"]})</span></div>'
+        )
+
+    last_date = trends[0]["snapshot_date"] if trends else ""
+    return f"""
+    <div class="card" style="overflow:hidden">
+        <h3>Trending en Cine <span style="font-weight:normal;font-size:0.75rem;color:var(--text2)">({last_date})</span></h3>
+        <div style="display:flex;gap:0.5rem;overflow-x:auto;padding:0.5rem 0;scrollbar-width:thin">
+            {items}
+        </div>
+    </div>
+    """
+
+
 def _home(conn):
     stats = {}
     for t in ["movies", "quotes", "shorts"]:
@@ -182,8 +219,11 @@ def _home(conn):
     cur = conn.execute("SELECT COUNT(*) as n FROM curriculum_plan WHERE status = 'planned'")
     stats["planned"] = cur.fetchone()["n"]
 
+    trends_carousel = _build_trends_carousel(conn)
+
     return f"""
     <h1>Pipeline Home</h1>
+    {trends_carousel}
     <div class="grid-3">
         <div class="card stat"><div class="num">{stats['movies']}</div><div class="label">Películas</div></div>
         <div class="card stat"><div class="num">{stats['quotes']}</div><div class="label">Quotes totales</div></div>

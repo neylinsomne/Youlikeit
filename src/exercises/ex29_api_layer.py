@@ -454,6 +454,188 @@ def build_app(settings: Settings):
             params = ()
         return _paginate(query, params, conn, page, per_page)
 
+    # --- Pipeline execution (trigger from frontend) ---
+
+    @app.post("/api/pipeline/run")
+    def run_pipeline(
+        request: dict,
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        """Trigger a pipeline run from the frontend."""
+        import subprocess, json, threading
+        pipeline = request.get("pipeline", "manga")
+        params = request.get("params", {})
+
+        # Record the run
+        cur = conn.execute(
+            """INSERT INTO pipeline_runs (pipeline, trigger, params)
+               VALUES (?, 'frontend', ?)""",
+            (pipeline, json.dumps(params)),
+        )
+        conn.commit()
+        run_id = cur.lastrowid
+
+        # Build command
+        cmd_parts = ["python", "src/main.py"]
+        if pipeline == "manga":
+            cmd_parts += ["ex36", "--media-type", params.get("media_type", "all"),
+                         "--max-movies", str(params.get("max_series", 15))]
+        elif pipeline == "movies":
+            cmd_parts += ["ex04", "--max-movies", str(params.get("max_movies", 12)),
+                         "--mode", params.get("mode", "trending")]
+        elif pipeline == "learn":
+            cmd_parts += ["ex31", "--batch-size", "50"]
+
+        def _run_in_background(run_id, cmd_parts, data_dir):
+            import sqlite3
+            c = sqlite3.connect(str(data_dir / "shorts_pipeline.db"))
+            try:
+                subprocess.run(cmd_parts, capture_output=True, timeout=300)
+                c.execute("UPDATE pipeline_runs SET status='completed', finished_at=CURRENT_TIMESTAMP WHERE id=?", (run_id,))
+            except Exception as e:
+                c.execute("UPDATE pipeline_runs SET status='failed', finished_at=CURRENT_TIMESTAMP WHERE id=?", (run_id,))
+            c.commit()
+            c.close()
+
+        t = threading.Thread(target=_run_in_background, args=(run_id, cmd_parts, settings.data_dir))
+        t.daemon = True
+        t.start()
+
+        return {"run_id": run_id, "pipeline": pipeline, "status": "started"}
+
+    @app.get("/api/pipeline/runs")
+    def list_pipeline_runs(
+        page: int = Query(1, ge=1),
+        per_page: int = Query(20, ge=1, le=50),
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        return _paginate(
+            "SELECT * FROM pipeline_runs ORDER BY started_at DESC",
+            (), conn, page, per_page,
+        )
+
+    # --- Clip Library ---
+
+    @app.get("/api/clips")
+    def list_clips(
+        page: int = Query(1, ge=1),
+        per_page: int = Query(20, ge=1, le=50),
+        category: str = "",
+        source_type: str = "",
+        search: str = "",
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        """List clips from the library with optional filters."""
+        conditions = []
+        params = []
+        if category:
+            conditions.append("category = ?")
+            params.append(category)
+        if source_type:
+            conditions.append("source_type = ?")
+            params.append(source_type)
+        if search:
+            conditions.append("(title LIKE ? OR description LIKE ? OR tags LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+
+        where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        return _paginate(
+            f"SELECT * FROM clip_library{where} ORDER BY times_used DESC, created_at DESC",
+            tuple(params), conn, page, per_page,
+        )
+
+    @app.get("/api/clips/{clip_id}/usage")
+    def clip_usage(clip_id: int, conn=Depends(get_conn), user=Depends(get_current_user)):
+        """Show which shorts used this clip."""
+        cur = conn.execute(
+            """SELECT sc.*, s.title as short_title, s.status as short_status
+               FROM short_clips sc
+               JOIN shorts s ON sc.short_id = s.id
+               WHERE sc.clip_id = ?
+               ORDER BY sc.created_at DESC""",
+            (clip_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    @app.get("/api/clips/search")
+    def search_clips_semantic(
+        q: str = Query("", description="Semantic search query"),
+        limit: int = Query(10, ge=1, le=50),
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        """Semantic search across clip library using ChromaDB."""
+        if not q:
+            return []
+        try:
+            import chromadb
+            client = chromadb.PersistentClient(path=str(settings.data_dir / "chroma"))
+            collection = client.get_or_create_collection("clip_library")
+            results = collection.query(query_texts=[q], n_results=limit)
+            clip_ids = [int(cid) for cid in (results.get("ids", [[]])[0])]
+            if not clip_ids:
+                return []
+            placeholders = ",".join("?" * len(clip_ids))
+            cur = conn.execute(
+                f"SELECT * FROM clip_library WHERE id IN ({placeholders})",
+                clip_ids,
+            )
+            return [dict(r) for r in cur.fetchall()]
+        except Exception:
+            # Fallback to text search
+            cur = conn.execute(
+                """SELECT * FROM clip_library
+                   WHERE title LIKE ? OR description LIKE ? OR tags LIKE ?
+                   ORDER BY times_used DESC LIMIT ?""",
+                (f"%{q}%", f"%{q}%", f"%{q}%", limit),
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+    # --- Manga-specific endpoints ---
+
+    @app.get("/api/manga/series")
+    def list_manga_series(
+        page: int = Query(1, ge=1),
+        per_page: int = Query(20, ge=1, le=50),
+        media_type: str = "",
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        if media_type:
+            return _paginate(
+                "SELECT * FROM manga_series WHERE media_type = ? ORDER BY composite_score DESC",
+                (media_type,), conn, page, per_page,
+            )
+        return _paginate(
+            "SELECT * FROM manga_series ORDER BY composite_score DESC",
+            (), conn, page, per_page,
+        )
+
+    @app.get("/api/manga/quotes")
+    def list_manga_quotes(
+        page: int = Query(1, ge=1),
+        per_page: int = Query(20, ge=1, le=50),
+        category: str = "",
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        if category:
+            return _paginate(
+                """SELECT mq.*, ms.title as series_title
+                   FROM manga_quotes mq JOIN manga_series ms ON mq.series_id = ms.id
+                   WHERE mq.category = ? ORDER BY mq.viral_score DESC""",
+                (category,), conn, page, per_page,
+            )
+        return _paginate(
+            """SELECT mq.*, ms.title as series_title
+               FROM manga_quotes mq JOIN manga_series ms ON mq.series_id = ms.id
+               ORDER BY mq.viral_score DESC""",
+            (), conn, page, per_page,
+        )
+
     return app
 
 

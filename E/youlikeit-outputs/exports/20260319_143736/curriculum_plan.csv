@@ -1,0 +1,16 @@
+id,position,suggested_query,target_learning_type,target_category,target_emotion,rationale,status,short_id,planned_at
+1,1,plot twist revelación,critical_thinking,dramatic,surprise,diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500,planned,,2026-03-19 07:28:32
+2,2,despedida conmovedora,emotional_intelligence,romance,sadness,diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500,planned,,2026-03-19 07:28:32
+3,3,corrupción poder,ethics,villain,anger,diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500,planned,,2026-03-19 07:28:32
+4,4,solución ingeniosa,creativity,comedy,joy,diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500,planned,,2026-03-19 07:28:32
+5,5,villano tiene razón,critical_thinking,villain,surprise,diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500,planned,,2026-03-19 07:28:32
+6,6,momento emotivo,emotional_intelligence,dramatic,sadness,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:41:34
+7,7,sacrificio heroico,ethics,action,anger,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:41:34
+8,8,improvisación genial,creativity,comedy,joy,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:41:34
+9,9,momento de verdad consigo mismo,self_awareness,dramatic,neutral,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:41:34
+10,10,despedida conmovedora,emotional_intelligence,romance,sadness,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:41:34
+11,11,corrupción poder,ethics,villain,anger,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:41:34
+12,12,solución ingeniosa,creativity,comedy,joy,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:41:34
+13,13,momento emotivo,emotional_intelligence,dramatic,sadness,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:44:13
+14,14,sacrificio heroico,ethics,action,anger,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:44:13
+15,15,improvisación genial,creativity,comedy,joy,diversity_score=0.50 | coverage_gap=1.00 | total_score=0.625,planned,,2026-03-19 07:44:13

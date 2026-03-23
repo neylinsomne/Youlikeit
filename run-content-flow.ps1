@@ -98,3 +98,12 @@ Invoke-Exercise "ex33" @()
 
 Write-Log "Flow completed successfully."
 Write-Log "Output logs: $logFile"
+
+# Sync outputs to USB E: (if connected)
+if (Test-Path "E:\") {
+    Write-Log "Syncing outputs to USB E:..."
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "sync-to-usb.ps1")
+    Write-Log "USB sync done."
+} else {
+    Write-Log "USB E: not connected, skipping sync."
+}

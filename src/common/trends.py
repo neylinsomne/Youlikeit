@@ -182,3 +182,51 @@ def suggest_trending_queries(geo: str = "") -> list[str]:
     """
     trends = get_cinema_trends(geo=geo, limit=8)
     return [t["topic"] for t in trends if t.get("interest", 0) > 20]
+
+
+def save_trends_to_db(conn, geo: str = "") -> int:
+    """
+    Fetch cinema trends and save daily snapshot to DB.
+    Returns number of topics saved.
+    """
+    from datetime import date
+
+    today = date.today().isoformat()
+
+    # Check if already saved today
+    cur = conn.execute(
+        "SELECT COUNT(*) as n FROM trending_topics WHERE snapshot_date = ? AND geo = ?",
+        (today, geo),
+    )
+    if cur.fetchone()[0] > 0:
+        return 0  # Already saved today
+
+    trends = get_cinema_trends(geo=geo, limit=15)
+    if not trends:
+        return 0
+
+    for t in trends:
+        conn.execute("""
+            INSERT INTO trending_topics (topic, interest, rising, geo, snapshot_date)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            t["topic"],
+            t.get("interest", 0),
+            1 if t.get("rising") else 0,
+            geo,
+            today,
+        ))
+    conn.commit()
+    return len(trends)
+
+
+def get_recent_trends_from_db(conn, days: int = 7, geo: str = "") -> list[dict]:
+    """Get trending topics from the last N days for display."""
+    cur = conn.execute("""
+        SELECT topic, interest, rising, snapshot_date
+        FROM trending_topics
+        WHERE geo = ?
+          AND snapshot_date >= date('now', ?)
+        ORDER BY snapshot_date DESC, interest DESC
+    """, (geo, f"-{days} days"))
+    return [dict(r) for r in cur.fetchall()]

@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import requests
+from common.http_client import get_session
 
 if TYPE_CHECKING:
     import sqlite3
@@ -374,13 +375,14 @@ def _generate_groq(
     user_prompt: str,
     max_tokens: int = 300,
 ) -> str | None:
-    """Generate via Groq API (free tier)."""
+    """Generate via Groq API (free tier) with session reuse + retry."""
     key = os.getenv("GROQ_API_KEY", "")
     if not key:
         return None
 
+    session = get_session("groq")
     try:
-        resp = requests.post(
+        resp = session.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={
@@ -396,6 +398,26 @@ def _generate_groq(
         )
         if resp.status_code == 200:
             return resp.json()["choices"][0]["message"]["content"]
+        if resp.status_code == 429:
+            import logging, time
+            logging.getLogger(__name__).warning("Groq rate limited, waiting 5s")
+            time.sleep(5)
+            resp = session.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "temperature": 0.6,
+                    "max_tokens": max_tokens,
+                },
+                timeout=20,
+            )
+            if resp.status_code == 200:
+                return resp.json()["choices"][0]["message"]["content"]
     except Exception:
         pass
     return None
@@ -406,13 +428,14 @@ def _generate_gemini(
     user_prompt: str,
     max_tokens: int = 300,
 ) -> str | None:
-    """Generate via Gemini API (free tier)."""
+    """Generate via Gemini API (free tier) with session reuse + retry."""
     key = os.getenv("GEMINI_API_KEY", "")
     if not key:
         return None
 
+    session = get_session("gemini")
     try:
-        resp = requests.post(
+        resp = session.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}",
             headers={"Content-Type": "application/json"},
             json={
@@ -424,6 +447,23 @@ def _generate_gemini(
         )
         if resp.status_code == 200:
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        if resp.status_code == 429:
+            import logging, time
+            retry_after = float(resp.headers.get("Retry-After", 10))
+            logging.getLogger(__name__).warning(f"Gemini rate limited, waiting {retry_after}s")
+            time.sleep(retry_after)
+            resp = session.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "systemInstruction": {"parts": [{"text": system_prompt}]},
+                    "contents": [{"parts": [{"text": user_prompt}]}],
+                    "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.6},
+                },
+                timeout=20,
+            )
+            if resp.status_code == 200:
+                return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
     except Exception:
         pass
     return None

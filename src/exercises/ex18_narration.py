@@ -429,6 +429,61 @@ def _check_fish_speech_available(api_url: str) -> bool:
         return False
 
 
+def _synthesize_edge_tts(text: str, output_path: Path, lang: str = "en") -> dict:
+    """Synthesize speech using edge-tts (Microsoft, free, no API key)."""
+    import asyncio
+    import edge_tts
+
+    # Voice selection by language
+    voice_map = {
+        "en": "en-US-AndrewMultilingualNeural",
+        "es": "es-CO-GonzaloNeural",
+        "pt": "pt-BR-AntonioNeural",
+        "ja": "ja-JP-KeitaNeural",
+    }
+    voice = voice_map.get(lang, "en-US-AndrewMultilingualNeural")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    mp3_path = output_path.with_suffix(".mp3")
+
+    try:
+        async def _do_tts():
+            communicate = edge_tts.Communicate(text, voice, rate="-10%", pitch="-5Hz")
+            await communicate.save(str(mp3_path))
+
+        asyncio.run(_do_tts())
+
+        # Convert mp3 to wav for pipeline compatibility
+        import subprocess
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(mp3_path), "-ar", "44100", "-ac", "1", str(output_path)],
+            capture_output=True, timeout=15,
+        )
+        mp3_path.unlink(missing_ok=True)
+
+        # Get duration
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(output_path)],
+            capture_output=True, text=True, timeout=10,
+        )
+        duration = float(result.stdout.strip()) if result.stdout.strip() else 2.0
+
+        return {
+            "success": True,
+            "placeholder": False,
+            "path": str(output_path),
+            "duration_s": duration,
+            "text": text,
+            "lang": lang,
+            "voice": voice,
+            "engine": "edge-tts",
+        }
+    except Exception as e:
+        log.warning(f"edge-tts failed: {e}. Falling back to silent placeholder.")
+        return _generate_placeholder_wav(output_path)
+
+
 def _generate_placeholder_wav(output_path: Path, duration_s: float = 2.0, sample_rate: int = 44100) -> dict:
     """
     Generate a silent WAV placeholder when Fish Speech is not available.
@@ -577,6 +632,16 @@ def run(
 
     voice_ref_path = voice_ref if voice_ref else os.getenv("VOICE_REF_PATH", "")
 
+    # Check if edge-tts is available as fallback
+    edge_tts_available = False
+    if not fish_available:
+        try:
+            import edge_tts
+            edge_tts_available = True
+            log.info("Using edge-tts (Microsoft TTS) for narration")
+        except ImportError:
+            log.info("edge-tts not installed. Using silent placeholders.")
+
     for seg in segments:
         if seg["type"] != "narration":
             continue
@@ -593,6 +658,13 @@ def run(
                 voice_ref_path=voice_ref_path or None,
                 api_url=api_url,
             )
+        elif edge_tts_available:
+            result = _synthesize_edge_tts(
+                text=seg["text"],
+                output_path=wav_path,
+                lang=lang,
+            )
+            result["tone"] = seg.get("tone", "")
         else:
             est_dur = seg.get("estimated_duration_s", 2.0)
             result = _generate_placeholder_wav(wav_path, duration_s=est_dur)

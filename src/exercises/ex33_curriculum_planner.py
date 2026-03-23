@@ -403,8 +403,12 @@ def run(
     state = _extract_current_state(conn)
 
     # Enrich with Google Trends (what cinema topics are hot right now)
+    # Also saves daily snapshot to DB for the frontend carrusel
     try:
-        from common.trends import suggest_trending_queries
+        from common.trends import suggest_trending_queries, save_trends_to_db
+        saved = save_trends_to_db(conn, geo="")
+        if saved:
+            log.info("Google Trends: %d topics saved to DB", saved)
         trending = suggest_trending_queries()
         if trending:
             state["trending_topics"] = trending

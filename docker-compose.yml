@@ -5,6 +5,8 @@ services:
     working_dir: /workspace
     volumes:
       - ./:/workspace
+      - e:/movies:/movies
+    env_file: .env
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
@@ -18,32 +20,123 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu, video]
-    depends_on:
-      - fish-speech
-    ports:
-      - "8000:8000"   # ex28 dashboard
-      - "8001:8001"   # ex29 API REST
-      - "8002:8002"   # ex30 frontend
     command: ["bash", "-lc", "tail -f /dev/null"]
 
-  fish-speech:
-    image: fishaudio/fish-speech:latest
-    container_name: fish-speech
+  dashboard:
+    build: .
+    container_name: yt-dashboard
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
     ports:
       - "8080:8080"
-    volumes:
-      - fish-speech-models:/root/.cache/fish-speech
-      - ./data/voices:/voices
+    env_file: .env
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    command: ["python", "-m", "fish_speech.serve", "--host", "0.0.0.0", "--port", "8080"]
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    command: ["python", "src/main.py", "ex28", "--host", "0.0.0.0", "--port", "8080"]
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: yt-api
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    command: ["python", "src/main.py", "ex29", "--host", "0.0.0.0", "--port", "8001"]
+    restart: unless-stopped
+
+  frontend:
+    build: .
+    container_name: yt-frontend
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8002:8002"
+    env_file: .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    command: ["python", "src/main.py", "ex30", "--host", "0.0.0.0", "--port", "8002"]
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: yt-qbit
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Bogota
+      - WEBUI_PORT=8090
+    volumes:
+      - e:/movies:/downloads
+      - qbit-config:/config
+    ports:
+      - "8090:8090"     # Web UI
+      - "6881:6881"     # Torrent port
+      - "6881:6881/udp"
+    restart: unless-stopped
+
+  # ─── Clapshot: Video review & approval ───
+  clapshot:
+    image: elonen/clapshot:latest-demo-htadmin
+    container_name: yt-clapshot
+    ports:
+      - "8085:80"
+    volumes:
+      - ./data/clapshot:/mnt/clapshot-data/data
+    environment:
+      - CLAPSHOT_SERVER__URL_BASE=http://localhost:8085/
+      - CLAPSHOT_SERVER__BITRATE=2.5
+      - CLAPSHOT_SERVER__WORKERS=0
+      - CLAPSHOT_SERVER__POLL=5
+      - CLAPSHOT_APP_TITLE=YouLikeIt Review
+    restart: unless-stopped
+
+  # ─── Twick: Video editor + render server ───
+  twick:
+    build:
+      context: ./twick-render-server
+      dockerfile: Dockerfile
+    container_name: yt-twick
+    ports:
+      - "3100:3000"
+    env_file: .env
+    volumes:
+      - ./outputs:/app/outputs
+      - ./data:/app/data
+    environment:
+      - DISABLE_TELEMETRY=true
+    restart: unless-stopped
+
+  # Fish Speech TTS - descomentar cuando lo necesites
+  # fish-speech:
+  #   image: fishaudio/fish-speech:latest
+  #   container_name: fish-speech
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - fish-speech-models:/root/.cache/fish-speech
+  #     - ./data/voices:/voices
+  #   environment:
+  #     - NVIDIA_VISIBLE_DEVICES=all
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   command: ["python", "-m", "fish_speech.serve", "--host", "0.0.0.0", "--port", "8080"]
+  #   restart: unless-stopped
 
 volumes:
-  fish-speech-models:
+  qbit-config:
+#   fish-speech-models:

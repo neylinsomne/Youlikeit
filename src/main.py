@@ -38,6 +38,10 @@ from exercises import (
     ex33_curriculum_planner,
     ex34_oauth_manager,
     ex35_data_export,
+    ex36_manga_discovery,
+    ex37_manga_classify,
+    ex38_manga_panels,
+    ex39_manga_wiki_scraper,
 )
 
 
@@ -78,6 +82,10 @@ EXERCISES = {
     "ex33": "Planificador de curriculum con diversidad pedagógica",
     "ex34": "Verificar OAuth de YouTube (upload + analytics scopes)",
     "ex35": "Exportar BD a CSV/JSON + backup + reporte del canal",
+    "ex36": "Descubrir manga/anime trending (Jikan + AniList + Animechan)",
+    "ex37": "Clasificar quotes de manga/anime (categoria, emocion, viral score)",
+    "ex38": "Panel detection + OCR + Ken Burns video desde paginas de manga",
+    "ex39": "Scraper de Fandom Wiki para panels iconicos de manga",
 }
 
 
@@ -172,6 +180,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--plan-size", type=int, default=10, help="Entradas en el plan de curriculum (ex33)")
     # ex35
     parser.add_argument("--format", default="csv", choices=["csv", "json"], help="Formato de exportación (ex35)")
+    # ex36
+    parser.add_argument("--media-type", default="all", choices=["anime", "manga", "all"], help="Tipo: anime, manga, all (ex36)")
+    parser.add_argument("--with-quotes", action="store_true", default=True, help="Extraer quotes (ex36)")
+    # ex38
+    parser.add_argument("--source", default="", help="Ruta a imagen/folder/CBZ de manga (ex38)")
+    parser.add_argument("--series-title", default="", help="Titulo del manga/anime (ex38)")
+    parser.add_argument("--max-pages", type=int, default=5, help="Max paginas a procesar (ex38)")
+    parser.add_argument("--languages", default="en", help="Idiomas OCR: en,ja,ko (ex38)")
+    parser.add_argument("--reading-order", default="rtl", choices=["rtl", "ltr"], help="Orden lectura: rtl manga, ltr manhwa (ex38)")
     # ex28 / ex29 / ex30 (port ya existe vía ex15)
 
     return parser
@@ -404,6 +421,36 @@ def main() -> None:
         out = ex35_data_export.run(
             settings,
             fmt=args.format,
+        )
+    elif args.exercise == "ex36":
+        out = ex36_manga_discovery.run(
+            settings,
+            mode=args.mode,
+            max_items=args.max_movies,
+            media_type=args.media_type,
+            with_quotes=args.with_quotes,
+        )
+    elif args.exercise == "ex37":
+        out = ex37_manga_classify.run(
+            settings,
+            provider=args.provider,
+            batch_size=args.batch_size,
+        )
+    elif args.exercise == "ex38":
+        out = ex38_manga_panels.run(
+            settings,
+            source=args.source,
+            series_title=args.series_title,
+            max_pages=args.max_pages,
+            languages=args.languages,
+            reading_order=args.reading_order,
+        )
+    elif args.exercise == "ex39":
+        out = ex39_manga_wiki_scraper.run(
+            settings,
+            series_title=args.series_title,
+            max_chapters=args.max_pages,
+            download_images=True,
         )
     else:
         raise ValueError("Ejercicio no soportado")

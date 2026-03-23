@@ -1,0 +1,154 @@
+name: Content Pipeline
+
+on:
+  schedule:
+    # Runs daily at 6am UTC (1am Colombia) EXCEPT days 15-18
+    - cron: '0 6 1-14,19-31 * *'
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: 'Pipeline to run'
+        required: true
+        default: 'manga'
+        type: choice
+        options:
+          - manga
+          - movies
+          - learn
+      media_type:
+        description: 'Media type (manga pipeline)'
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - anime
+          - manga
+      series_title:
+        description: 'Specific series (optional)'
+        required: false
+        default: ''
+      max_items:
+        description: 'Max items to discover'
+        required: false
+        default: '15'
+
+env:
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+  TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+  OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+  OPENSUBTITLES_USERNAME: ${{ secrets.OPENSUBTITLES_USERNAME }}
+  OPENSUBTITLES_PASSWORD: ${{ secrets.OPENSUBTITLES_PASSWORD }}
+  OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+  TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install easyocr opencv-python-headless
+
+      - name: Create data directories
+        run: |
+          mkdir -p data outputs/logs outputs/metadata outputs/publish outputs/narration outputs/manga
+
+      - name: Check date exclusion (skip 15-18)
+        id: check_date
+        run: |
+          DAY=$(date +%d)
+          if [ "$DAY" -ge 15 ] && [ "$DAY" -le 18 ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping: day $DAY is in exclusion range 15-18"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine pipeline
+        if: steps.check_date.outputs.skip != 'true'
+        id: config
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pipeline=${{ inputs.pipeline }}" >> $GITHUB_OUTPUT
+            echo "media_type=${{ inputs.media_type }}" >> $GITHUB_OUTPUT
+            echo "series_title=${{ inputs.series_title }}" >> $GITHUB_OUTPUT
+            echo "max_items=${{ inputs.max_items }}" >> $GITHUB_OUTPUT
+          else
+            # Scheduled: alternate between manga and learn
+            DOW=$(date +%u)
+            if [ "$DOW" -le 5 ]; then
+              echo "pipeline=manga" >> $GITHUB_OUTPUT
+            else
+              echo "pipeline=learn" >> $GITHUB_OUTPUT
+            fi
+            echo "media_type=all" >> $GITHUB_OUTPUT
+            echo "series_title=" >> $GITHUB_OUTPUT
+            echo "max_items=15" >> $GITHUB_OUTPUT
+          fi
+
+      # --- MANGA PIPELINE ---
+      - name: "ex36: Discover trending manga/anime"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
+        working-directory: src
+        run: python main.py ex36 --media-type ${{ steps.config.outputs.media_type }} --max-movies ${{ steps.config.outputs.max_items }}
+
+      - name: "ex37: Classify manga quotes"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
+        working-directory: src
+        run: python main.py ex37 --provider auto --batch-size 50
+
+      - name: "ex39: Wiki scrape"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga' && steps.config.outputs.series_title != ''
+        working-directory: src
+        run: python main.py ex39 --series-title "${{ steps.config.outputs.series_title }}" --max-pages 10
+
+      - name: "ex08: Growth pack"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
+        working-directory: src
+        run: python main.py ex08 --query "anime manga trending quotes" --country-code CO
+
+      - name: "ex17: Publish strategy"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
+        working-directory: src
+        run: python main.py ex17 --query "anime manga trending" --platform both --country-code CO --lang en
+
+      # --- LEARN PIPELINE ---
+      - name: "ex31: Lesson taxonomy"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'learn'
+        working-directory: src
+        run: python main.py ex31 --batch-size 50
+
+      - name: "ex32: Lesson performance"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'learn'
+        working-directory: src
+        run: python main.py ex32
+
+      - name: "ex33: Curriculum planner"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'learn'
+        working-directory: src
+        run: python main.py ex33 --plan-size 10
+
+      # --- Upload artifacts ---
+      - name: Upload pipeline outputs
+        if: steps.check_date.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-outputs-${{ github.run_number }}
+          path: |
+            outputs/logs/
+            outputs/metadata/
+            outputs/publish/
+            data/shorts_pipeline.db
+          retention-days: 30

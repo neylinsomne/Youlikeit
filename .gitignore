@@ -2,8 +2,31 @@
 __pycache__/
 *.pyc
 .env
-outputs/screenshots/*.png
-outputs/logs/*.log
-data/raw/*.json
-data/processed/*.json
 client_secret.json
+client_secrets.json
+data/youtube_oauth_token.json
+
+# Clapshot runtime files
+data/clapshot/*.sock
+data/clapshot/*.log
+data/clapshot/*.sqlite
+data/clapshot/*.sqlite-*
+
+# ChromaDB (regenerable)
+data/chromadb/
+
+# Large binary files
+*.mp4
+*.wav
+*.mp3
+*.mkv
+*.avi
+data/shorts_pipeline.db
+
+# Node
+node_modules/
+frontend-react/dist/
+
+# Outputs (regenerable)
+outputs/
+E/

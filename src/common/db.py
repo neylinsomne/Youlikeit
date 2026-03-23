@@ -370,6 +370,90 @@ CREATE INDEX IF NOT EXISTS idx_demographics_dim ON audience_demographics(dimensi
 CREATE INDEX IF NOT EXISTS idx_user_tokens ON user_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_curriculum_status ON curriculum_plan(status);
 CREATE INDEX IF NOT EXISTS idx_model_snapshots_type ON model_snapshots(model_type);
+
+-- Trending topics (daily snapshots from Google Trends)
+CREATE TABLE IF NOT EXISTS trending_topics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic TEXT NOT NULL,
+    interest INTEGER DEFAULT 0,          -- 0-100 Google Trends score
+    rising INTEGER DEFAULT 0,            -- 1 if breakout/rising topic
+    geo TEXT DEFAULT '',                  -- country code
+    source TEXT DEFAULT 'pytrends',       -- pytrends, manual
+    snapshot_date TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_trending_date ON trending_topics(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_trending_topic ON trending_topics(topic);
+
+-- Clip library: tracks every reusable clip/panel across verticals
+CREATE TABLE IF NOT EXISTS clip_library (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- Source identification
+    source_type TEXT NOT NULL,             -- 'movie', 'anime', 'manga_panel'
+    source_id INTEGER,                     -- movie_id or manga_series_id
+    quote_id INTEGER,                      -- quotes.id or manga_quotes.id
+    -- Content
+    file_path TEXT,                         -- path to video clip or panel image
+    thumbnail_path TEXT,
+    audio_path TEXT,                        -- narration audio for this clip
+    duration_s REAL,
+    -- Text content
+    quote_text TEXT,                        -- the quote/dialogue text
+    character_name TEXT,                   -- who said it
+    ocr_text TEXT,                         -- raw OCR text from panel
+    -- Semantic metadata
+    title TEXT,                            -- "Griffith betrayal speech"
+    description TEXT,                      -- longer description for search
+    tags TEXT,                             -- JSON array: ["villain", "dark", "betrayal"]
+    category TEXT,                         -- villain, motivational, philosophical...
+    emotion TEXT,
+    themes TEXT,                           -- JSON array: ["power", "ambition", "sacrifice"]
+    -- Source reference
+    chapter TEXT,                          -- manga chapter number
+    page_number INTEGER,                   -- page within chapter
+    panel_index INTEGER,                   -- panel within page
+    -- ChromaDB reference
+    chroma_id TEXT,                        -- ID in ChromaDB collection for semantic search
+    -- Usage tracking
+    times_used INTEGER DEFAULT 0,
+    last_used_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Junction: which clips are used in which shorts
+CREATE TABLE IF NOT EXISTS short_clips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    short_id INTEGER NOT NULL,
+    clip_id INTEGER NOT NULL,
+    position INTEGER DEFAULT 0,            -- order in the short
+    start_s REAL DEFAULT 0,                -- start time in the short
+    end_s REAL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (short_id) REFERENCES shorts(id),
+    FOREIGN KEY (clip_id) REFERENCES clip_library(id)
+);
+
+-- Pipeline runs: track automated executions
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pipeline TEXT NOT NULL,                 -- 'manga', 'movies', 'learn'
+    status TEXT DEFAULT 'running',          -- running, completed, failed
+    trigger TEXT DEFAULT 'manual',          -- manual, github_action, frontend, scheduled
+    params TEXT,                            -- JSON: parameters used
+    steps_completed TEXT,                   -- JSON array of completed steps
+    steps_failed TEXT,                      -- JSON array of failed steps
+    shorts_produced INTEGER DEFAULT 0,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_clip_source ON clip_library(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_clip_category ON clip_library(category);
+CREATE INDEX IF NOT EXISTS idx_clip_chroma ON clip_library(chroma_id);
+CREATE INDEX IF NOT EXISTS idx_short_clips_short ON short_clips(short_id);
+CREATE INDEX IF NOT EXISTS idx_short_clips_clip ON short_clips(clip_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(status);
 """
 
 
@@ -381,6 +465,24 @@ def get_db(data_dir: Path) -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     _migrate_columns(conn)
     return conn
+
+
+class db_context:
+    """Context manager for safe database connections. Closes on exit."""
+    def __init__(self, data_dir: Path):
+        self.data_dir = data_dir
+        self.conn = None
+
+    def __enter__(self) -> sqlite3.Connection:
+        self.conn = get_db(self.data_dir)
+        return self.conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.conn:
+            if exc_type:
+                self.conn.rollback()
+            self.conn.close()
+        return False
 
 
 def _migrate_columns(conn: sqlite3.Connection):
@@ -396,12 +498,64 @@ def _migrate_columns(conn: sqlite3.Connection):
         ("analytics", "avg_view_duration_s", "REAL DEFAULT 0"),
         ("analytics", "subscriber_gained", "INTEGER DEFAULT 0"),
         ("analytics", "subscriber_lost", "INTEGER DEFAULT 0"),
+        # Clip library extra columns
+        ("clip_library", "audio_path", "TEXT"),
+        ("clip_library", "quote_text", "TEXT"),
+        ("clip_library", "character_name", "TEXT"),
+        ("clip_library", "ocr_text", "TEXT"),
+        ("clip_library", "chapter", "TEXT"),
+        ("clip_library", "page_number", "INTEGER"),
+        ("clip_library", "panel_index", "INTEGER"),
     ]
     for table, column, col_type in migrations:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+
+def register_clip(conn: sqlite3.Connection, **kwargs) -> int:
+    """Register a clip in the library for reuse. Returns clip id.
+
+    Deduplicates by file_path — same file won't be registered twice.
+    """
+    file_path = kwargs.get("file_path", "")
+    if file_path:
+        cur = conn.execute("SELECT id FROM clip_library WHERE file_path = ?", (file_path,))
+        row = cur.fetchone()
+        if row:
+            return row["id"]
+
+    cur = conn.execute(
+        """INSERT INTO clip_library
+           (source_type, source_id, quote_id, file_path, thumbnail_path, audio_path,
+            duration_s, quote_text, character_name, ocr_text, title, description,
+            tags, category, emotion, themes, chapter, page_number, panel_index)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            kwargs.get("source_type", "manga_panel"),
+            kwargs.get("source_id"),
+            kwargs.get("quote_id"),
+            file_path,
+            kwargs.get("thumbnail_path"),
+            kwargs.get("audio_path"),
+            kwargs.get("duration_s"),
+            kwargs.get("quote_text"),
+            kwargs.get("character_name"),
+            kwargs.get("ocr_text"),
+            kwargs.get("title"),
+            kwargs.get("description"),
+            kwargs.get("tags"),
+            kwargs.get("category"),
+            kwargs.get("emotion"),
+            kwargs.get("themes"),
+            kwargs.get("chapter"),
+            kwargs.get("page_number"),
+            kwargs.get("panel_index"),
+        ),
+    )
+    conn.commit()
+    return cur.lastrowid
 
 
 def insert_movie(conn: sqlite3.Connection, **kwargs) -> int:
