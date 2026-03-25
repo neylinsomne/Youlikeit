@@ -28,8 +28,6 @@ Uso:
   python src/main.py ex29 --host 0.0.0.0 --port 8001
 """
 
-from __future__ import annotations
-
 import json
 import secrets
 from datetime import datetime, timedelta
@@ -95,7 +93,8 @@ def _get_or_create_token(conn, username: str) -> dict:
     }
 
 
-def _validate_token(conn, token: str) -> dict | None:
+from typing import Optional
+def _validate_token(conn, token: str) -> Optional[dict]:
     """Validate a bearer token. Returns user info or None."""
     cur = conn.execute("""
         SELECT u.id, u.username, u.role, u.display_name
@@ -139,12 +138,9 @@ def _paginate(query: str, params: tuple, conn, page: int = 1, per_page: int = 20
 
 def build_app(settings: Settings):
     """Build the FastAPI application with all endpoints."""
-    try:
-        from fastapi import FastAPI, HTTPException, Query, Request, Depends
-        from fastapi.middleware.cors import CORSMiddleware
-        from fastapi.responses import JSONResponse
-    except ImportError:
-        raise ImportError("FastAPI is required. Install: pip install fastapi uvicorn")
+    from fastapi import FastAPI, HTTPException, Query, Request, Depends
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
 
     app = FastAPI(
         title="YouTube Shorts Pipeline API",
@@ -163,7 +159,12 @@ def build_app(settings: Settings):
     create_ws_endpoint(app)
 
     def get_conn():
-        conn = get_db(settings.data_dir)
+        import sqlite3
+        db_path = settings.data_dir / "shorts_pipeline.db"
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        from common.db import SCHEMA
+        conn.executescript(SCHEMA)
         try:
             yield conn
         finally:
@@ -216,7 +217,7 @@ def build_app(settings: Settings):
         category: str = "",
         emotion: str = "",
         learning_type: str = "",
-        has_timestamps: bool | None = None,
+        has_timestamps: Optional[bool] = None,
         conn=Depends(get_conn),
         user=Depends(get_current_user),
     ):
@@ -635,6 +636,190 @@ def build_app(settings: Settings):
                ORDER BY mq.viral_score DESC""",
             (), conn, page, per_page,
         )
+
+    # --- Trending Music (ytmusicapi) ---
+
+    @app.get("/api/music/trending")
+    def get_trending_music(country: str = "CO", query: str = "", limit: int = 15):
+        """Get trending songs with YouTube links."""
+        try:
+            from ytmusicapi import YTMusic
+            yt = YTMusic()
+            if query:
+                results = yt.search(query, filter="songs", limit=limit)
+            else:
+                results = yt.search(f"trending songs {country} 2026", filter="songs", limit=limit)
+
+            songs = []
+            for r in results[:limit]:
+                artists = ", ".join(a["name"] for a in r.get("artists", []))
+                vid = r.get("videoId", "")
+                songs.append({
+                    "title": r.get("title", ""),
+                    "artist": artists,
+                    "duration": r.get("duration", ""),
+                    "youtube_url": f"https://youtube.com/watch?v={vid}" if vid else "",
+                    "youtube_music_url": f"https://music.youtube.com/watch?v={vid}" if vid else "",
+                    "video_id": vid,
+                    "thumbnail": r.get("thumbnails", [{}])[-1].get("url", "") if r.get("thumbnails") else "",
+                    "album": r.get("album", {}).get("name", "") if r.get("album") else "",
+                })
+            return {"songs": songs, "country": country, "query": query}
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            return {"songs": [], "error": str(e)}
+
+    # --- Serve static files (videos, images, panels) ---
+
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    @app.get("/api/files/{file_path:path}")
+    def serve_file(file_path: str):
+        """Serve output files (videos, images, panels)."""
+        # Try direct path first (file_path may include outputs/ or data/)
+        candidates = [
+            Path(file_path),  # direct relative path
+            Path(settings.output_dir) / file_path,
+            Path(settings.data_dir) / file_path,
+        ]
+        # Strip leading outputs/ or data/ if already in file_path
+        stripped = file_path
+        for prefix in ("outputs/", "data/"):
+            if file_path.startswith(prefix):
+                stripped = file_path[len(prefix):]
+                break
+        candidates.append(Path(settings.output_dir) / stripped)
+        candidates.append(Path(settings.data_dir) / stripped)
+
+        for full in candidates:
+            if full.exists() and full.is_file():
+                media_type = None
+                suffix = full.suffix.lower()
+                if suffix == ".mp4":
+                    media_type = "video/mp4"
+                elif suffix in (".jpg", ".jpeg"):
+                    media_type = "image/jpeg"
+                elif suffix in (".png",):
+                    media_type = "image/png"
+                elif suffix in (".webp",):
+                    media_type = "image/webp"
+                elif suffix in (".wav",):
+                    media_type = "audio/wav"
+                return FileResponse(str(full), media_type=media_type)
+        raise HTTPException(404, f"File not found: {file_path}")
+
+    # --- Review endpoints ---
+
+    @app.get("/api/review")
+    def list_review_items(
+        status: str = "",
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        """List generated Shorts pending review."""
+        conditions = []
+        params = []
+        if status:
+            conditions.append("s.status = ?")
+            params.append(status)
+        else:
+            conditions.append("s.status IN ('rendered','pending_review','draft')")
+
+        where = " AND ".join(conditions) if conditions else "1=1"
+        cur = conn.execute(f"""
+            SELECT s.*, GROUP_CONCAT(sc.clip_id) as clip_ids
+            FROM shorts s
+            LEFT JOIN short_clips sc ON s.id = sc.short_id
+            WHERE {where}
+            GROUP BY s.id
+            ORDER BY s.created_at DESC
+        """, tuple(params))
+        return [dict(r) for r in cur.fetchall()]
+
+    @app.post("/api/review/{short_id}/approve")
+    def approve_short(short_id: int, conn=Depends(get_conn), user=Depends(get_current_user)):
+        conn.execute("UPDATE shorts SET status='approved' WHERE id=?", (short_id,))
+        conn.commit()
+        return {"id": short_id, "status": "approved"}
+
+    @app.post("/api/review/{short_id}/reject")
+    def reject_short(short_id: int, body: dict, conn=Depends(get_conn), user=Depends(get_current_user)):
+        reason = body.get("reason", "")
+        conn.execute("UPDATE shorts SET status='rejected' WHERE id=?", (short_id,))
+        conn.commit()
+        return {"id": short_id, "status": "rejected", "reason": reason}
+
+    @app.post("/api/review/{short_id}/issues")
+    def add_issue(short_id: int, body: dict, conn=Depends(get_conn), user=Depends(get_current_user)):
+        """Add a quality issue to a short."""
+        issue_type = body.get("type", "other")
+        start_s = body.get("start_s", 0)
+        end_s = body.get("end_s", 0)
+        note = body.get("note", "")
+        conn.execute(
+            """INSERT INTO short_issues (short_id, issue_type, start_s, end_s, note, reported_by)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (short_id, issue_type, start_s, end_s, note, user.get("username", "unknown")),
+        )
+        conn.commit()
+        return {"short_id": short_id, "type": issue_type, "status": "added"}
+
+    @app.get("/api/review/{short_id}/issues")
+    def list_issues(short_id: int, conn=Depends(get_conn), user=Depends(get_current_user)):
+        cur = conn.execute(
+            "SELECT * FROM short_issues WHERE short_id = ? ORDER BY start_s",
+            (short_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    # --- Home / Dashboard summary ---
+
+    @app.get("/api/home")
+    def home_dashboard(conn=Depends(get_conn)):
+        """Public dashboard summary — no auth needed."""
+        stats = {}
+        for table in ["movies", "quotes", "shorts", "manga_series", "manga_quotes"]:
+            try:
+                cur = conn.execute(f"SELECT COUNT(*) as n FROM {table}")
+                stats[table] = cur.fetchone()["n"]
+            except Exception:
+                stats[table] = 0
+
+        # Clip library count
+        try:
+            cur = conn.execute("SELECT COUNT(*) as n FROM clip_library")
+            stats["clips"] = cur.fetchone()["n"]
+        except Exception:
+            stats["clips"] = 0
+
+        # Pipeline runs
+        try:
+            cur = conn.execute(
+                "SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT 10"
+            )
+            stats["recent_runs"] = [dict(r) for r in cur.fetchall()]
+        except Exception:
+            stats["recent_runs"] = []
+
+        # Analytics summary
+        try:
+            cur = conn.execute("""
+                SELECT COALESCE(SUM(views),0) as views,
+                       COALESCE(SUM(likes),0) as likes,
+                       COALESCE(AVG(engagement_rate),0) as avg_engagement
+                FROM analytics
+            """)
+            row = cur.fetchone()
+            stats["total_views"] = row["views"]
+            stats["total_likes"] = row["likes"]
+            stats["avg_engagement"] = round(row["avg_engagement"], 4)
+        except Exception:
+            stats["total_views"] = 0
+            stats["total_likes"] = 0
+            stats["avg_engagement"] = 0
+
+        return stats
 
     return app
 

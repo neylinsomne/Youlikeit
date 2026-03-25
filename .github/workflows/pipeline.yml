@@ -13,39 +13,37 @@ on:
         type: choice
         options:
           - manga
-          - movies
+          - full-manga-short
           - learn
-      media_type:
-        description: 'Media type (manga pipeline)'
-        default: 'all'
+      series_title:
+        description: 'Series title (e.g. Berserk, One Piece)'
+        required: false
+        default: 'Berserk'
+      max_episodes:
+        description: 'Episodes to cover per Short'
+        required: false
+        default: '3'
+      auto_upload:
+        description: 'Upload to YouTube automatically'
+        required: false
+        default: 'false'
         type: choice
         options:
-          - all
-          - anime
-          - manga
-      series_title:
-        description: 'Specific series (optional)'
-        required: false
-        default: ''
-      max_items:
-        description: 'Max items to discover'
-        required: false
-        default: '15'
+          - 'false'
+          - 'unlisted'
+          - 'public'
 
 env:
   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
   YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
   TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-  OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
-  OPENSUBTITLES_USERNAME: ${{ secrets.OPENSUBTITLES_USERNAME }}
-  OPENSUBTITLES_PASSWORD: ${{ secrets.OPENSUBTITLES_PASSWORD }}
   OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
   TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
 
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -59,11 +57,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install easyocr opencv-python-headless
+          pip install easyocr opencv-python-headless edge-tts ytmusicapi manga-ocr rapidfuzz
+          pip install google-api-python-client google-auth-oauthlib google-auth-httplib2
 
-      - name: Create data directories
-        run: |
-          mkdir -p data outputs/logs outputs/metadata outputs/publish outputs/narration outputs/manga
+      - name: Create directories
+        run: mkdir -p data outputs/logs outputs/manga outputs/metadata outputs/publish
 
       - name: Check date exclusion (skip 15-18)
         id: check_date
@@ -82,73 +80,182 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "pipeline=${{ inputs.pipeline }}" >> $GITHUB_OUTPUT
-            echo "media_type=${{ inputs.media_type }}" >> $GITHUB_OUTPUT
-            echo "series_title=${{ inputs.series_title }}" >> $GITHUB_OUTPUT
-            echo "max_items=${{ inputs.max_items }}" >> $GITHUB_OUTPUT
+            echo "series=${{ inputs.series_title }}" >> $GITHUB_OUTPUT
+            echo "max_eps=${{ inputs.max_episodes }}" >> $GITHUB_OUTPUT
+            echo "upload=${{ inputs.auto_upload }}" >> $GITHUB_OUTPUT
           else
-            # Scheduled: alternate between manga and learn
-            DOW=$(date +%u)
-            if [ "$DOW" -le 5 ]; then
-              echo "pipeline=manga" >> $GITHUB_OUTPUT
-            else
-              echo "pipeline=learn" >> $GITHUB_OUTPUT
-            fi
-            echo "media_type=all" >> $GITHUB_OUTPUT
-            echo "series_title=" >> $GITHUB_OUTPUT
-            echo "max_items=15" >> $GITHUB_OUTPUT
+            echo "pipeline=manga" >> $GITHUB_OUTPUT
+            echo "series=" >> $GITHUB_OUTPUT
+            echo "max_eps=3" >> $GITHUB_OUTPUT
+            echo "upload=false" >> $GITHUB_OUTPUT
           fi
 
-      # --- MANGA PIPELINE ---
-      - name: "ex36: Discover trending manga/anime"
+      # ========================================
+      # MANGA DISCOVERY PIPELINE
+      # ========================================
+      - name: "Discover trending manga/anime"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
         working-directory: src
-        run: python main.py ex36 --media-type ${{ steps.config.outputs.media_type }} --max-movies ${{ steps.config.outputs.max_items }}
+        run: python main.py ex36 --media-type all --max-movies 15
 
-      - name: "ex37: Classify manga quotes"
+      - name: "Classify manga quotes"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
         working-directory: src
         run: python main.py ex37 --provider auto --batch-size 50
 
-      - name: "ex39: Wiki scrape"
-        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga' && steps.config.outputs.series_title != ''
-        working-directory: src
-        run: python main.py ex39 --series-title "${{ steps.config.outputs.series_title }}" --max-pages 10
-
-      - name: "ex08: Growth pack"
+      - name: "Growth pack + publish strategy"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
         working-directory: src
-        run: python main.py ex08 --query "anime manga trending quotes" --country-code CO
+        run: |
+          python main.py ex08 --query "anime manga trending" --country-code CO
+          python main.py ex17 --query "anime manga trending" --platform both --country-code CO --lang en
 
-      - name: "ex17: Publish strategy"
-        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
+      # ========================================
+      # FULL MANGA SHORT PRODUCTION
+      # ========================================
+      - name: "Restore OAuth token"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'full-manga-short'
+        run: echo '${{ secrets.YOUTUBE_OAUTH_TOKEN }}' > data/youtube_oauth_token.json
+
+      - name: "Generate manga Short series"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'full-manga-short'
         working-directory: src
-        run: python main.py ex17 --query "anime manga trending" --platform both --country-code CO --lang en
+        run: |
+          python -c "
+          import sys, os, json, re, requests, time, subprocess, asyncio, glob
+          sys.path.insert(0, '.')
+          from exercises.ex38_manga_panels import _detect_panels
+          from common.manga_camera import render_manga_short, classify_page
 
-      # --- LEARN PIPELINE ---
-      - name: "ex31: Lesson taxonomy"
+          SERIES = '${{ steps.config.outputs.series }}' or 'Berserk'
+          MAX_EPS = int('${{ steps.config.outputs.max_eps }}' or '3')
+          GEMINI_KEY = os.getenv('GEMINI_API_KEY', '')
+
+          print(f'=== Generating Short for {SERIES} ===')
+
+          # 1. Get wiki summaries
+          import common.http_client as hc
+          subdomain_map = {'berserk':'berserk','one piece':'onepiece','naruto':'naruto','death note':'deathnote'}
+          subdomain = subdomain_map.get(SERIES.lower(), SERIES.lower().replace(' ',''))
+
+          summaries = {}
+          for ep in range(1, MAX_EPS * 3 + 1):
+              page = f'Episode {ep} (Manga)'
+              try:
+                  data = requests.get(f'https://{subdomain}.fandom.com/api.php', params={
+                      'action':'parse','page':page,'prop':'wikitext','format':'json'
+                  }, timeout=15).json()
+                  wt = data.get('parse',{}).get('wikitext',{}).get('*','')
+                  summary = ''
+                  in_sum = False
+                  for line in wt.split('\n'):
+                      if re.match(r'==\s*(Summary|Plot|Synopsis)', line, re.I):
+                          in_sum = True; continue
+                      elif in_sum and line.startswith('=='): break
+                      elif in_sum:
+                          clean = re.sub(r'\[\[([^\]|]*\|)?([^\]]*)\]\]', r'\2', line)
+                          clean = re.sub(r\"'''?\", '', clean).strip()
+                          if clean: summary += clean + ' '
+                  if summary.strip():
+                      summaries[ep] = summary.strip()[:500]
+              except: pass
+              time.sleep(0.3)
+
+          print(f'Got {len(summaries)} episode summaries')
+          if not summaries:
+              print('No summaries found, exiting')
+              sys.exit(0)
+
+          # 2. Gemini: convert to narration
+          eps_list = sorted(summaries.keys())[:MAX_EPS * 3]
+          groups = [eps_list[i:i+MAX_EPS] for i in range(0, len(eps_list), MAX_EPS)]
+
+          scripts = []
+          for gi, group in enumerate(groups[:3]):
+              combined = '\n'.join(f'Episode {e}: {summaries[e][:300]}' for e in group if e in summaries)
+              prompt = f'Convert this {SERIES} manga summary into a dramatic YouTube Short narration (45s). Write 4 narration lines, each tied to an episode. Be accurate. Return JSON: {{\"part\":{gi+1},\"title\":\"...\",\"intro\":\"...\",\"segments\":[{{\"text\":\"...\",\"episode\":N,\"emotion\":\"dark|epic|tragic|hopeful\"}}],\"outro\":\"...\",\"hashtags\":[\"#...\"]}}. No markdown.\n\n{combined}'
+              resp = requests.post(f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}',
+                  json={'contents':[{'parts':[{'text':prompt}]}],'generationConfig':{'temperature':0.4}}, timeout=30)
+              text = resp.json()['candidates'][0]['content']['parts'][0]['text']
+              text = re.sub(r'\`\`\`json?\s*', '', text).strip().rstrip('\`')
+              scripts.append(json.loads(text))
+
+          os.makedirs('../outputs/manga/series_output', exist_ok=True)
+          with open('../outputs/manga/series_output/scripts.json','w') as f:
+              json.dump(scripts, f, indent=2)
+
+          print(f'Generated {len(scripts)} narration scripts')
+
+          # 3. Download pages from MangaDex + generate audio + render
+          # (simplified for CI - full version in Docker)
+          print('Scripts saved. Full rendering requires Docker with GPU.')
+          print('Use workflow_dispatch with auto_upload for local rendering.')
+          "
+
+      - name: "Upload to YouTube"
+        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'full-manga-short' && steps.config.outputs.upload != 'false'
+        working-directory: src
+        run: |
+          python -c "
+          import os, json, glob
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+          from pathlib import Path
+
+          token = Path('../data/youtube_oauth_token.json')
+          if not token.exists():
+              print('No OAuth token, skipping upload')
+              exit(0)
+
+          creds = Credentials.from_authorized_user_file(str(token))
+          youtube = build('youtube', 'v3', credentials=creds)
+
+          privacy = '${{ steps.config.outputs.upload }}'
+          videos = sorted(glob.glob('../outputs/manga/series_output/*.mp4'))
+
+          for vf in videos:
+              name = Path(vf).stem
+              body = {
+                  'snippet': {
+                      'title': f'{name} #Shorts',
+                      'description': 'Auto-generated by YouLikeIt Pipeline',
+                      'tags': ['Manga', 'Anime', 'Shorts'],
+                      'categoryId': '24',
+                  },
+                  'status': {
+                      'privacyStatus': privacy,
+                      'selfDeclaredMadeForKids': False,
+                  },
+              }
+              media = MediaFileUpload(vf, mimetype='video/mp4', resumable=True)
+              req = youtube.videos().insert(part='snippet,status', body=body, media_body=media)
+              resp = None
+              while resp is None:
+                  status, resp = req.next_chunk()
+              print(f'Uploaded: {name} -> https://youtube.com/shorts/{resp[\"id\"]}')
+          "
+
+      # ========================================
+      # LEARN PIPELINE
+      # ========================================
+      - name: "Learning cycle"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'learn'
         working-directory: src
-        run: python main.py ex31 --batch-size 50
+        run: |
+          python main.py ex31 --batch-size 50
+          python main.py ex32
+          python main.py ex33 --plan-size 10
 
-      - name: "ex32: Lesson performance"
-        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'learn'
-        working-directory: src
-        run: python main.py ex32
-
-      - name: "ex33: Curriculum planner"
-        if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'learn'
-        working-directory: src
-        run: python main.py ex33 --plan-size 10
-
-      # --- Upload artifacts ---
+      # ========================================
+      # ARTIFACTS
+      # ========================================
       - name: Upload pipeline outputs
-        if: steps.check_date.outputs.skip != 'true'
+        if: always() && steps.check_date.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-outputs-${{ github.run_number }}
           path: |
-            outputs/logs/
-            outputs/metadata/
-            outputs/publish/
+            outputs/
             data/shorts_pipeline.db
           retention-days: 30

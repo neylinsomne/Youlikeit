@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { triggerPipeline } from '../api/client';
+import { triggerPipeline, fetchHome, fetchPipelineRuns } from '../api/client';
 
 const pipelines = [
   { id: 'manga', label: 'Manga / Anime', icon: 'auto_stories', description: 'Discover trending manga, extract quotes, generate shorts', color: 'text-primary' },
@@ -49,8 +49,8 @@ export default function Pipeline() {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    fetch('/api/status').then(r => r.ok ? r.json() : null).then(setStats).catch(() => {});
-    fetch('/api/pipeline/runs').then(r => r.ok ? r.json() : null).then(d => setRuns(d?.data || [])).catch(() => {});
+    fetchHome().then(setStats).catch(() => {});
+    fetchPipelineRuns().then(d => setRuns(d?.items || [])).catch(() => {});
   }, []);
 
   const handleRun = async (pipelineId) => {

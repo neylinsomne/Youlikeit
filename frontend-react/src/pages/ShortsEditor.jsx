@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { fetchClips, submitRender } from '../api/client';
+import { fetchClips, fetchTrendingMusic, fileUrl } from '../api/client';
 
 const cameraIcons = {
   zoom_in: 'zoom_in',
@@ -16,7 +16,7 @@ const cameraIcons = {
 
 function ClipCard({ clip, onAdd }) {
   const src = clip.file_path
-    ? `/panels/${clip.file_path.split('manga_panels/')[1] || ''}`
+    ? `/api/files/${clip.file_path}`
     : null;
 
   // Parse description JSON for camera move info
@@ -141,12 +141,7 @@ function DropZone({ onDrop }) {
   );
 }
 
-const trendingSongs = [
-  { title: 'Midnight Pulse', artist: 'Lumina Wave', hits: '1.2M' },
-  { title: 'Cyber Symphony', artist: 'Drift-X', hits: '890k' },
-  { title: 'Echo Chamber', artist: 'Mono State', hits: '2.4M' },
-  { title: 'Smooth Glitch', artist: 'Retro Kid', hits: '156k' },
-];
+// Removed mock data — songs come from API
 
 export default function ShortsEditor() {
   const [clips, setClips] = useState([]);
@@ -156,9 +151,27 @@ export default function ShortsEditor() {
   const [title, setTitle] = useState('');
   const [hashtags, setHashtags] = useState('#AnimeEdit #MangaArt #Shorts #YouLikeIt');
   const [rendering, setRendering] = useState(false);
+  const [previewIdx, setPreviewIdx] = useState(0);
+  const [songs, setSongs] = useState([]);
+  const [musicQuery, setMusicQuery] = useState('');
 
   useEffect(() => {
-    fetchClips({ limit: 20 }).then((data) => setClips(data.clips || []));
+    fetchTrendingMusic('CO').then(data => setSongs(data.songs || []));
+  }, []);
+
+  const searchMusic = () => {
+    if (musicQuery.trim()) {
+      fetchTrendingMusic('CO', musicQuery).then(data => setSongs(data.songs || []));
+    }
+  };
+
+  useEffect(() => {
+    fetchClips({ per_page: 50 })
+      .then((data) => {
+        console.log('[YLI] Clips response:', data);
+        setClips(data.items || data.clips || []);
+      })
+      .catch((e) => console.error('[YLI] Clips fetch error:', e));
   }, []);
 
   const addToTimeline = (clip) => {
@@ -179,13 +192,19 @@ export default function ShortsEditor() {
     setRendering(true);
     const ids = timeline.map((c) => c.id);
     const name = title.replace(/\s+/g, '_').toLowerCase() || `short_${Date.now()}`;
-    await submitRender(ids, name);
+    // TODO: connect to render API
+    console.log('Render:', ids, name);
     setRendering(false);
   };
 
   const filteredClips = filter === 'all'
     ? clips
-    : clips.filter((c) => c.source_type?.includes(filter));
+    : clips.filter((c) => {
+        const st = c.source_type || '';
+        if (filter === 'manga') return st.includes('manga') || st.includes('anime');
+        if (filter === 'movie') return st.includes('movie') || st.includes('video');
+        return st.includes(filter);
+      });
 
   return (
     <Layout title="Creative Studio">
@@ -194,12 +213,23 @@ export default function ShortsEditor() {
         <div className="col-span-12 lg:col-span-8 space-y-6">
           {/* Preview */}
           <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
-            <div className="aspect-video bg-surface-dim flex items-center justify-center relative">
+            <div className="aspect-[9/16] max-h-[480px] bg-surface-dim flex items-center justify-center relative mx-auto">
               {timeline.length > 0 ? (
-                <div className="text-center">
-                  <span className="material-symbols-outlined text-5xl text-primary/40">smart_display</span>
-                  <p className="text-xs text-on-surface-variant mt-2">{timeline.length} clips in timeline</p>
-                </div>
+                <>
+                  <img
+                    src={`/api/files/${timeline[previewIdx]?.file_path}`}
+                    alt={timeline[previewIdx]?.title}
+                    className="w-full h-full object-contain"
+                  />
+                  {timeline[previewIdx]?.quote_text && (
+                    <div className="absolute bottom-4 left-4 right-4 bg-surface/80 backdrop-blur-sm rounded-lg p-3">
+                      <p className="text-xs text-primary italic">"{timeline[previewIdx].quote_text.slice(0, 100)}"</p>
+                      {timeline[previewIdx].character_name && (
+                        <p className="text-[10px] text-tertiary mt-1">— {timeline[previewIdx].character_name}</p>
+                      )}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center">
                   <span className="material-symbols-outlined text-5xl text-outline-variant">movie_edit</span>
@@ -210,18 +240,28 @@ export default function ShortsEditor() {
                 <span className="w-2 h-2 rounded-full bg-on-error animate-pulse" />
                 Live Preview
               </div>
-              <div className="absolute top-4 right-4 text-xs text-on-surface-variant font-mono">
-                00:{String(timeline.length * 3).padStart(2, '0')}:00 / 00:30:00
-              </div>
+              {timeline.length > 0 && (
+                <div className="absolute top-4 right-4 bg-surface/70 backdrop-blur-sm text-xs text-on-surface font-mono px-2 py-1 rounded">
+                  {previewIdx + 1} / {timeline.length} | ~{timeline.reduce((s, c) => s + (c.duration_s || 2), 0).toFixed(0)}s
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-center gap-8 py-4 border-t border-outline-variant/10">
-              <button className="text-on-surface hover:text-primary cursor-pointer">
+              <button
+                onClick={() => setPreviewIdx((i) => Math.max(0, i - 1))}
+                disabled={!timeline.length}
+                className="text-on-surface hover:text-primary cursor-pointer disabled:opacity-30"
+              >
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>skip_previous</span>
               </button>
               <button className="w-12 h-12 bg-primary text-on-primary rounded-full flex items-center justify-center hover:scale-105 cursor-pointer">
                 <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
               </button>
-              <button className="text-on-surface hover:text-primary cursor-pointer">
+              <button
+                onClick={() => setPreviewIdx((i) => Math.min(timeline.length - 1, i + 1))}
+                disabled={!timeline.length}
+                className="text-on-surface hover:text-primary cursor-pointer disabled:opacity-30"
+              >
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>skip_next</span>
               </button>
             </div>
@@ -247,7 +287,11 @@ export default function ShortsEditor() {
                 ))}
               </div>
             </div>
-            <div className="p-4 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 max-h-64 overflow-y-auto">
+            <div className="p-4">
+              <p className="text-[10px] text-on-surface-variant mb-2">
+                Loaded: {clips.length} clips | Showing: {filteredClips.length} | Filter: {filter}
+              </p>
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 max-h-64 overflow-y-auto">
               {filteredClips.map((clip) => (
                 <ClipCard key={clip.id} clip={clip} onAdd={addToTimeline} />
               ))}
@@ -257,6 +301,7 @@ export default function ShortsEditor() {
                 </div>
               )}
             </div>
+          </div>
           </div>
 
           {/* Timeline */}
@@ -285,41 +330,64 @@ export default function ShortsEditor() {
         <div className="col-span-12 lg:col-span-4 space-y-6">
           {/* Trending Music */}
           <div className="bg-surface-container rounded-xl p-5 border border-outline-variant/10">
-            <h3 className="text-xs font-bold tracking-widest uppercase flex items-center gap-2 mb-4 text-primary" style={{ fontFamily: 'var(--font-headline)' }}>
+            <h3 className="text-xs font-bold tracking-widest uppercase flex items-center gap-2 mb-3 text-primary" style={{ fontFamily: 'var(--font-headline)' }}>
               <span className="material-symbols-outlined text-sm">trending_up</span>
               YouTube Music Trending
             </h3>
-            <p className="text-[10px] text-on-surface-variant mb-3">Global Hot 50 Selection</p>
-            <div className="space-y-2">
-              {trendingSongs.map((song, i) => (
+            <div className="flex gap-2 mb-3">
+              <input
+                value={musicQuery}
+                onChange={(e) => setMusicQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchMusic()}
+                placeholder="Search songs..."
+                className="flex-1 bg-surface-highest border-none rounded-lg py-1.5 px-2 text-[11px] text-on-surface focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+              <button onClick={searchMusic} className="text-primary hover:text-primary-glow cursor-pointer">
+                <span className="material-symbols-outlined text-sm">search</span>
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {songs.map((song, i) => (
                 <div
-                  key={i}
+                  key={song.video_id || i}
                   onClick={() => setSelectedSong(i)}
-                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
                     selectedSong === i
                       ? 'bg-primary-glow/10 border border-primary-glow/30'
                       : 'hover:bg-surface-high'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-lg bg-surface-highest flex items-center justify-center flex-shrink-0">
-                    <span className="material-symbols-outlined text-primary text-sm">music_note</span>
-                  </div>
+                  {song.thumbnail ? (
+                    <img src={song.thumbnail} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-lg bg-surface-highest flex items-center justify-center flex-shrink-0">
+                      <span className="material-symbols-outlined text-primary text-sm">music_note</span>
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold truncate">{song.title}</div>
-                    <div className="text-[10px] text-on-surface-variant">{song.artist} - {song.hits} Hits</div>
+                    <div className="text-[11px] font-bold truncate">{song.title}</div>
+                    <div className="text-[9px] text-on-surface-variant truncate">{song.artist} {song.duration && `· ${song.duration}`}</div>
                   </div>
                   {selectedSong === i ? (
-                    <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    <a href={song.youtube_url} target="_blank" rel="noreferrer"
+                      className="text-primary hover:text-primary-glow" onClick={(e) => e.stopPropagation()}>
+                      <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    </a>
                   ) : (
                     <span className="material-symbols-outlined text-outline-variant text-sm">add_circle</span>
                   )}
                 </div>
               ))}
+              {songs.length === 0 && (
+                <p className="text-[10px] text-on-surface-variant text-center py-4">Loading trending songs...</p>
+              )}
             </div>
-            {selectedSong !== null && (
-              <div className="mt-3 w-full h-1 bg-surface-highest rounded-full overflow-hidden">
-                <div className="bg-tertiary h-full w-[65%]" />
-              </div>
+            {selectedSong !== null && songs[selectedSong] && (
+              <a href={songs[selectedSong].youtube_url} target="_blank" rel="noreferrer"
+                className="mt-3 flex items-center justify-center gap-2 bg-surface-highest rounded-lg py-2 text-[10px] text-primary hover:text-primary-glow transition-colors">
+                <span className="material-symbols-outlined text-sm">play_circle</span>
+                Open in YouTube
+              </a>
             )}
           </div>
 

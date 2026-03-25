@@ -1,30 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
-import { fetchRenderQueue, sendToReview } from '../api/client';
-
-const mockQueue = [
-  {
-    id: 'short_001',
-    title: 'Berserk Ch.382 - Dark Philosophy',
-    status: 'pending_review',
-    duration: '28s',
-    clips: 14,
-    voice: 'Andrew (EN)',
-    created: '2026-03-22 14:58',
-    video_url: '/files/manga/Berserk_20260322_143056/BERSERK_ANDREW_v3.mp4',
-    thumbnail: null,
-    narration: {
-      intro: 'What you\'re about to hear, you felt before you understood it',
-      outro: 'Maybe that\'s why cinema never dies.',
-    },
-    metadata: {
-      hashtags: '#Berserk #MangaEdit #AnimeQuotes #Shorts #DarkPhilosophy #YouLikeIt',
-      song: 'Midnight Pulse - Lumina Wave',
-      category: 'philosophical',
-      emotion: 'determination',
-    },
-  },
-];
+import { fetchReview, approveShort, rejectShort, addIssue as apiAddIssue, fetchIssues, fileUrl } from '../api/client';
 
 function formatTime(seconds) {
   const m = Math.floor(seconds / 60);
@@ -118,8 +94,8 @@ function ReviewCard({ short, onSelect, selected }) {
 }
 
 export default function ReviewQueue() {
-  const [queue, setQueue] = useState(mockQueue);
-  const [selected, setSelected] = useState(mockQueue[0]);
+  const [queue, setQueue] = useState([]);
+  const [selected, setSelected] = useState(null);
   const [issues, setIssues] = useState([]);
   const [addingIssue, setAddingIssue] = useState(false);
   const [issueType, setIssueType] = useState('voice');
@@ -127,22 +103,63 @@ export default function ReviewQueue() {
   const [issueEnd, setIssueEnd] = useState(0);
   const [issueNote, setIssueNote] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
+  const [loading, setLoading] = useState(true);
   const videoRef = useRef(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchReview().then(data => {
+      console.log('[YLI] Review raw data:', JSON.stringify(data).slice(0, 500));
+      const rawItems = Array.isArray(data) ? data : (data?.items || data || []);
+      console.log('[YLI] rawItems count:', rawItems.length);
+      if (rawItems.length > 0) {
+        console.log('[YLI] First item keys:', Object.keys(rawItems[0]));
+        console.log('[YLI] First item output_file:', rawItems[0].output_file);
+      }
+      const items = rawItems.map(s => {
+        const vurl = (s.output_file || s.output_path) ? `/api/files/${s.output_file || s.output_path}` : '';
+        console.log(`[YLI] Short ${s.id}: video_url = "${vurl}"`);
+        return {
+          ...s,
+          title: s.title || s.theme_query || `Short #${s.id}`,
+          duration: s.duration_s ? `${Math.round(s.duration_s)}s` : '?',
+          clips: s.clip_ids ? s.clip_ids.split(',').length : 0,
+          voice: 'Andrew (EN)',
+          created: s.created_at || '',
+          video_url: vurl,
+          narration: { intro: s.narration_intro || '', outro: s.narration_outro || '' },
+          metadata: {
+            hashtags: s.hashtags || '',
+            song: s.suggested_song || 'Select on platform',
+            category: s.category || '',
+            emotion: s.emotion || '',
+          },
+        };
+      });
+      setQueue(items);
+      if (items.length > 0) setSelected(items[0]);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (selected?.id) {
+      fetchIssues(selected.id).then(setIssues).catch(() => setIssues([]));
+    }
+  }, [selected?.id]);
 
   const videoDuration = parseInt(selected?.duration) || 30;
 
   const addIssue = () => {
     if (issueStart >= issueEnd) return;
-    setIssues(prev => [...prev, {
-      type: issueType,
-      start: issueStart,
-      end: issueEnd,
-      note: issueNote,
-    }]);
-    setIssueStart(0);
-    setIssueEnd(0);
-    setIssueNote('');
-    setAddingIssue(false);
+    const issue = { type: issueType, start_s: issueStart, end_s: issueEnd, note: issueNote };
+    apiAddIssue(selected.id, issue).then(() => {
+      setIssues(prev => [...prev, { ...issue, start: issueStart, end: issueEnd }]);
+      setIssueStart(0);
+      setIssueEnd(0);
+      setIssueNote('');
+      setAddingIssue(false);
+    });
   };
 
   const removeIssue = (index) => {
@@ -150,23 +167,22 @@ export default function ReviewQueue() {
   };
 
   const handleApprove = () => {
-    setQueue(prev => prev.map(s =>
-      s.id === selected.id ? { ...s, status: 'approved' } : s
-    ));
-    setSelected(prev => ({ ...prev, status: 'approved' }));
+    approveShort(selected.id).then(() => {
+      setQueue(prev => prev.map(s => s.id === selected.id ? { ...s, status: 'approved' } : s));
+      setSelected(prev => ({ ...prev, status: 'approved' }));
+    });
   };
 
   const handleReject = () => {
-    setQueue(prev => prev.map(s =>
-      s.id === selected.id ? { ...s, status: 'rejected' } : s
-    ));
-    setSelected(prev => ({ ...prev, status: 'rejected' }));
+    rejectShort(selected.id, reviewNotes).then(() => {
+      setQueue(prev => prev.map(s => s.id === selected.id ? { ...s, status: 'rejected' } : s));
+      setSelected(prev => ({ ...prev, status: 'rejected' }));
+    });
   };
 
   const handleUpload = () => {
-    setQueue(prev => prev.map(s =>
-      s.id === selected.id ? { ...s, status: 'uploaded' } : s
-    ));
+    // TODO: trigger ex12 upload
+    setQueue(prev => prev.map(s => s.id === selected.id ? { ...s, status: 'uploaded' } : s));
     setSelected(prev => ({ ...prev, status: 'uploaded' }));
   };
 
@@ -219,12 +235,24 @@ export default function ReviewQueue() {
             {/* Video player */}
             <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
               <div className="relative aspect-[9/16] max-h-[500px] bg-surface-dim mx-auto">
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-contain"
-                  controls
-                  src={selected.video_url}
-                />
+                {selected.video_url ? (
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full object-contain"
+                    controls
+                    preload="auto"
+                    key={selected.id}
+                    src={selected.video_url}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-on-surface-variant">
+                    <div className="text-center">
+                      <span className="material-symbols-outlined text-3xl">videocam_off</span>
+                      <p className="text-xs mt-2">No video URL</p>
+                      <p className="text-[9px] mt-1 text-error">output_file: {selected.output_file || 'missing'}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

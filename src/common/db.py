@@ -454,6 +454,20 @@ CREATE INDEX IF NOT EXISTS idx_clip_chroma ON clip_library(chroma_id);
 CREATE INDEX IF NOT EXISTS idx_short_clips_short ON short_clips(short_id);
 CREATE INDEX IF NOT EXISTS idx_short_clips_clip ON short_clips(clip_id);
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(status);
+
+CREATE TABLE IF NOT EXISTS short_issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    short_id INTEGER NOT NULL,
+    issue_type TEXT DEFAULT 'other',  -- voice, image, timing, other
+    start_s REAL DEFAULT 0,
+    end_s REAL DEFAULT 0,
+    note TEXT,
+    reported_by TEXT,
+    resolved INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (short_id) REFERENCES shorts(id)
+);
+CREATE INDEX IF NOT EXISTS idx_short_issues_short ON short_issues(short_id);
 """
 
 

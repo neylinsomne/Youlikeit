@@ -1,18 +1,21 @@
+# YouLikeIt - Pipeline
+# Single image shared across services to save disk space (~2GB total vs ~12GB before)
+
 services:
+  # Main pipeline worker (GPU)
   ytlab:
     build: .
+    image: youlikeit:latest
     container_name: ytlab
     working_dir: /workspace
     volumes:
       - ./:/workspace
-      - e:/movies:/movies
     env_file: .env
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-      - FISH_SPEECH_URL=http://fish-speech:8080
     deploy:
       resources:
         reservations:
@@ -22,24 +25,11 @@ services:
               capabilities: [gpu, video]
     command: ["bash", "-lc", "tail -f /dev/null"]
 
-  dashboard:
-    build: .
-    container_name: yt-dashboard
-    working_dir: /workspace
-    volumes:
-      - ./:/workspace
-    ports:
-      - "8080:8080"
-    env_file: .env
-    environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
-    command: ["python", "src/main.py", "ex28", "--host", "0.0.0.0", "--port", "8080"]
-    restart: unless-stopped
-
+  # API REST (reuses same image)
   api:
-    build: .
+    image: youlikeit:latest
     container_name: yt-api
+    depends_on: [ytlab]
     working_dir: /workspace
     volumes:
       - ./:/workspace
@@ -52,91 +42,16 @@ services:
     command: ["python", "src/main.py", "ex29", "--host", "0.0.0.0", "--port", "8001"]
     restart: unless-stopped
 
+  # Frontend React (production build served by Node)
   frontend:
-    build: .
+    image: node:22-alpine
     container_name: yt-frontend
-    working_dir: /workspace
+    working_dir: /app
     volumes:
-      - ./:/workspace
+      - ./frontend-react:/app
     ports:
-      - "8002:8002"
-    env_file: .env
+      - "5180:5180"
     environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
-    command: ["python", "src/main.py", "ex30", "--host", "0.0.0.0", "--port", "8002"]
+      - VITE_API_URL=http://localhost:8001
+    command: ["sh", "-c", "npm install --silent 2>/dev/null; npx vite --host 0.0.0.0 --port 5180"]
     restart: unless-stopped
-
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    container_name: yt-qbit
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/Bogota
-      - WEBUI_PORT=8090
-    volumes:
-      - e:/movies:/downloads
-      - qbit-config:/config
-    ports:
-      - "8090:8090"     # Web UI
-      - "6881:6881"     # Torrent port
-      - "6881:6881/udp"
-    restart: unless-stopped
-
-  # ─── Clapshot: Video review & approval ───
-  clapshot:
-    image: elonen/clapshot:latest-demo-htadmin
-    container_name: yt-clapshot
-    ports:
-      - "8085:80"
-    volumes:
-      - ./data/clapshot:/mnt/clapshot-data/data
-    environment:
-      - CLAPSHOT_SERVER__URL_BASE=http://localhost:8085/
-      - CLAPSHOT_SERVER__BITRATE=2.5
-      - CLAPSHOT_SERVER__WORKERS=0
-      - CLAPSHOT_SERVER__POLL=5
-      - CLAPSHOT_APP_TITLE=YouLikeIt Review
-    restart: unless-stopped
-
-  # ─── Twick: Video editor + render server ───
-  twick:
-    build:
-      context: ./twick-render-server
-      dockerfile: Dockerfile
-    container_name: yt-twick
-    ports:
-      - "3100:3000"
-    env_file: .env
-    volumes:
-      - ./outputs:/app/outputs
-      - ./data:/app/data
-    environment:
-      - DISABLE_TELEMETRY=true
-    restart: unless-stopped
-
-  # Fish Speech TTS - descomentar cuando lo necesites
-  # fish-speech:
-  #   image: fishaudio/fish-speech:latest
-  #   container_name: fish-speech
-  #   ports:
-  #     - "8080:8080"
-  #   volumes:
-  #     - fish-speech-models:/root/.cache/fish-speech
-  #     - ./data/voices:/voices
-  #   environment:
-  #     - NVIDIA_VISIBLE_DEVICES=all
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
-  #   command: ["python", "-m", "fish_speech.serve", "--host", "0.0.0.0", "--port", "8080"]
-  #   restart: unless-stopped
-
-volumes:
-  qbit-config:
-#   fish-speech-models:

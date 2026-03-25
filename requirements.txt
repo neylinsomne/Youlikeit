@@ -1,24 +1,46 @@
-playwright==1.54.0
+# Core
 python-dotenv==1.1.1
-rich==14.1.0
-yt-dlp==2025.7.21
-feedparser==6.0.11
 requests==2.32.4
-beautifulsoup4>=4.12.0
-pysubs2>=1.7.0
+rich==14.1.0
+
+# Manga pipeline
+easyocr>=1.7.0
+opencv-python-headless>=4.9.0
+numpy>=1.26.0
 rapidfuzz>=3.6.0
+
+# Subtitle/quote matching
+pysubs2>=1.7.0
+beautifulsoup4>=4.12.0
+feedparser==6.0.11
+
+# Vector search
 chromadb>=0.5.0
 networkx>=3.2.0
-scipy>=1.14.0
+
+# API + WebSocket
 fastapi>=0.115.0
 uvicorn>=0.32.0
-# YouTube upload (ex12) + analytics (ex24, ex26)
+
+# Analytics
+scipy>=1.14.0
+
+# YouTube upload/analytics
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.2.0
-# LLM local (fallback offline para ex10, ex18, ex31)
-airllm>=2.11.0
-# Subtítulos locales (fallback cuando se acaban las 20 descargas/día)
-openai-whisper>=20240930
-# Google Trends para contenido trend-aware (ex17, ex33)
+
+# TTS (free, no API key)
+edge-tts>=6.1.0
+
+# Trends
 pytrends>=4.9.0
+
+# Video download
+yt-dlp>=2025.3.0
+
+# Whisper (subtitle fallback - heavy, downloads model on first use)
+openai-whisper>=20240930
+
+# Playwright (web scraping - install browsers separately)
+playwright==1.54.0

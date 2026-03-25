@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { fetchClips, fetchSeries } from '../api/client';
+import { fetchClips, fetchMangaSeries, fileUrl } from '../api/client';
 
 const tabs = [
   { id: 'all', label: 'All', icon: 'grid_view' },
@@ -20,11 +20,11 @@ export default function ContentBank() {
     const params = {};
     if (activeTab !== 'all') params.source_type = activeTab;
     if (search) params.search = search;
-    fetchClips({ ...params, limit: 50 }).then((d) => setClips(d.clips || []));
+    fetchClips({ ...params, per_page: 50 }).then((d) => setClips(d?.items || [])).catch(() => setClips([]));
   }, [activeTab, search]);
 
   useEffect(() => {
-    fetchSeries().then(setSeries).catch(() => {});
+    fetchMangaSeries({ per_page: 50 }).then(d => setSeries(d?.items || [])).catch(() => {});
   }, []);
 
   return (

@@ -39,10 +39,11 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _detect_panels(image_path: str, min_area_ratio: float = 0.02) -> list[dict]:
-    """Detect manga panels from a page image using contour detection.
+    """Detect manga panels from a page image using adaptive threshold + contours.
 
-    Returns list of panels sorted in reading order (right-to-left for manga,
-    left-to-right for manhwa/comics), each with {x, y, w, h, index}.
+    Uses adaptive thresholding (works with grey/dark backgrounds) and filters
+    by aspect ratio to avoid detecting gutters as panels.
+    Returns list of panels sorted in reading order, each with {x, y, w, h, index}.
     """
     import cv2
 
@@ -55,20 +56,29 @@ def _detect_panels(image_path: str, min_area_ratio: float = 0.02) -> list[dict]:
     total_area = h * w
     min_area = total_area * min_area_ratio
 
-    # Convert to grayscale and threshold
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # Invert: manga panels have dark borders on white
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, thresh = cv2.threshold(blur, 200, 255, cv2.THRESH_BINARY)
-    # Invert so panel borders become white
-    thresh_inv = cv2.bitwise_not(thresh)
 
-    # Morphological operations to connect panel borders
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    dilated = cv2.dilate(thresh_inv, kernel, iterations=3)
+    # Adaptive threshold handles dark/grey manga pages (Berserk, Vagabond, etc.)
+    thresh = cv2.adaptiveThreshold(
+        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 10
+    )
 
-    # Find contours
-    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # Connect panel borders with morphology
+    kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (w // 20, 1))
+    kernel_v = cv2.getStructuringElement(cv2.MORPH_RECT, (1, h // 20))
+    lines_h = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_h)
+    lines_v = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_v)
+    grid = cv2.bitwise_or(lines_h, lines_v)
+
+    # Dilate to close gaps in panel borders
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+    dilated = cv2.dilate(grid, kernel, iterations=2)
+
+    # Invert: we want the white interior of panels
+    inv = cv2.bitwise_not(dilated)
+
+    contours, _ = cv2.findContours(inv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     panels = []
     for cnt in contours:
@@ -76,8 +86,11 @@ def _detect_panels(image_path: str, min_area_ratio: float = 0.02) -> list[dict]:
         area = pw * ph
         if area < min_area:
             continue
-        # Skip if it's basically the whole page
         if area > total_area * 0.9:
+            continue
+        # Filter gutters: panels should have reasonable aspect ratio
+        ar = pw / ph if ph > 0 else 0
+        if ar > 6 or ar < 0.15:
             continue
         panels.append({"x": x, "y": y, "w": pw, "h": ph, "area": area})
 
@@ -95,21 +108,19 @@ def _detect_panels(image_path: str, min_area_ratio: float = 0.02) -> list[dict]:
                 })
 
     # Sort in reading order: top-to-bottom, right-to-left (manga style)
-    # Group into rows (similar y position)
     panels.sort(key=lambda p: p["y"])
-    rows = []
+    row_groups = []
     current_row = [panels[0]]
     for p in panels[1:]:
         if abs(p["y"] - current_row[0]["y"]) < h * 0.1:
             current_row.append(p)
         else:
-            rows.append(current_row)
+            row_groups.append(current_row)
             current_row = [p]
-    rows.append(current_row)
+    row_groups.append(current_row)
 
-    # Within each row, sort right-to-left (manga) or left-to-right (comics)
     sorted_panels = []
-    for row in rows:
+    for row in row_groups:
         row.sort(key=lambda p: -p["x"])  # Right to left (manga default)
         sorted_panels.extend(row)
 
@@ -154,25 +165,134 @@ def _get_ocr_reader(languages: list[str] = None):
     return _ocr_reader
 
 
-def _ocr_panel(image_path: str, languages: list[str] = None) -> list[dict]:
-    """Run OCR on a panel image, return detected text blocks.
+def _detect_speech_bubbles(image_path: str) -> list[dict]:
+    """Detect speech bubbles in a manga panel using shape analysis.
 
-    Returns list of {text, confidence, bbox} sorted top-to-bottom.
+    Speech bubbles are white/light rounded regions. We find them by:
+    1. Threshold to isolate white regions
+    2. Find contours with convexity > 0.7 (round shapes)
+    3. Filter by size (not too small, not the whole panel)
+
+    Returns list of {x, y, w, h, mask} for each bubble.
     """
+    import cv2
+
+    img = cv2.imread(image_path)
+    if img is None:
+        return []
+
+    h, w = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Speech bubbles are white/very light
+    _, white_mask = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)
+
+    # Close small gaps in bubble borders
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    closed = cv2.morphologyEx(white_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    bubbles = []
+    min_area = (h * w) * 0.005  # At least 0.5% of panel
+    max_area = (h * w) * 0.5    # At most 50% of panel
+
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area < min_area or area > max_area:
+            continue
+
+        # Check roundness (convexity)
+        hull = cv2.convexHull(cnt)
+        hull_area = cv2.contourArea(hull)
+        if hull_area == 0:
+            continue
+        convexity = area / hull_area
+        if convexity < 0.6:  # Not round enough for a speech bubble
+            continue
+
+        x, y, bw, bh = cv2.boundingRect(cnt)
+        bubbles.append({"x": x, "y": y, "w": bw, "h": bh, "area": area})
+
+    bubbles.sort(key=lambda b: b["y"])
+    return bubbles
+
+
+def _ocr_panel(image_path: str, languages: list[str] = None) -> list[dict]:
+    """Run OCR on a panel image with speech bubble priority.
+
+    1. Detect speech bubbles (white rounded regions)
+    2. OCR inside bubbles first (these are dialogue)
+    3. OCR remaining text (narration boxes, labels)
+    4. Mark each block as 'dialogue', 'narration', or 'sfx'
+
+    Returns list of {text, confidence, bbox, text_type} sorted top-to-bottom.
+    """
+    import cv2
+
     reader = _get_ocr_reader(languages)
-    results = reader.readtext(image_path)
+    bubbles = _detect_speech_bubbles(image_path)
 
     blocks = []
+    used_regions = []
+
+    # First pass: OCR inside detected speech bubbles
+    if bubbles:
+        img = cv2.imread(image_path)
+        for bubble in bubbles:
+            x, y, bw, bh = bubble["x"], bubble["y"], bubble["w"], bubble["h"]
+            pad = 5
+            x1, y1 = max(0, x - pad), max(0, y - pad)
+            x2 = min(img.shape[1], x + bw + pad)
+            y2 = min(img.shape[0], y + bh + pad)
+            bubble_crop = img[y1:y2, x1:x2]
+
+            results = reader.readtext(bubble_crop)
+            for bbox, text, conf in results:
+                if conf < 0.3 or len(text.strip()) < 2:
+                    continue
+                y_center = y1 + (bbox[0][1] + bbox[2][1]) / 2
+                blocks.append({
+                    "text": text.strip(),
+                    "confidence": conf,
+                    "y_center": y_center,
+                    "bbox": bbox,
+                    "text_type": "dialogue",
+                })
+            used_regions.append((x1, y1, x2, y2))
+
+    # Second pass: OCR the full panel for text outside bubbles
+    results = reader.readtext(image_path)
     for bbox, text, conf in results:
         if conf < 0.3 or len(text.strip()) < 2:
             continue
-        # bbox is [[x1,y1],[x2,y1],[x2,y2],[x1,y2]]
+
         y_center = (bbox[0][1] + bbox[2][1]) / 2
+        x_center = (bbox[0][0] + bbox[2][0]) / 2
+
+        # Skip if this text is inside a bubble we already OCR'd
+        in_bubble = False
+        for rx1, ry1, rx2, ry2 in used_regions:
+            if rx1 <= x_center <= rx2 and ry1 <= y_center <= ry2:
+                in_bubble = True
+                break
+        if in_bubble:
+            continue
+
+        # Classify: short uppercase = SFX, rectangular region = narration box
+        text_type = "narration"
+        clean = text.strip()
+        if len(clean) <= 4 and clean.isupper():
+            text_type = "sfx"
+        elif len(clean) <= 2:
+            text_type = "sfx"
+
         blocks.append({
-            "text": text.strip(),
+            "text": clean,
             "confidence": conf,
             "y_center": y_center,
             "bbox": bbox,
+            "text_type": text_type,
         })
 
     # Sort top to bottom
@@ -185,10 +305,16 @@ def _ocr_panel(image_path: str, languages: list[str] = None) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _match_ocr_to_quotes(ocr_text: str, series_title: str, conn) -> dict | None:
-    """Match OCR-extracted text against manga_quotes DB using fuzzy matching."""
+    """Match OCR-extracted text against manga_quotes DB using multi-strategy fuzzy matching.
+
+    Uses three strategies and takes the best:
+    1. partial_ratio: handles OCR missing some words
+    2. token_sort_ratio: handles words in different order
+    3. token_set_ratio: handles extra/missing words from OCR noise
+    """
     from rapidfuzz import fuzz
 
-    if len(ocr_text) < 10:
+    if len(ocr_text) < 5:
         return None
 
     cur = conn.execute(
@@ -201,9 +327,16 @@ def _match_ocr_to_quotes(ocr_text: str, series_title: str, conn) -> dict | None:
     best_match = None
     best_score = 0
 
+    ocr_lower = ocr_text.lower().strip()
     for row in cur.fetchall():
-        score = fuzz.partial_ratio(ocr_text.lower(), row["text"].lower())
-        if score > best_score and score >= 60:
+        db_lower = row["text"].lower().strip()
+        # Multi-strategy: take the highest score
+        score = max(
+            fuzz.partial_ratio(ocr_lower, db_lower),
+            fuzz.token_sort_ratio(ocr_lower, db_lower),
+            fuzz.token_set_ratio(ocr_lower, db_lower),
+        )
+        if score > best_score and score >= 55:
             best_score = score
             best_match = {
                 "quote_id": row["id"],
@@ -436,16 +569,23 @@ def _process_manga_page(
         _extract_panel_image(image_path, panel, panel_img_path)
 
         ocr_blocks = _ocr_panel(panel_img_path, languages)
-        panel_text = " ".join(b["text"] for b in ocr_blocks)
+
+        # Separate dialogue from SFX/narration for matching
+        dialogue_text = " ".join(b["text"] for b in ocr_blocks if b.get("text_type") == "dialogue")
+        all_text = " ".join(b["text"] for b in ocr_blocks)
+        # Use dialogue for matching if available, otherwise all text
+        match_text = dialogue_text if len(dialogue_text) >= 5 else all_text
+
         panel_texts[i] = {
-            "text": panel_text,
+            "text": all_text,
+            "dialogue": dialogue_text,
             "blocks": ocr_blocks,
             "panel": panel,
         }
 
-        if panel_text and len(panel_text) >= 10:
-            log.info(f"  Panel {i}: \"{panel_text[:60]}...\"")
-            match = _match_ocr_to_quotes(panel_text, series_title, conn)
+        if match_text and len(match_text) >= 5:
+            log.info(f"  Panel {i}: \"{match_text[:60]}\"")
+            match = _match_ocr_to_quotes(match_text, series_title, conn)
             if match:
                 matched_panels[i] = match
                 log.info(f"    MATCH [{match['match_score']}%]: {match['text'][:50]}")
@@ -589,20 +729,20 @@ def run(
     max_pages: int = 5,
     languages: str = "en",
     reading_order: str = "rtl",
+    manga_lang: str = "en",
+    chapter: str = "",
 ) -> str:
     """Process manga pages: detect panels, OCR, match quotes, generate Short.
 
     Args:
-        source: Path to image, folder, or CBZ/CBR file
-        series_title: Manga/anime title for quote matching
+        source: Path to image/folder/CBZ, OR 'mangadex' to auto-download
+        series_title: Manga/anime title for quote matching + MangaDex search
         max_pages: Max pages to process
         languages: OCR languages comma-separated (en, ja, ko, zh)
         reading_order: rtl (manga) or ltr (manhwa/comics)
+        manga_lang: Language for MangaDex download (en, es, es-la, pt-br)
+        chapter: Specific chapter number to download (empty = auto-select iconic)
     """
-    if not source:
-        log.error("No source provided. Use --source path/to/manga/page.jpg")
-        return ""
-
     data_dir = Path(settings.data_dir)
     conn = get_db(data_dir)
 
@@ -611,6 +751,54 @@ def run(
         conn.execute("SELECT 1 FROM manga_quotes LIMIT 1")
     except Exception:
         log.warning("manga_quotes table not found. Run ex36 first for quote matching.")
+
+    # Auto-download from MangaDex if source is 'mangadex' or not provided
+    if not source or source.lower() == "mangadex":
+        if not series_title:
+            log.error("Need --series-title for MangaDex search (e.g., 'Berserk')")
+            return ""
+
+        from common.mangadex import search_manga, get_chapters, download_chapter_pages, get_popular_chapters
+
+        log.info(f"Searching MangaDex for '{series_title}' in '{manga_lang}'...")
+        manga = search_manga(series_title)
+        if not manga:
+            log.error(f"Manga not found on MangaDex: {series_title}")
+            return ""
+
+        log.info(f"Found: {manga['title']} ({manga['year']}) [{manga['status']}]")
+
+        download_dir = str(data_dir / "manga_panels" / series_title.lower().replace(" ", "_"))
+
+        if chapter:
+            # Download specific chapter
+            chapters = get_chapters(manga["id"], lang=manga_lang, limit=100)
+            target = [c for c in chapters if c["chapter"] == chapter]
+            if not target:
+                log.error(f"Chapter {chapter} not found in '{manga_lang}'. Available: {[c['chapter'] for c in chapters[:10]]}")
+                return ""
+            pages_downloaded = download_chapter_pages(
+                target[0]["id"], f"{download_dir}/ch_{chapter}", max_pages=max_pages
+            )
+        else:
+            # Auto-select iconic chapters
+            popular = get_popular_chapters(manga["id"], lang=manga_lang, count=3)
+            if not popular:
+                log.error(f"No chapters available in '{manga_lang}'. Try --manga-lang es or en")
+                return ""
+            pages_downloaded = []
+            for ch in popular:
+                ch_dir = f"{download_dir}/ch_{ch['chapter']}"
+                ch_pages = download_chapter_pages(ch["id"], ch_dir, max_pages=max_pages)
+                pages_downloaded.extend(ch_pages)
+                if len(pages_downloaded) >= max_pages:
+                    break
+
+        source = download_dir
+        if not pages_downloaded:
+            log.error("No pages downloaded from MangaDex")
+            return ""
+        log.info(f"Downloaded {len(pages_downloaded)} pages from MangaDex")
 
     lang_list = [l.strip() for l in languages.split(",")]
     pages = _load_pages_from_source(source)

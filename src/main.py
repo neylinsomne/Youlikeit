@@ -189,6 +189,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-pages", type=int, default=5, help="Max paginas a procesar (ex38)")
     parser.add_argument("--languages", default="en", help="Idiomas OCR: en,ja,ko (ex38)")
     parser.add_argument("--reading-order", default="rtl", choices=["rtl", "ltr"], help="Orden lectura: rtl manga, ltr manhwa (ex38)")
+    parser.add_argument("--manga-lang", default="en", help="Idioma MangaDex: en, es, es-la, pt-br (ex38)")
+    parser.add_argument("--chapter", default="", help="Capitulo especifico a descargar (ex38)")
     # ex28 / ex29 / ex30 (port ya existe vía ex15)
 
     return parser
@@ -444,6 +446,8 @@ def main() -> None:
             max_pages=args.max_pages,
             languages=args.languages,
             reading_order=args.reading_order,
+            manga_lang=args.manga_lang,
+            chapter=args.chapter,
         )
     elif args.exercise == "ex39":
         out = ex39_manga_wiki_scraper.run(
