@@ -821,6 +821,33 @@ def build_app(settings: Settings):
 
         return stats
 
+    # --- Trending Songs ---
+
+    @app.get("/api/trending-songs")
+    def get_trending_songs(region: str = "", conn=Depends(get_conn)):
+        """Get cached trending songs. Refreshes once per day."""
+        try:
+            # Check if cache is fresh (< 24h)
+            cur = conn.execute("SELECT MAX(fetched_at) as last FROM trending_songs")
+            row = cur.fetchone()
+            last = row["last"] if row else None
+
+            if not last:
+                return {"songs": [], "cached": False, "message": "No songs cached. Run pipeline to fetch."}
+
+            conditions = []
+            params = []
+            if region:
+                conditions.append("region = ?")
+                params.append(region)
+
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            cur = conn.execute(f"SELECT * FROM trending_songs {where} ORDER BY id", tuple(params))
+            songs = [dict(r) for r in cur.fetchall()]
+            return {"songs": songs, "cached": True, "last_fetched": last}
+        except Exception:
+            return {"songs": [], "cached": False}
+
     return app
 
 

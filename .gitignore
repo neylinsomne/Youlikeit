@@ -15,6 +15,12 @@ data/clapshot/*.sqlite-*
 # ChromaDB (regenerable)
 data/chromadb/
 
+# Downloaded manga panels (regenerable)
+data/manga_panels/
+
+# EasyOCR models (auto-downloaded)
+data/.easyocr/
+
 # Large binary files
 *.mp4
 *.wav
