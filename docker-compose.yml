@@ -42,6 +42,34 @@ services:
     command: ["python", "src/main.py", "ex29", "--host", "0.0.0.0", "--port", "8001"]
     restart: unless-stopped
 
+  # Fish Speech TTS (GPU)
+  fish-speech:
+    build:
+      context: .
+      dockerfile: Dockerfile.fish
+      args:
+        HF_TOKEN: ${HF_TOKEN:-}
+    image: youlikeit-fish:latest
+    container_name: yt-fish-speech
+    ports:
+      - "7860:7860"
+      - "8080:8080"
+    volumes:
+      - fish-speech-models:/app/checkpoints
+      - ./outputs/voice_samples/references:/app/references
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - DEVICE=cuda
+      - TORCHAUDIO_BACKEND=soundfile
+    command: []
+    restart: unless-stopped
+
   # Frontend React (production build served by Node)
   frontend:
     image: node:22-alpine
@@ -55,3 +83,6 @@ services:
       - VITE_API_URL=http://localhost:8001
     command: ["sh", "-c", "npm install --silent 2>/dev/null; npx vite --host 0.0.0.0 --port 5180"]
     restart: unless-stopped
+
+volumes:
+  fish-speech-models:

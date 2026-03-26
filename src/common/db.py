@@ -59,6 +59,19 @@ CREATE TABLE IF NOT EXISTS shorts (
     output_file TEXT,
     status TEXT DEFAULT 'pending',  -- pending, rendered, uploaded
     youtube_id TEXT,
+    -- Metadata fields
+    category TEXT,           -- action, dramatic, philosophical, villain, etc
+    emotion TEXT,            -- dark, epic, tragic, hopeful
+    hashtags TEXT,           -- comma-separated hashtags
+    song_suggestion TEXT,    -- recommended song for platform selection
+    narration_intro TEXT,    -- intro narration text
+    narration_outro TEXT,    -- outro narration text
+    narration_segments TEXT, -- JSON: [{text, emotion, duration_s}]
+    voice TEXT DEFAULT 'andrew',  -- tts voice used
+    series_name TEXT,        -- e.g. Berserk, One Piece
+    arc_name TEXT,           -- e.g. Golden Age
+    part_number INTEGER,     -- part X of the series
+    description TEXT,        -- YouTube description
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

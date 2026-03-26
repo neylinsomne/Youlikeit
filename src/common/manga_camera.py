@@ -647,3 +647,47 @@ def render_manga_short(
         size = Path(output_path).stat().st_size // 1024
         log.info(f"Final Short: {size}KB ({len(clip_paths)} pages)")
     return output_path
+
+
+# ── Fair Use validation gate ────────────────────────────────────
+MAX_PANELS_PER_SHORT = 5
+
+def validate_fair_use(
+    video_path: str,
+    has_narration_audio: bool,
+    has_subtitles: bool,
+    num_panels: int,
+    has_original_commentary: bool = True,
+) -> tuple[bool, list[str]]:
+    """Validate a Short meets Fair Use requirements before upload.
+
+    Returns (is_valid, list_of_issues).
+    A Short MUST have narration + subtitles + limited panels to be uploaded.
+    """
+    issues = []
+
+    if not has_narration_audio:
+        issues.append("BLOCKED: No narration audio — cannot upload without original voice commentary")
+
+    if not has_subtitles:
+        issues.append("BLOCKED: No subtitles — narrated text must be visible on screen")
+
+    if num_panels > MAX_PANELS_PER_SHORT:
+        issues.append(f"BLOCKED: {num_panels} panels exceeds limit of {MAX_PANELS_PER_SHORT} — reduce to avoid copyright issues")
+
+    if not has_original_commentary:
+        issues.append("BLOCKED: No original commentary — Short must include analysis/reflection, not just show panels")
+
+    if not Path(video_path).exists():
+        issues.append("BLOCKED: Video file does not exist")
+
+    is_valid = len(issues) == 0
+
+    if is_valid:
+        log.info(f"Fair Use validation PASSED: {video_path}")
+    else:
+        log.warning(f"Fair Use validation FAILED: {video_path}")
+        for issue in issues:
+            log.warning(f"  {issue}")
+
+    return is_valid, issues
