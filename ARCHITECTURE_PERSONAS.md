@@ -144,10 +144,65 @@ CREATE TABLE personas (
     display_name TEXT,
     voice_ref_path TEXT,           -- path al .wav de referencia
     fish_speech_params JSONB,      -- {temperature, top_p, seed, ...}
-    prompt_template TEXT,          -- template de Gemini para narración
     subtitle_style JSONB,          -- {font, color, animation}
     edit_style JSONB,              -- {pace, color_grade, transitions}
     active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Prompts versionados por persona (evolucionan con el aprendizaje)
+CREATE TABLE persona_prompts (
+    id SERIAL PRIMARY KEY,
+    persona_id INTEGER REFERENCES personas(id),
+    prompt_type TEXT NOT NULL,     -- 'system', 'narration', 'cross_ref', 'intro', 'outro', 'analysis'
+    version INTEGER DEFAULT 1,
+    content TEXT NOT NULL,         -- el prompt completo
+    variables TEXT[],              -- ['{{work_title}}', '{{themes}}', '{{cross_refs}}']
+    active BOOLEAN DEFAULT true,   -- solo 1 activo por (persona_id, prompt_type)
+    performance_score REAL,        -- avg retention de Shorts que usaron este prompt
+    a_b_test_id INTEGER,           -- si está en A/B test
+    notes TEXT,                    -- por qué se cambió
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Feed de información nueva por persona (contexto que se acumula)
+CREATE TABLE persona_knowledge (
+    id SERIAL PRIMARY KEY,
+    persona_id INTEGER REFERENCES personas(id),
+    knowledge_type TEXT NOT NULL,  -- 'reference', 'insight', 'style_note', 'audience_signal', 'trend'
+    content TEXT NOT NULL,         -- el conocimiento en sí
+    source TEXT,                   -- 'analytics', 'manual', 'gemini', 'trend_api', 'a_b_test'
+    relevance_score REAL DEFAULT 1.0,  -- decae con el tiempo si no se valida
+    expires_at TIMESTAMPTZ,        -- NULL = permanente, fecha = temporal (trends)
+    used_count INTEGER DEFAULT 0,  -- cuántas veces se usó en producción
+    embedding VECTOR(384),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Reglas de comportamiento por persona (lo que puede/no puede hacer)
+CREATE TABLE persona_rules (
+    id SERIAL PRIMARY KEY,
+    persona_id INTEGER REFERENCES personas(id),
+    rule_type TEXT NOT NULL,       -- 'must', 'never', 'prefer', 'avoid'
+    rule TEXT NOT NULL,            -- "Siempre citar al director cuando menciones una película"
+    priority INTEGER DEFAULT 5,    -- 1-10, 10 = inquebrantable
+    source TEXT,                   -- 'manual', 'a_b_test', 'audience_feedback'
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Historial de interacciones del pipeline con cada persona
+CREATE TABLE persona_runs (
+    id SERIAL PRIMARY KEY,
+    persona_id INTEGER REFERENCES personas(id),
+    short_id INTEGER REFERENCES shorts(id),
+    prompt_id INTEGER REFERENCES persona_prompts(id),
+    knowledge_ids INTEGER[],       -- qué knowledge se inyectó
+    llm_input TEXT,                -- prompt completo enviado a Gemini
+    llm_output TEXT,               -- respuesta completa de Gemini
+    tokens_used INTEGER,
+    duration_ms INTEGER,
+    quality_score REAL,            -- auto-eval o manual
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
