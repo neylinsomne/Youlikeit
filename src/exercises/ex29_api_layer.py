@@ -848,6 +848,126 @@ def build_app(settings: Settings):
         except Exception:
             return {"songs": [], "cached": False}
 
+    # --- A/B Testing ---
+
+    @app.post("/api/ab-tests")
+    def create_test(
+        name: str,
+        hypothesis: str,
+        variable: str,
+        variant_a: str,  # JSON string
+        variant_b: str,  # JSON string
+        metric: str = "engagement_rate",
+        conn=Depends(get_conn),
+        user=Depends(get_current_user),
+    ):
+        """Create a new A/B test."""
+        from common.ab_testing import create_ab_test, TESTABLE_VARIABLES
+        try:
+            config_a = json.loads(variant_a)
+            config_b = json.loads(variant_b)
+        except json.JSONDecodeError:
+            return {"error": "Invalid JSON in variant configs"}
+
+        test_id = create_ab_test(conn, name, hypothesis, variable, config_a, config_b, metric)
+        return {"test_id": test_id, "status": "draft", "testable_variables": list(TESTABLE_VARIABLES.keys())}
+
+    @app.get("/api/ab-tests")
+    def list_ab_tests(status: str = "", conn=Depends(get_conn), user=Depends(get_current_user)):
+        """List all A/B tests."""
+        from common.ab_testing import list_tests
+        return list_tests(conn, status)
+
+    @app.get("/api/ab-tests/{test_id}")
+    def get_ab_test(test_id: int, conn=Depends(get_conn), user=Depends(get_current_user)):
+        """Get detailed A/B test summary."""
+        from common.ab_testing import get_test_summary
+        return get_test_summary(conn, test_id)
+
+    @app.post("/api/ab-tests/{test_id}/start")
+    def start_ab_test(test_id: int, conn=Depends(get_conn), user=Depends(get_current_user)):
+        """Start an A/B test."""
+        from common.ab_testing import start_test
+        return start_test(conn, test_id)
+
+    @app.post("/api/ab-tests/{test_id}/assign")
+    def assign_to_test(
+        test_id: int, short_id: int, variant: str,
+        conn=Depends(get_conn), user=Depends(get_current_user),
+    ):
+        """Assign a Short to a test variant (a or b)."""
+        from common.ab_testing import assign_short_to_test
+        if variant not in ("a", "b"):
+            return {"error": "variant must be 'a' or 'b'"}
+        assign_short_to_test(conn, test_id, short_id, variant)
+        return {"status": "assigned", "short_id": short_id, "variant": variant}
+
+    @app.post("/api/ab-tests/{test_id}/collect")
+    def collect_test_results(test_id: int, conn=Depends(get_conn), user=Depends(get_current_user)):
+        """Pull latest analytics for both variants."""
+        from common.ab_testing import collect_results
+        return collect_results(conn, test_id)
+
+    @app.post("/api/ab-tests/{test_id}/conclude")
+    def conclude_ab_test(test_id: int, conn=Depends(get_conn), user=Depends(get_current_user)):
+        """Run statistical test and determine winner."""
+        from common.ab_testing import conclude_test
+        return conclude_test(conn, test_id)
+
+    @app.get("/api/ab-tests/variables")
+    def get_testable_variables(user=Depends(get_current_user)):
+        """List all variables that can be A/B tested."""
+        from common.ab_testing import TESTABLE_VARIABLES
+        return TESTABLE_VARIABLES
+
+    # --- Personas ---
+
+    @app.get("/api/personas")
+    def list_personas(conn=Depends(get_conn), user=Depends(get_current_user)):
+        """List all personas with their stats."""
+        from common.personas import get_persona
+        rows = conn.execute("SELECT name FROM personas WHERE active=1").fetchall()
+        personas = []
+        for row in rows:
+            p = get_persona(conn, row["name"])
+            if p:
+                personas.append({
+                    "id": p["id"],
+                    "name": p["name"],
+                    "display_name": p["display_name"],
+                    "voice_ref": p["voice_ref_path"],
+                    "prompts": list(p["prompts"].keys()),
+                    "rules_count": len(p["rules"]),
+                    "knowledge_count": len(p["knowledge"]),
+                })
+        return personas
+
+    @app.get("/api/personas/{name}")
+    def get_persona_detail(name: str, conn=Depends(get_conn), user=Depends(get_current_user)):
+        """Get full persona details including prompts, rules, knowledge."""
+        from common.personas import get_persona
+        persona = get_persona(conn, name)
+        if not persona:
+            return {"error": f"Persona '{name}' not found"}
+        return persona
+
+    @app.get("/api/cross-references")
+    def list_cross_refs(
+        source: str = "", target_type: str = "",
+        conn=Depends(get_conn), user=Depends(get_current_user),
+    ):
+        """List cross-references, optionally filtered."""
+        conditions, params = [], []
+        if source:
+            conditions.append("source_work = ?")
+            params.append(source)
+        if target_type:
+            conditions.append("target_type = ?")
+            params.append(target_type)
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        rows = conn.execute(f"SELECT * FROM cross_references {where} ORDER BY strength DESC", tuple(params)).fetchall()
+        return [dict(r) for r in rows]
+
     return app
 
 
