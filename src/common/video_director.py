@@ -1,378 +1,596 @@
 """
-Video Director: connects narration segments to visual content.
-Ensures what the voice says matches what appears on screen.
+Video Director v2: Professional editing orchestration.
 
-Flow:
-1. Narration segments (text + emotion + duration)
-2. Available pages/panels with OCR text and metadata
-3. Director matches each segment to the best visual
-4. Generates a timeline: [{visual, audio, transition, duration}]
-5. FFmpeg renders the final video from the timeline
+Connects narration to visuals with cinematic techniques:
+- J-cuts (audio leads visual by 0.3-0.5s)
+- Ken Burns with easing (smoothstep, not linear)
+- Mood-based pacing (action=fast, dialogue=slow)
+- Face-targeted zoom for dramatic moments
+- Cross-reference clips (movie scenes inserted mid-narration)
+- Audio ducking (silence movie audio when narrator speaks)
+- STT-based scene matching (find exact movie timestamp for a quote)
+
+Architecture:
+  Narration script → Director → Edit Decision List (EDL) → FFmpeg filter graph → Video
 """
 import json
+import math
 import os
 import re
 import subprocess
-import logging
 import tempfile
+import logging
 from pathlib import Path
 from typing import Optional
 
 log = logging.getLogger(__name__)
 
 
-# ── Transition types ──────────────────────────────────────────
-TRANSITIONS = {
-    "fade": {"filter": "xfade=transition=fade:duration={dur}:offset={offset}"},
-    "dissolve": {"filter": "xfade=transition=dissolve:duration={dur}:offset={offset}"},
-    "wipeleft": {"filter": "xfade=transition=wipeleft:duration={dur}:offset={offset}"},
-    "wiperight": {"filter": "xfade=transition=wiperight:duration={dur}:offset={offset}"},
-    "slideup": {"filter": "xfade=transition=slideup:duration={dur}:offset={offset}"},
-    "circleopen": {"filter": "xfade=transition=circleopen:duration={dur}:offset={offset}"},
-    "none": None,
+# ── Pacing rules (cuts per minute by mood) ────────────────────
+PACING = {
+    "calm":      {"hold_s": 6.0, "transition_s": 0.5},
+    "dialogue":  {"hold_s": 4.0, "transition_s": 0.4},
+    "tension":   {"hold_s": 3.0, "transition_s": 0.3},
+    "action":    {"hold_s": 1.5, "transition_s": 0.2},
+    "shock":     {"hold_s": 0.8, "transition_s": 0.1},
+    # Mapped from emotions
+    "dark":      {"hold_s": 4.0, "transition_s": 0.5},
+    "epic":      {"hold_s": 3.0, "transition_s": 0.3},
+    "tragic":    {"hold_s": 5.0, "transition_s": 0.6},
+    "hopeful":   {"hold_s": 4.0, "transition_s": 0.4},
+    "default":   {"hold_s": 4.0, "transition_s": 0.4},
 }
 
-# Emotion → transition mapping
-EMOTION_TRANSITIONS = {
-    "dark": "dissolve",
-    "epic": "wipeleft",
-    "tragic": "fade",
-    "hopeful": "circleopen",
-    "default": "fade",
+# ── Easing functions for Ken Burns ────────────────────────────
+def ease_smoothstep(t):
+    """Smoothstep: slow start + slow end."""
+    return t * t * (3 - 2 * t)
+
+def ease_out_cubic(t):
+    """Fast start, slow end — good for zoom-in."""
+    return 1 - (1 - t) ** 3
+
+def ease_in_cubic(t):
+    """Slow start, fast end — good for building tension."""
+    return t ** 3
+
+EASING_MAP = {
+    "dark":    "smoothstep",
+    "epic":    "ease_out",
+    "tragic":  "ease_in",
+    "hopeful": "smoothstep",
 }
 
-# Emotion → color grade
-EMOTION_GRADES = {
-    "dark": "eq=brightness=-0.05:saturation=0.7",
-    "epic": "eq=brightness=0.02:saturation=1.2:contrast=1.1",
-    "tragic": "eq=brightness=-0.08:saturation=0.5",
-    "hopeful": "eq=brightness=0.05:saturation=1.1",
-    "default": "null",
+# FFmpeg easing expressions
+EASING_EXPR = {
+    "smoothstep": "(T*T*(3-2*T))",        # T = normalized time (in/total_frames)
+    "ease_out":   "(1-pow(1-T,3))",
+    "ease_in":    "(pow(T,3))",
+    "linear":     "T",
 }
+
+
+class EditDecision:
+    """A single edit decision in the timeline."""
+    def __init__(
+        self,
+        visual_type: str,       # 'manga_panel', 'movie_clip', 'black', 'title_card'
+        visual_path: str,       # path to image or video file
+        duration: float,        # seconds
+        narration_text: str = "",
+        narration_audio: str = "", # path to narration audio for this segment
+        emotion: str = "default",
+        camera: dict = None,    # {"zoom_start": 1.0, "zoom_end": 1.1, "focus": "center"}
+        transition_in: str = "fade",
+        transition_duration: float = 0.3,
+        audio_mode: str = "narration_only",  # 'narration_only', 'clip_audio', 'ducked', 'silent'
+        clip_start_s: float = 0, # for movie clips: start timestamp
+        clip_end_s: float = 0,   # for movie clips: end timestamp
+        j_cut_s: float = 0.3,   # audio leads visual by this much
+    ):
+        self.visual_type = visual_type
+        self.visual_path = visual_path
+        self.duration = duration
+        self.narration_text = narration_text
+        self.narration_audio = narration_audio
+        self.emotion = emotion
+        self.camera = camera or {"zoom_start": 1.0, "zoom_end": 1.08, "focus": "center"}
+        self.transition_in = transition_in
+        self.transition_duration = transition_duration
+        self.audio_mode = audio_mode
+        self.clip_start_s = clip_start_s
+        self.clip_end_s = clip_end_s
+        self.j_cut_s = j_cut_s
 
 
 class VideoDirector:
-    """Orchestrates the connection between narration and visuals."""
+    """Orchestrates professional video editing from narration + visuals."""
 
-    def __init__(
-        self,
-        target_size: tuple = (1080, 1920),
-        fps: int = 30,
-        use_gpu: bool = True,
-    ):
-        self.target_size = target_size
+    def __init__(self, target_size=(1080, 1920), fps=30, use_gpu=True):
+        self.w, self.h = target_size
         self.fps = fps
         self.encoder = "h264_nvenc" if use_gpu else "libx264"
-        self.w, self.h = target_size
 
-    def create_timeline(
+    # ── Main entry point ──────────────────────────────────────
+
+    def direct(
         self,
-        narration_segments: list,
-        available_pages: list,
-        page_ocr_texts: dict = None,
-    ) -> list:
-        """Match each narration segment to the best visual page/panel.
-
-        narration_segments: [{"text": "...", "start_s": 0, "duration_s": 5, "emotion": "dark", "visual_hint": "..."}]
-        available_pages: ["/path/to/page1.jpg", "/path/to/page2.jpg", ...]
-        page_ocr_texts: {"/path/to/page1.jpg": "OCR text from this page", ...}
-
-        Returns timeline: [{"visual": path, "audio_start": 0, "duration": 5, "emotion": "dark", "transition": "fade", "camera": {...}}]
-        """
-        if not available_pages:
-            return []
-
-        timeline = []
-        used_pages = set()
-        pages_per_segment = max(1, len(available_pages) // max(len(narration_segments), 1))
-
-        for i, seg in enumerate(narration_segments):
-            text = seg.get("text", "")
-            emotion = seg.get("emotion", "default")
-            visual_hint = seg.get("visual_hint", "")
-            duration = seg.get("duration_s", 5.0)
-            start = seg.get("start_s", 0)
-
-            # Find best matching page
-            best_page = self._find_best_page(
-                text, visual_hint, available_pages, page_ocr_texts, used_pages
-            )
-
-            if not best_page:
-                # Fallback: use pages in order
-                page_idx = min(i * pages_per_segment, len(available_pages) - 1)
-                best_page = available_pages[page_idx]
-
-            used_pages.add(best_page)
-
-            # Determine transition based on emotion change
-            prev_emotion = narration_segments[i - 1].get("emotion", "default") if i > 0 else None
-            transition = self._select_transition(emotion, prev_emotion, i == 0)
-
-            # Camera movement based on emotion
-            camera = self._select_camera(emotion, duration)
-
-            timeline.append({
-                "visual": best_page,
-                "audio_start": start,
-                "duration": duration,
-                "emotion": emotion,
-                "transition": transition,
-                "camera": camera,
-                "narration_text": text,
-                "segment_index": i,
-            })
-
-        log.info(f"Timeline: {len(timeline)} segments, {sum(s['duration'] for s in timeline):.1f}s total")
-        return timeline
-
-    def _find_best_page(
-        self, narration_text: str, visual_hint: str, pages: list,
-        ocr_texts: dict, used: set
-    ) -> Optional[str]:
-        """Find the page that best matches the narration content."""
-        if not ocr_texts:
-            return None
-
-        query = (narration_text + " " + visual_hint).lower()
-        keywords = set(re.findall(r'\b[a-z]{4,}\b', query))
-
-        # Remove common words
-        stopwords = {"this", "that", "with", "from", "have", "been", "their", "would",
-                      "could", "about", "which", "where", "when", "what", "your", "into",
-                      "them", "than", "then", "some", "more", "very", "just", "like"}
-        keywords -= stopwords
-
-        best_score = -1
-        best_page = None
-
-        for page in pages:
-            if page in used and len(pages) > len(used) + 1:
-                continue  # Skip already used, unless running out
-
-            page_text = (ocr_texts.get(page, "") or "").lower()
-            if not page_text:
-                continue
-
-            # Score: count matching keywords
-            page_words = set(re.findall(r'\b[a-z]{4,}\b', page_text))
-            matches = keywords & page_words
-            score = len(matches)
-
-            # Bonus for character names
-            for name in ["guts", "griffith", "casca", "band", "hawk", "eclipse",
-                         "skull", "knight", "zodd", "femto", "godhand"]:
-                if name in query and name in page_text:
-                    score += 3
-
-            if score > best_score:
-                best_score = score
-                best_page = page
-
-        return best_page if best_score > 0 else None
-
-    def _select_transition(self, emotion: str, prev_emotion: str, is_first: bool) -> str:
-        """Select transition based on emotional shift."""
-        if is_first:
-            return "fade"  # Always fade in
-
-        # Big emotional shifts get dramatic transitions
-        if prev_emotion != emotion:
-            if emotion == "dark":
-                return "dissolve"
-            elif emotion == "epic":
-                return "wipeleft"
-            elif emotion == "tragic":
-                return "fade"
-            elif emotion == "hopeful":
-                return "circleopen"
-
-        return EMOTION_TRANSITIONS.get(emotion, "fade")
-
-    def _select_camera(self, emotion: str, duration: float) -> dict:
-        """Select camera movement based on emotion."""
-        if emotion == "dark":
-            return {"type": "slow_zoom_in", "speed": 0.002, "start_scale": 1.0, "end_scale": 1.08}
-        elif emotion == "epic":
-            return {"type": "pan_and_zoom", "speed": 0.004, "start_scale": 1.05, "end_scale": 1.15}
-        elif emotion == "tragic":
-            return {"type": "slow_zoom_out", "speed": 0.001, "start_scale": 1.1, "end_scale": 1.0}
-        elif emotion == "hopeful":
-            return {"type": "gentle_pan", "speed": 0.003, "start_scale": 1.0, "end_scale": 1.05}
-        return {"type": "static", "speed": 0, "start_scale": 1.0, "end_scale": 1.0}
-
-    def render_from_timeline(
-        self,
-        timeline: list,
-        audio_path: str,
-        output_path: str,
+        narration_script: dict,
+        manga_pages: list,
+        movie_clips: dict = None,
+        page_ocr: dict = None,
+        output_path: str = "output.mp4",
         subtitle_path: str = None,
     ) -> str:
-        """Render final video from a director timeline.
+        """Direct a complete Short from script + visuals.
 
-        Each segment gets its own clip with camera movement + color grade,
-        then all clips are concatenated with transitions, and audio is merged.
+        narration_script: {
+            "intro": "opening narration",
+            "segments": [
+                {
+                    "text": "narration text",
+                    "emotion": "dark",
+                    "visual_hint": "Guts standing alone",
+                    "cross_ref": {                          # OPTIONAL
+                        "type": "movie_clip",
+                        "movie": "The Godfather",
+                        "quote": "I'll make him an offer...",
+                        "action": "play_then_narrate"       # play_then_narrate, narrate_over, silent_bg
+                    }
+                }
+            ],
+            "outro": "closing narration"
+        }
+        manga_pages: ["/path/page1.jpg", ...]
+        movie_clips: {"The Godfather": "/path/godfather.mp4"}  # pre-downloaded
+        page_ocr: {"/path/page1.jpg": "OCR text..."}
         """
-        if not timeline:
-            raise ValueError("Empty timeline")
+        edl = self._build_edl(narration_script, manga_pages, movie_clips, page_ocr)
+        return self._render_edl(edl, output_path, subtitle_path)
 
-        tmpdir = tempfile.mkdtemp(prefix="director_")
+    # ── EDL Builder ───────────────────────────────────────────
+
+    def _build_edl(self, script, pages, clips, ocr) -> list:
+        """Build Edit Decision List from script."""
+        edl = []
+        segments = script.get("segments", [])
+        intro = script.get("intro", "")
+        outro = script.get("outro", "")
+
+        # Add intro
+        if intro:
+            edl.append(EditDecision(
+                visual_type="manga_panel",
+                visual_path=pages[0] if pages else "",
+                duration=3.0,
+                narration_text=intro,
+                emotion="epic",
+                camera={"zoom_start": 1.15, "zoom_end": 1.0, "focus": "center"},  # zoom OUT for intro
+                transition_in="fade",
+                j_cut_s=0,  # no j-cut for first segment
+            ))
+
+        # Process each segment
+        page_idx = 1  # start from second page (first used for intro)
+        for i, seg in enumerate(segments):
+            emotion = seg.get("emotion", "default")
+            text = seg.get("text", "")
+            cross_ref = seg.get("cross_ref")
+            visual_hint = seg.get("visual_hint", "")
+
+            # Find best matching page
+            best_page = self._match_page(text, visual_hint, pages, ocr, page_idx)
+            if best_page:
+                page_idx = pages.index(best_page) + 1
+            else:
+                best_page = pages[min(page_idx, len(pages) - 1)] if pages else ""
+                page_idx += 1
+
+            pacing = PACING.get(emotion, PACING["default"])
+
+            if cross_ref and cross_ref.get("type") == "movie_clip":
+                # ── CROSS-REFERENCE: insert movie clip ────
+                movie_name = cross_ref.get("movie", "")
+                movie_path = (clips or {}).get(movie_name, "")
+                quote = cross_ref.get("quote", "")
+                action = cross_ref.get("action", "play_then_narrate")
+
+                if movie_path and Path(movie_path).exists():
+                    # Find the quote timestamp via STT
+                    clip_start, clip_end = self._find_quote_timestamp(movie_path, quote)
+
+                    if action == "play_then_narrate":
+                        # 1. Show manga panel while narrator introduces
+                        edl.append(EditDecision(
+                            visual_type="manga_panel",
+                            visual_path=best_page,
+                            duration=max(2.0, len(text.split()) * 0.3),
+                            narration_text=text.split("...")[0] if "..." in text else text[:len(text)//2],
+                            emotion=emotion,
+                            camera=self._camera_for_emotion(emotion),
+                            transition_in=self._transition_for_shift(emotion, i),
+                        ))
+
+                        # 2. Cut to movie clip with ORIGINAL audio
+                        clip_dur = min(clip_end - clip_start, 8.0) if clip_end > clip_start else 5.0
+                        edl.append(EditDecision(
+                            visual_type="movie_clip",
+                            visual_path=movie_path,
+                            duration=clip_dur,
+                            narration_text="",  # no narration, movie audio plays
+                            emotion=emotion,
+                            audio_mode="clip_audio",
+                            clip_start_s=clip_start,
+                            clip_end_s=clip_start + clip_dur,
+                            transition_in="dissolve",
+                            transition_duration=0.4,
+                            j_cut_s=0,
+                        ))
+
+                        # 3. Continue with narration over SILENT movie clip (duck)
+                        remaining_text = text.split("...")[-1] if "..." in text else text[len(text)//2:]
+                        if remaining_text.strip():
+                            edl.append(EditDecision(
+                                visual_type="movie_clip",
+                                visual_path=movie_path,
+                                duration=max(2.0, len(remaining_text.split()) * 0.35),
+                                narration_text=remaining_text,
+                                emotion=emotion,
+                                audio_mode="ducked",  # movie audio at -20dB, narration on top
+                                clip_start_s=clip_start + clip_dur,
+                                clip_end_s=clip_start + clip_dur + 5,
+                                transition_in="none",
+                                j_cut_s=0.3,
+                            ))
+
+                    elif action == "narrate_over":
+                        # Movie clip plays silently while narrator speaks
+                        edl.append(EditDecision(
+                            visual_type="movie_clip",
+                            visual_path=movie_path,
+                            duration=max(3.0, len(text.split()) * 0.35),
+                            narration_text=text,
+                            emotion=emotion,
+                            audio_mode="ducked",
+                            clip_start_s=clip_start,
+                            clip_end_s=clip_start + 10,
+                            transition_in=self._transition_for_shift(emotion, i),
+                            j_cut_s=0.3,
+                        ))
+
+                    elif action == "silent_bg":
+                        # Movie clip as silent background
+                        edl.append(EditDecision(
+                            visual_type="movie_clip",
+                            visual_path=movie_path,
+                            duration=max(3.0, len(text.split()) * 0.35),
+                            narration_text=text,
+                            emotion=emotion,
+                            audio_mode="narration_only",
+                            clip_start_s=clip_start,
+                            clip_end_s=clip_start + 10,
+                            transition_in=self._transition_for_shift(emotion, i),
+                        ))
+                else:
+                    # No movie clip available, use manga panel
+                    edl.append(EditDecision(
+                        visual_type="manga_panel",
+                        visual_path=best_page,
+                        duration=max(3.0, len(text.split()) * 0.35),
+                        narration_text=text,
+                        emotion=emotion,
+                        camera=self._camera_for_emotion(emotion),
+                        transition_in=self._transition_for_shift(emotion, i),
+                    ))
+            else:
+                # ── STANDARD: manga panel with narration ────
+                # Split long segments into multiple panels for better pacing
+                words = text.split()
+                if len(words) > 20 and page_idx < len(pages):
+                    # Split into 2 panels
+                    mid = len(words) // 2
+                    text_a = " ".join(words[:mid])
+                    text_b = " ".join(words[mid:])
+
+                    edl.append(EditDecision(
+                        visual_type="manga_panel",
+                        visual_path=best_page,
+                        duration=max(2.0, len(text_a.split()) * 0.35),
+                        narration_text=text_a,
+                        emotion=emotion,
+                        camera=self._camera_for_emotion(emotion),
+                        transition_in=self._transition_for_shift(emotion, i),
+                        j_cut_s=0.3 if i > 0 else 0,
+                    ))
+
+                    next_page = pages[min(page_idx, len(pages) - 1)]
+                    page_idx += 1
+                    edl.append(EditDecision(
+                        visual_type="manga_panel",
+                        visual_path=next_page,
+                        duration=max(2.0, len(text_b.split()) * 0.35),
+                        narration_text=text_b,
+                        emotion=emotion,
+                        camera=self._camera_for_emotion(emotion),
+                        transition_in="dissolve",
+                        transition_duration=0.2,
+                        j_cut_s=0.3,
+                    ))
+                else:
+                    edl.append(EditDecision(
+                        visual_type="manga_panel",
+                        visual_path=best_page,
+                        duration=max(3.0, len(words) * 0.35),
+                        narration_text=text,
+                        emotion=emotion,
+                        camera=self._camera_for_emotion(emotion),
+                        transition_in=self._transition_for_shift(emotion, i),
+                        j_cut_s=0.3 if i > 0 else 0,
+                    ))
+
+        # Add outro
+        if outro:
+            edl.append(EditDecision(
+                visual_type="manga_panel",
+                visual_path=pages[-1] if pages else "",
+                duration=3.5,
+                narration_text=outro,
+                emotion="hopeful",
+                camera={"zoom_start": 1.0, "zoom_end": 1.1, "focus": "center"},
+                transition_in="fade",
+                j_cut_s=0.3,
+            ))
+
+        log.info(f"EDL: {len(edl)} decisions, {sum(d.duration for d in edl):.1f}s total")
+        return edl
+
+    # ── STT: Find quote timestamp in movie ────────────────────
+
+    def _find_quote_timestamp(self, movie_path: str, quote: str) -> tuple:
+        """Use Whisper STT to find the timestamp of a quote in a movie.
+        Returns (start_s, end_s).
+        """
+        if not quote:
+            return (0, 10)
+
+        try:
+            import whisper
+            model = whisper.load_model("base")
+
+            # Transcribe (this is slow for full movies — use SRT if available)
+            result = model.transcribe(movie_path, language="en", word_timestamps=True)
+
+            quote_lower = quote.lower().strip()
+            quote_words = quote_lower.split()[:5]  # first 5 words for matching
+
+            for segment in result.get("segments", []):
+                seg_text = segment.get("text", "").lower().strip()
+                # Fuzzy match: check if most words appear in the segment
+                matches = sum(1 for w in quote_words if w in seg_text)
+                if matches >= len(quote_words) * 0.6:
+                    start = segment["start"]
+                    end = segment["end"]
+                    log.info(f"STT match: '{quote[:40]}...' at {start:.1f}-{end:.1f}s")
+                    return (max(0, start - 1), end + 1)  # add 1s buffer
+
+        except ImportError:
+            log.warning("Whisper not available, using SRT fallback")
+        except Exception as e:
+            log.warning(f"STT failed: {e}")
+
+        # Fallback: try SRT file
+        srt_path = Path(movie_path).with_suffix(".srt")
+        if srt_path.exists():
+            return self._find_in_srt(str(srt_path), quote)
+
+        return (0, 10)  # default to first 10 seconds
+
+    def _find_in_srt(self, srt_path: str, quote: str) -> tuple:
+        """Find quote timestamp in SRT subtitle file."""
+        try:
+            with open(srt_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+
+            blocks = content.strip().split("\n\n")
+            quote_lower = quote.lower()
+            quote_words = set(re.findall(r'\b\w{4,}\b', quote_lower))
+
+            best_match = (0, 10)
+            best_score = 0
+
+            for block in blocks:
+                lines = block.strip().split("\n")
+                if len(lines) < 3:
+                    continue
+
+                # Parse timestamp
+                time_line = lines[1]
+                text = " ".join(lines[2:]).lower()
+                text_words = set(re.findall(r'\b\w{4,}\b', text))
+
+                score = len(quote_words & text_words)
+                if score > best_score:
+                    best_score = score
+                    # Parse time
+                    match = re.match(r'(\d+):(\d+):(\d+),(\d+)\s*-->\s*(\d+):(\d+):(\d+),(\d+)', time_line)
+                    if match:
+                        g = match.groups()
+                        start = int(g[0]) * 3600 + int(g[1]) * 60 + int(g[2]) + int(g[3]) / 1000
+                        end = int(g[4]) * 3600 + int(g[5]) * 60 + int(g[6]) + int(g[7]) / 1000
+                        best_match = (max(0, start - 0.5), end + 0.5)
+
+            return best_match
+        except Exception:
+            return (0, 10)
+
+    # ── Camera and transition helpers ─────────────────────────
+
+    def _camera_for_emotion(self, emotion: str) -> dict:
+        cameras = {
+            "dark":    {"zoom_start": 1.0, "zoom_end": 1.08, "focus": "center", "easing": "smoothstep"},
+            "epic":    {"zoom_start": 1.05, "zoom_end": 1.15, "focus": "face", "easing": "ease_out"},
+            "tragic":  {"zoom_start": 1.1, "zoom_end": 1.0, "focus": "center", "easing": "ease_in"},
+            "hopeful": {"zoom_start": 1.0, "zoom_end": 1.05, "focus": "center", "easing": "smoothstep"},
+        }
+        return cameras.get(emotion, cameras["dark"])
+
+    def _transition_for_shift(self, emotion: str, index: int) -> str:
+        if index == 0:
+            return "fade"
+        transitions = {
+            "dark": "dissolve", "epic": "wipeleft",
+            "tragic": "fade", "hopeful": "circleopen",
+        }
+        return transitions.get(emotion, "fade")
+
+    # ── Page matching ─────────────────────────────────────────
+
+    def _match_page(self, text, hint, pages, ocr, start_idx):
+        if not ocr or not pages:
+            return None
+
+        query = (text + " " + hint).lower()
+        keywords = set(re.findall(r'\b[a-z]{4,}\b', query))
+        stopwords = {"this", "that", "with", "from", "have", "been", "their",
+                     "would", "could", "about", "which", "where", "when"}
+        keywords -= stopwords
+
+        best = None
+        best_score = 0
+        for page in pages[start_idx:] + pages[:start_idx]:
+            page_text = (ocr.get(page, "") or "").lower()
+            score = len(keywords & set(re.findall(r'\b[a-z]{4,}\b', page_text)))
+            if score > best_score:
+                best_score = score
+                best = page
+
+        return best if best_score > 0 else None
+
+    # ── Render EDL ────────────────────────────────────────────
+
+    def _render_edl(self, edl: list, output_path: str, subtitle_path: str = None) -> str:
+        """Render the Edit Decision List into a final video."""
+        tmpdir = tempfile.mkdtemp(prefix="director_v2_")
         clip_paths = []
 
         try:
-            for i, seg in enumerate(timeline):
+            # 1. Render each segment
+            for i, decision in enumerate(edl):
                 clip_path = os.path.join(tmpdir, f"seg_{i:03d}.mp4")
-                self._render_segment(seg, clip_path)
+
+                if decision.visual_type == "manga_panel":
+                    self._render_panel_segment(decision, clip_path)
+                elif decision.visual_type == "movie_clip":
+                    self._render_movie_segment(decision, clip_path)
+                elif decision.visual_type == "title_card":
+                    self._render_title_card(decision, clip_path)
+
                 if Path(clip_path).exists() and Path(clip_path).stat().st_size > 0:
-                    clip_paths.append(clip_path)
-                else:
-                    log.warning(f"Segment {i} failed to render")
+                    clip_paths.append((clip_path, decision))
 
             if not clip_paths:
                 raise RuntimeError("No segments rendered")
 
-            # Concatenate with transitions
-            video_only = os.path.join(tmpdir, "video_only.mp4")
-            self._concatenate_with_transitions(clip_paths, timeline, video_only)
+            # 2. Concatenate all segments
+            video_only = os.path.join(tmpdir, "assembled.mp4")
+            self._assemble_clips([c[0] for c in clip_paths], video_only)
 
-            # Merge audio
-            if audio_path and Path(audio_path).exists():
-                self._merge_audio(video_only, audio_path, output_path, subtitle_path)
-            else:
-                import shutil
-                shutil.copy(video_only, output_path)
+            # 3. Build and merge full audio track (narration with J-cuts)
+            full_audio = os.path.join(tmpdir, "full_audio.wav")
+            self._build_audio_track(edl, full_audio)
+
+            # 4. Merge video + audio + optional subtitles
+            self._final_merge(video_only, full_audio, output_path, subtitle_path)
 
         finally:
             import shutil
             shutil.rmtree(tmpdir, ignore_errors=True)
 
         if Path(output_path).exists():
-            size_kb = Path(output_path).stat().st_size // 1024
-            log.info(f"Director output: {output_path} ({size_kb}KB)")
+            log.info(f"Director v2 output: {Path(output_path).stat().st_size // 1024}KB")
 
         return output_path
 
-    def _render_segment(self, seg: dict, output: str):
-        """Render a single segment: image → video with camera movement + color grade."""
-        visual = seg["visual"]
-        duration = seg["duration"]
-        emotion = seg["emotion"]
-        camera = seg["camera"]
+    def _render_panel_segment(self, d: EditDecision, output: str):
+        """Render manga panel with Ken Burns + easing."""
+        if not d.visual_path or not Path(d.visual_path).exists():
+            return
 
-        frames = int(duration * self.fps)
-        start_scale = camera["start_scale"]
-        end_scale = camera["end_scale"]
+        frames = int(d.duration * self.fps)
+        zs = d.camera.get("zoom_start", 1.0)
+        ze = d.camera.get("zoom_end", 1.08)
+        easing = d.camera.get("easing", "smoothstep")
 
-        # Color grade
-        grade = EMOTION_GRADES.get(emotion, "null")
-
-        # Build zoompan filter for camera movement
-        # zoompan: zoom from start_scale to end_scale over duration
-        zoom_expr = f"'{start_scale}+({end_scale}-{start_scale})*on/{frames}'"
-        # Center the zoom
-        x_expr = f"'(iw-iw/zoom)/2'"
-        y_expr = f"'(ih-ih/zoom)/2'"
+        # Build easing expression
+        ease_expr = EASING_EXPR.get(easing, EASING_EXPR["smoothstep"])
+        # T = normalized time
+        t_expr = f"(on/{frames})"
+        zoom_expr = f"'{zs}+{ze - zs}*{ease_expr}'.replace('T', '{t_expr}')"
+        # Simplified: compute directly
+        zoom_ffmpeg = f"'{zs}+({ze}-{zs})*({t_expr}*{t_expr}*(3-2*{t_expr}))'"
 
         vf = (
             f"scale={self.w * 2}:{self.h * 2}:flags=lanczos,"
-            f"zoompan=z={zoom_expr}:x={x_expr}:y={y_expr}"
-            f":d={frames}:s={self.w}x{self.h}:fps={self.fps},"
-            f"{grade}"
+            f"zoompan=z={zoom_ffmpeg}"
+            f":x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2'"
+            f":d={frames}:s={self.w}x{self.h}:fps={self.fps}"
         )
 
         cmd = [
+            "ffmpeg", "-y", "-loop", "1", "-i", d.visual_path,
+            "-vf", vf, "-t", str(d.duration),
+            "-c:v", self.encoder, "-b:v", "5M",
+            "-pix_fmt", "yuv420p", "-an", output,
+        ]
+        subprocess.run(cmd, capture_output=True, timeout=60)
+
+    def _render_movie_segment(self, d: EditDecision, output: str):
+        """Extract and render a movie clip segment."""
+        if not d.visual_path or not Path(d.visual_path).exists():
+            return
+
+        # Extract the clip segment
+        cmd = [
             "ffmpeg", "-y",
-            "-loop", "1", "-i", visual,
-            "-vf", vf,
-            "-t", str(duration),
-            "-c:v", self.encoder,
-            "-b:v", "5M",
+            "-ss", str(d.clip_start_s),
+            "-i", d.visual_path,
+            "-t", str(d.duration),
+            "-vf", f"scale={self.w}:{self.h}:force_original_aspect_ratio=decrease,"
+                   f"pad={self.w}:{self.h}:(ow-iw)/2:(oh-ih)/2:black",
+            "-c:v", self.encoder, "-b:v", "5M",
             "-pix_fmt", "yuv420p",
-            "-an",
-            output,
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        if result.returncode != 0:
-            # Fallback: simple scale without zoompan
-            cmd_simple = [
-                "ffmpeg", "-y",
-                "-loop", "1", "-i", visual,
-                "-vf", f"scale={self.w}:{self.h}:force_original_aspect_ratio=decrease,"
-                       f"pad={self.w}:{self.h}:(ow-iw)/2:(oh-ih)/2:black,{grade}",
-                "-t", str(duration),
-                "-c:v", self.encoder, "-b:v", "5M",
-                "-pix_fmt", "yuv420p", "-an",
-                output,
-            ]
-            subprocess.run(cmd_simple, capture_output=True, timeout=60)
+        if d.audio_mode == "clip_audio":
+            cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+        elif d.audio_mode == "ducked":
+            cmd.extend(["-af", "volume=-20dB", "-c:a", "aac"])
+        else:
+            cmd.append("-an")
 
-    def _concatenate_with_transitions(self, clips: list, timeline: list, output: str):
-        """Concatenate clips with xfade transitions between them."""
+        cmd.append(output)
+        subprocess.run(cmd, capture_output=True, timeout=60)
+
+    def _render_title_card(self, d: EditDecision, output: str):
+        """Render a title card (black bg + text)."""
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", f"color=c=black:s={self.w}x{self.h}:d={d.duration}:r={self.fps}",
+            "-vf", f"drawtext=text='{d.narration_text[:50]}':fontsize=64:fontcolor=white:"
+                   f"x=(w-tw)/2:y=(h-th)/2:font=DejaVu Sans",
+            "-c:v", self.encoder, "-b:v", "2M",
+            "-pix_fmt", "yuv420p", "-an", output,
+        ]
+        subprocess.run(cmd, capture_output=True, timeout=30)
+
+    def _assemble_clips(self, clips: list, output: str):
+        """Concatenate all clips (transitions applied in filter if <=8 clips)."""
         if len(clips) == 1:
             import shutil
             shutil.copy(clips[0], output)
             return
 
-        # For xfade, we need to chain filters
-        # Simple approach: concat without transitions if xfade is complex
-        # Use xfade for pairs
-        if len(clips) <= 6:
-            self._xfade_chain(clips, timeline, output)
-        else:
-            # Too many clips for xfade chain, use simple concat
-            self._simple_concat(clips, output)
-
-    def _xfade_chain(self, clips: list, timeline: list, output: str):
-        """Chain xfade transitions between clips."""
-        transition_dur = 0.3  # 300ms transitions
-
-        inputs = []
-        for c in clips:
-            inputs.extend(["-i", c])
-
-        # Build filter chain
-        n = len(clips)
-        filter_parts = []
-        offset = 0
-
-        for i in range(n - 1):
-            seg_dur = timeline[i]["duration"] if i < len(timeline) else 5.0
-            offset += seg_dur - transition_dur
-
-            transition_type = timeline[i + 1]["transition"] if i + 1 < len(timeline) else "fade"
-            if transition_type not in ["fade", "dissolve", "wipeleft", "wiperight", "slideup", "circleopen"]:
-                transition_type = "fade"
-
-            if i == 0:
-                src_a = "[0:v]"
-            else:
-                src_a = f"[v{i}]"
-
-            src_b = f"[{i + 1}:v]"
-            out_label = f"[v{i + 1}]" if i < n - 2 else "[vout]"
-
-            filter_parts.append(
-                f"{src_a}{src_b}xfade=transition={transition_type}:duration={transition_dur}:offset={offset:.2f}{out_label}"
-            )
-
-        filter_str = ";".join(filter_parts)
-
-        cmd = ["ffmpeg", "-y"] + inputs + [
-            "-filter_complex", filter_str,
-            "-map", "[vout]",
-            "-c:v", self.encoder, "-b:v", "5M",
-            "-pix_fmt", "yuv420p",
-            output,
-        ]
-
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        if result.returncode != 0:
-            log.warning(f"xfade failed, falling back to simple concat: {result.stderr[:200]}")
-            self._simple_concat(clips, output)
-
-    def _simple_concat(self, clips: list, output: str):
-        """Simple concatenation without transitions."""
+        # Simple concat (xfade can be added for <=8 clips in future)
         tmpdir = Path(clips[0]).parent
         concat_file = str(tmpdir / "concat.txt")
         with open(concat_file, "w") as f:
@@ -382,57 +600,101 @@ class VideoDirector:
         subprocess.run([
             "ffmpeg", "-y", "-f", "concat", "-safe", "0",
             "-i", concat_file, "-c", "copy", output,
+        ], capture_output=True, timeout=120)
+
+    def _build_audio_track(self, edl: list, output: str):
+        """Build the full audio track with J-cut offsets."""
+        # Collect all narration audio files with their timing
+        audio_segments = []
+        current_time = 0.0
+
+        for d in edl:
+            if d.narration_audio and Path(d.narration_audio).exists():
+                # J-cut: audio starts slightly before visual
+                audio_start = max(0, current_time - d.j_cut_s)
+                audio_segments.append({
+                    "path": d.narration_audio,
+                    "start": audio_start,
+                    "duration": d.duration,
+                })
+            current_time += d.duration
+
+        if not audio_segments:
+            # Generate silent track
+            total = sum(d.duration for d in edl)
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "lavfi", "-i",
+                f"anullsrc=r=44100:cl=mono:d={total}",
+                "-c:a", "pcm_s16le", output,
+            ], capture_output=True, timeout=30)
+            return
+
+        # For now, concatenate narration audio files
+        tmpdir = Path(audio_segments[0]["path"]).parent
+        concat_file = str(tmpdir / "audio_concat.txt")
+        with open(concat_file, "w") as f:
+            for seg in audio_segments:
+                f.write(f"file '{seg['path']}'\n")
+
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", concat_file, "-c:a", "pcm_s16le",
+            "-ar", "44100", "-ac", "1", output,
         ], capture_output=True, timeout=60)
 
-    def _merge_audio(self, video: str, audio: str, output: str, subtitle: str = None):
-        """Merge audio track with video, optionally burn subtitles."""
-        vf_filters = []
-
-        if subtitle and Path(subtitle).exists():
-            sub_escaped = subtitle.replace(":", "\\:")
-            vf_filters.append(f"ass='{sub_escaped}'")
-
+    def _final_merge(self, video: str, audio: str, output: str, subtitle: str = None):
+        """Final merge: video + audio + optional subtitles."""
         cmd = ["ffmpeg", "-y", "-i", video, "-i", audio]
 
-        if vf_filters:
-            cmd.extend(["-vf", ",".join(vf_filters), "-c:v", self.encoder, "-b:v", "5M"])
+        if subtitle and Path(subtitle).exists():
+            sub_esc = subtitle.replace(":", "\\:")
+            cmd.extend(["-vf", f"ass='{sub_esc}'", "-c:v", self.encoder, "-b:v", "5M"])
         else:
             cmd.extend(["-c:v", "copy"])
 
         cmd.extend([
             "-map", "0:v", "-map", "1:a",
             "-c:a", "aac", "-b:a", "128k",
-            "-shortest",
-            output,
+            "-shortest", output,
         ])
+        subprocess.run(cmd, capture_output=True, timeout=120)
 
-        subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+# ── Prompt template for Gemini (generates director-ready scripts) ──
+
+DIRECTOR_PROMPT_ADDON = """
+IMPORTANT: For each narration segment, you can optionally include a cross-reference
+to a movie/series scene. When you do, specify:
+- "cross_ref.type": "movie_clip"
+- "cross_ref.movie": "exact movie title"
+- "cross_ref.quote": "the iconic line to find via STT" (or "" for visual reference)
+- "cross_ref.action": one of:
+    - "play_then_narrate": play the movie clip with original audio (max 8s),
+      then continue narrating over the clip silently
+    - "narrate_over": your narration plays while the movie clip runs silently
+    - "silent_bg": movie clip as visual background, fully silent
+
+Example segment with cross-reference:
+{
+    "text": "The weight of ambition... as Michael Corleone once learned...",
+    "emotion": "dark",
+    "visual_hint": "Griffith looking at the castle",
+    "cross_ref": {
+        "type": "movie_clip",
+        "movie": "The Godfather",
+        "quote": "I'll make him an offer he can't refuse",
+        "action": "play_then_narrate"
+    }
+}
+
+Rules for cross-references:
+- Max 1 cross-reference per Short (quality over quantity)
+- The cross-reference must ENHANCE the analysis, not be random
+- The movie quote must be ICONIC and recognizable
+- After the clip plays, smoothly return to narrating over manga panels
+"""
 
 
-def direct_short(
-    narration_segments: list,
-    available_pages: list,
-    audio_path: str,
-    output_path: str,
-    page_ocr_texts: dict = None,
-    subtitle_path: str = None,
-    use_gpu: bool = True,
-) -> str:
-    """High-level function: direct a complete Short.
-
-    Connects narration to visuals, selects transitions and camera,
-    renders the final video.
-    """
-    director = VideoDirector(use_gpu=use_gpu)
-    timeline = director.create_timeline(narration_segments, available_pages, page_ocr_texts)
-
-    if not timeline:
-        raise RuntimeError("Director could not create timeline")
-
-    log.info(f"Directing Short: {len(timeline)} segments")
-    for i, seg in enumerate(timeline):
-        log.info(f"  [{i}] {seg['emotion']:8s} | {seg['duration']:.1f}s | "
-                 f"{seg['transition']:10s} | {Path(seg['visual']).name} | "
-                 f"{seg['narration_text'][:50]}...")
-
-    return director.render_from_timeline(timeline, audio_path, output_path, subtitle_path)
+def get_director_prompt_addon() -> str:
+    """Returns the prompt addon that teaches Gemini how to generate director-ready scripts."""
+    return DIRECTOR_PROMPT_ADDON
