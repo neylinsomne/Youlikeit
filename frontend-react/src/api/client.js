@@ -63,10 +63,14 @@ export const fetchMangaSeries = (params = {}) => apiFetch(`/manga/series?${new U
 export const fetchMangaQuotes = (params = {}) => apiFetch(`/manga/quotes?${new URLSearchParams(params)}`);
 export const fetchQuotes = (params = {}) => apiFetch(`/quotes?${new URLSearchParams(params)}`);
 
-// Music (no auth needed)
-export const fetchTrendingMusic = (country = 'CO', query = '') =>
-  fetch(`${API_BASE}/music/trending?country=${country}&query=${encodeURIComponent(query)}&limit=15`)
-    .then(r => r.json()).catch(() => ({ songs: [] }));
+// Music
+export const fetchTrendingMusic = (query = '') =>
+  apiFetch(`/trending-songs${query ? `?region=${encodeURIComponent(query)}` : ''}`)
+    .catch(() => ({ songs: [] }));
+
+export const searchMusic = (query) =>
+  apiFetch(`/trending-songs?region=${encodeURIComponent(query)}`)
+    .catch(() => ({ songs: [] }));
 
 // Clips
 export const fetchClips = (params = {}) => apiFetch(`/clips?${new URLSearchParams(params)}`);

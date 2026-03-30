@@ -156,13 +156,17 @@ export default function ShortsEditor() {
   const [musicQuery, setMusicQuery] = useState('');
 
   useEffect(() => {
-    fetchTrendingMusic('CO').then(data => setSongs(data.songs || []));
+    fetchTrendingMusic().then(data => {
+      const s = data.songs || data || [];
+      setSongs(Array.isArray(s) ? s : []);
+    });
   }, []);
 
-  const searchMusic = () => {
-    if (musicQuery.trim()) {
-      fetchTrendingMusic('CO', musicQuery).then(data => setSongs(data.songs || []));
-    }
+  const doSearchMusic = () => {
+    fetchTrendingMusic(musicQuery.trim() || '').then(data => {
+      const s = data.songs || data || [];
+      setSongs(Array.isArray(s) ? s : []);
+    });
   };
 
   useEffect(() => {
@@ -338,18 +342,18 @@ export default function ShortsEditor() {
               <input
                 value={musicQuery}
                 onChange={(e) => setMusicQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && searchMusic()}
+                onKeyDown={(e) => e.key === 'Enter' && doSearchMusic()}
                 placeholder="Search songs..."
                 className="flex-1 bg-surface-highest border-none rounded-lg py-1.5 px-2 text-[11px] text-on-surface focus:ring-1 focus:ring-primary focus:outline-none"
               />
-              <button onClick={searchMusic} className="text-primary hover:text-primary-glow cursor-pointer">
+              <button onClick={doSearchMusic} className="text-primary hover:text-primary-glow cursor-pointer">
                 <span className="material-symbols-outlined text-sm">search</span>
               </button>
             </div>
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {songs.map((song, i) => (
                 <div
-                  key={song.video_id || i}
+                  key={song.id || song.video_id || i}
                   onClick={() => setSelectedSong(i)}
                   className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
                     selectedSong === i
