@@ -76,8 +76,20 @@ from common.mangadex import search_manga, get_chapters, download_chapter_pages
 pages = []
 manga_result = search_manga("Berserk")
 if manga_result:
-    chapters = get_chapters(manga_result["id"], limit=3, offset=82)
-    for ch in chapters[:2]:
+    # Get all EN chapters, filter to Eclipse arc (Ch 73-84)
+    all_chapters = get_chapters(manga_result["id"], lang="en", limit=100, offset=0)
+    eclipse_chs = []
+    for ch in all_chapters:
+        ch_num = ch.get("chapter", "")
+        try:
+            if ch_num and 73 <= float(ch_num) <= 84:
+                eclipse_chs.append(ch)
+        except (ValueError, TypeError):
+            pass
+    if not eclipse_chs:
+        eclipse_chs = all_chapters[-5:]  # fallback
+    log.info(f"Eclipse EN chapters: {len(eclipse_chs)}")
+    for ch in eclipse_chs[:3]:
         ch_pages = download_chapter_pages(ch["id"], output_dir=str(OUTPUT_DIR / "pages"), max_pages=5)
         pages.extend(ch_pages)
 
