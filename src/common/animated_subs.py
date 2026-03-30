@@ -96,8 +96,8 @@ def _format_time(seconds: float) -> str:
 
 def _generate_shorts_style(segments: List[Dict], highlight_color: str) -> str:
     """
-    YouTube Shorts style: 2-3 words at a time, centered,
-    key words highlighted in color with scale pop effect.
+    YouTube Shorts style: full sentence with keyword highlights.
+    Shows 1-2 lines at a time, key words pop in color.
     """
     ass = _ass_header()
 
@@ -108,42 +108,54 @@ def _generate_shorts_style(segments: List[Dict], highlight_color: str) -> str:
         emotion = seg.get('emotion', 'default')
         hl_color = HIGHLIGHT_COLORS.get(emotion, highlight_color)
 
-        words = text.split()
-        if not words:
+        if not text.strip():
             continue
 
-        # Calculate timing per word group (2-3 words per display)
+        # Split long text into chunks of ~8-12 words for readability
+        words = text.split()
+        chunks = []
+        if len(words) <= 12:
+            chunks.append(words)
+        else:
+            # Split into 2-3 chunks
+            chunk_size = max(6, len(words) // 2)
+            for i in range(0, len(words), chunk_size):
+                chunk = words[i:i + chunk_size]
+                if chunk:
+                    chunks.append(chunk)
+
         duration = end - start
-        group_size = 3 if len(words) > 8 else 2
-        groups = []
-        for i in range(0, len(words), group_size):
-            groups.append(words[i:i + group_size])
+        time_per_chunk = duration / max(len(chunks), 1)
 
-        time_per_group = duration / max(len(groups), 1)
+        for ci, chunk in enumerate(chunks):
+            c_start = start + (ci * time_per_chunk)
+            c_end = c_start + time_per_chunk + 0.1
 
-        for gi, group in enumerate(groups):
-            g_start = start + (gi * time_per_group)
-            g_end = g_start + time_per_group + 0.15  # slight overlap
-
-            # Build styled text with highlights
+            # Build styled text — full chunk with highlights on keywords
             styled_words = []
-            for word in group:
+            for word in chunk:
                 clean = re.sub(r'[^\w]', '', word.lower())
                 if clean in HIGHLIGHT_WORDS:
-                    # Highlighted word: color + scale pop + bold
                     styled_words.append(
-                        f"{{\\c{hl_color}\\fscx110\\fscy110\\t(0,150,\\fscx100\\fscy100)}}{word}"
+                        f"{{\\c{hl_color}\\fscx105\\fscy105}}{word}{{\\c&H00FFFFFF&\\fscx100\\fscy100}}"
                     )
                 else:
-                    styled_words.append(f"{{\\c&H00FFFFFF&}}{word}")
+                    styled_words.append(word)
 
             display_text = ' '.join(styled_words)
 
-            # Fade in (100ms) + fade out (100ms)
-            fade = "{\\fad(100,100)}"
+            # Word wrap at ~30 chars
+            raw_text = ' '.join(chunk)
+            if len(raw_text) > 30:
+                mid = len(chunk) // 2
+                line1 = ' '.join(styled_words[:mid])
+                line2 = ' '.join(styled_words[mid:])
+                display_text = f"{line1}\\N{line2}"
+
+            fade = "{\\fad(150,150)}"
 
             ass += (
-                f"Dialogue: 0,{_format_time(g_start)},{_format_time(g_end)},"
+                f"Dialogue: 0,{_format_time(c_start)},{_format_time(c_end)},"
                 f"Main,,0,0,0,,{fade}{display_text}\n"
             )
 
