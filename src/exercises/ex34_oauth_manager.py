@@ -59,8 +59,12 @@ def find_client_secrets() -> Path | None:
 # Token management
 # ---------------------------------------------------------------------------
 
-def _get_token_path(secrets_path: Path) -> Path:
-    """Token file lives next to client_secrets.json."""
+def _get_token_path(secrets_path: Path, persona: str = "") -> Path:
+    """Token file per persona. Falls back to default if no persona."""
+    if persona:
+        tokens_dir = Path("tokens")
+        tokens_dir.mkdir(exist_ok=True)
+        return tokens_dir / f"youtube_{persona}.json"
     return secrets_path.parent / "youtube_oauth_token.json"
 
 
@@ -92,6 +96,7 @@ def authenticate(
     secrets_path: Path | None = None,
     scopes: list[str] | None = None,
     log=None,
+    persona: str = "",
 ):
     """
     Authenticate with Google OAuth 2.0.
@@ -124,7 +129,7 @@ def authenticate(
         return None
 
     scopes = scopes or DEFAULT_SCOPES
-    token_path = _get_token_path(secrets_path)
+    token_path = _get_token_path(secrets_path, persona)
 
     # Try loading existing token
     creds = _load_credentials(token_path, scopes)
@@ -164,8 +169,8 @@ def authenticate(
 # Service builders
 # ---------------------------------------------------------------------------
 
-def get_youtube_service(secrets_path: Path | None = None, log=None):
-    """Get authenticated YouTube Data API v3 service."""
+def get_youtube_service(secrets_path: Path | None = None, log=None, persona: str = ""):
+    """Get authenticated YouTube Data API v3 service. Persona selects which channel token to use."""
     try:
         from googleapiclient.discovery import build
     except ImportError:
@@ -175,6 +180,7 @@ def get_youtube_service(secrets_path: Path | None = None, log=None):
 
     creds = authenticate(
         secrets_path=secrets_path,
+        persona=persona,
         scopes=[SCOPE_UPLOAD, SCOPE_READONLY],
         log=log,
     )

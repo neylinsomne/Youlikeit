@@ -325,6 +325,33 @@ LANG_TO_FISH = {
 }
 
 
+def _preprocess_text_for_prosody(text: str, position: str) -> str:
+    """
+    Preprocess narration text for natural-sounding TTS.
+
+    Adds breath marks, normalizes ellipsis into actual pauses,
+    and ensures proper sentence endings so the TTS model produces
+    natural falling/rising intonation.
+    """
+    # Trailing ellipsis sounds unfinished — give outros a real ending
+    if position == "outro" and text.rstrip().endswith("..."):
+        text = text.rstrip().rstrip(".") + "."
+
+    # Mid-sentence ellipsis → comma + pause marker for breath
+    text = re.sub(r"\.{3,}", ", ...", text)
+
+    # Double dash → comma for a natural pause
+    text = text.replace(" -- ", ", ")
+    text = text.replace("--", ", ")
+
+    # Ensure the text ends with punctuation (period if missing)
+    stripped = text.rstrip()
+    if stripped and stripped[-1] not in ".!?…":
+        text = stripped + "."
+
+    return text
+
+
 def _synthesize_segment(
     text: str,
     output_path: Path,
@@ -332,6 +359,7 @@ def _synthesize_segment(
     tone: str = "calm and reflective",
     voice_ref_path: str | None = None,
     api_url: str = "http://localhost:8080",
+    position: str = "intro",
 ) -> dict:
     """
     Synthesize a single narration segment using Fish Audio S1-Mini.
@@ -339,6 +367,9 @@ def _synthesize_segment(
     Returns metadata about the generated audio.
     """
     fish_lang = LANG_TO_FISH.get(lang, "en")
+
+    # Preprocess text for natural prosody
+    text = _preprocess_text_for_prosody(text, position)
 
     # Build the request for Fish Speech API
     payload: dict = {
@@ -364,6 +395,15 @@ def _synthesize_segment(
 
     payload["text"] = emotion_prefix + text
 
+    # Prosody parameters — make the voice less robotic
+    prosody_params = {
+        "temperature": 0.85,          # Higher = more expressive variation
+        "top_p": 0.85,                # Wider sampling for natural rhythm
+        "repetition_penalty": 1.12,   # Avoid monotone loops
+        "chunk_length": 150,          # Shorter chunks = more natural phrasing
+    }
+    payload.update(prosody_params)
+
     headers = {"Content-Type": "application/json"}
 
     # If voice reference is provided, use voice cloning
@@ -374,9 +414,18 @@ def _synthesize_segment(
             "reference_audio": open(voice_ref_path, "rb"),
         }
         # When using files, send payload as form data
+        form_data = {
+            "text": payload["text"],
+            "language": fish_lang,
+            "format": "wav",
+            "temperature": str(prosody_params["temperature"]),
+            "top_p": str(prosody_params["top_p"]),
+            "repetition_penalty": str(prosody_params["repetition_penalty"]),
+            "chunk_length": str(prosody_params["chunk_length"]),
+        }
         resp = requests.post(
             f"{api_url}/v1/tts",
-            data={"text": payload["text"], "language": fish_lang, "format": "wav"},
+            data=form_data,
             files=files,
             timeout=30,
         )
@@ -429,26 +478,56 @@ def _check_fish_speech_available(api_url: str) -> bool:
         return False
 
 
-def _synthesize_edge_tts(text: str, output_path: Path, lang: str = "en") -> dict:
+def _load_persona_voice(persona: str = "") -> dict:
+    """Load voice settings from tokens/personas.json for the given persona."""
+    try:
+        cfg_path = Path("tokens/personas.json")
+        if cfg_path.exists() and persona:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            p = cfg.get(persona, {})
+            voice_cfg = p.get("voice", {})
+            if voice_cfg.get("engine") == "edge-tts":
+                return voice_cfg
+    except Exception:
+        pass
+    return {}
+
+
+def _synthesize_edge_tts(
+    text: str,
+    output_path: Path,
+    lang: str = "en",
+    persona: str = "",
+) -> dict:
     """Synthesize speech using edge-tts (Microsoft, free, no API key)."""
     import asyncio
     import edge_tts
 
-    # Voice selection by language
-    voice_map = {
-        "en": "en-US-AndrewMultilingualNeural",
-        "es": "es-CO-GonzaloNeural",
-        "pt": "pt-BR-AntonioNeural",
-        "ja": "ja-JP-KeitaNeural",
-    }
-    voice = voice_map.get(lang, "en-US-AndrewMultilingualNeural")
+    # Check for persona-specific voice first
+    persona_voice = _load_persona_voice(persona)
+
+    if persona_voice:
+        voice = persona_voice["name"]
+        rate = persona_voice.get("rate", "-5%")
+        pitch = persona_voice.get("pitch", "-5Hz")
+    else:
+        # Default voice selection by language
+        voice_map = {
+            "en": "en-US-AndrewMultilingualNeural",
+            "es": "es-CO-GonzaloNeural",
+            "pt": "pt-BR-AntonioNeural",
+            "ja": "ja-JP-KeitaNeural",
+        }
+        voice = voice_map.get(lang, "en-US-AndrewMultilingualNeural")
+        rate = "-10%"
+        pitch = "-5Hz"
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     mp3_path = output_path.with_suffix(".mp3")
 
     try:
         async def _do_tts():
-            communicate = edge_tts.Communicate(text, voice, rate="-10%", pitch="-5Hz")
+            communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
             await communicate.save(str(mp3_path))
 
         asyncio.run(_do_tts())
@@ -579,6 +658,7 @@ def run(
     voice_ref: str = "",
     fish_url: str = "",
     use_llm: bool = True,
+    persona: str = "",
 ) -> Path:
     log = build_logger("ex18", settings.output_dir / "logs" / "ex18.log")
     conn = get_db(settings.data_dir)
@@ -657,12 +737,14 @@ def run(
                 tone=seg.get("tone", "calm and reflective"),
                 voice_ref_path=voice_ref_path or None,
                 api_url=api_url,
+                position=seg.get("position", "intro"),
             )
         elif edge_tts_available:
             result = _synthesize_edge_tts(
                 text=seg["text"],
                 output_path=wav_path,
                 lang=lang,
+                persona=persona,
             )
             result["tone"] = seg.get("tone", "")
         else:

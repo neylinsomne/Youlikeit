@@ -34,13 +34,14 @@ def _find_client_secrets() -> Path | None:
     return find_client_secrets()
 
 
-def _get_authenticated_service(secrets_path: Path, log):
+def _get_authenticated_service(secrets_path: Path, log, persona: str = ""):
     """
     Build an authenticated YouTube API service using OAuth 2.0.
     Delegates to ex34_oauth_manager for unified token management.
+    Persona selects which channel token to use.
     """
     from exercises.ex34_oauth_manager import get_youtube_service
-    return get_youtube_service(secrets_path=secrets_path, log=log)
+    return get_youtube_service(secrets_path=secrets_path, log=log, persona=persona)
 
 
 def _load_growth_pack(output_dir: Path, query: str) -> dict:
@@ -145,6 +146,8 @@ def run(
     title: str = "",
     privacy: str = "private",
     query: str = "",
+    persona: str = "",
+    video: str = "",
 ) -> Path:
     log = build_logger("ex12", settings.output_dir / "logs" / "ex12.log")
     report_lines = ["ex12 - YouTube Upload Report", "=" * 50, ""]
@@ -190,7 +193,10 @@ def run(
         return report_path
 
     # Authenticate
-    youtube = _get_authenticated_service(secrets, log)
+    # video param alias for backward compat
+    if video and not video_path:
+        video_path = video
+    youtube = _get_authenticated_service(secrets, log, persona=persona)
     if not youtube:
         report_lines.append("\nERROR: Authentication failed. Check logs.")
         report_path = settings.output_dir / "logs" / "ex12_upload_report.txt"

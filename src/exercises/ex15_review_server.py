@@ -23,6 +23,7 @@ Uso:
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,6 +48,7 @@ I18N = {
         "notes_placeholder": "Notas: qué hizo bien, qué mejorar, qué está mal...",
         "add_frame": "+ Marcar frame con problema",
         "btn_approve": "Aprobar",
+        "btn_disapprove": "Desaprobar",
         "btn_edit": "Pedir edición",
         "btn_reject": "Rechazar",
         "no_video": "Sin video",
@@ -66,6 +68,19 @@ I18N = {
         "strategy": "Estrategia",
         "view_strategy": "Ver estrategia de publicación",
         "no_strategy": "Sin estrategia (ejecutar ex17)",
+        "recommended_songs": "🎵 Canciones recomendadas",
+        "song_from_strategy": "Recomendada por estrategia",
+        "trending_songs": "Trending ahora",
+        "copy_link": "Copiar link",
+        "copied": "¡Copiado!",
+        "no_songs": "Sin canciones (API no disponible)",
+        "views": "vistas",
+        "upload_youtube": "Subir a YouTube",
+        "upload_tiktok": "Abrir TikTok Upload",
+        "uploading": "Subiendo...",
+        "upload_ok": "¡Subido!",
+        "upload_fail": "Error al subir",
+        "only_approved": "Solo shorts aprobados",
     },
     "en": {
         "title": "Shorts Review Dashboard",
@@ -79,6 +94,7 @@ I18N = {
         "notes_placeholder": "Notes: what was good, what to improve, what's wrong...",
         "add_frame": "+ Flag frame issue",
         "btn_approve": "Approve",
+        "btn_disapprove": "Disapprove",
         "btn_edit": "Request edit",
         "btn_reject": "Reject",
         "no_video": "No video",
@@ -98,6 +114,19 @@ I18N = {
         "strategy": "Strategy",
         "view_strategy": "View publish strategy",
         "no_strategy": "No strategy (run ex17)",
+        "recommended_songs": "🎵 Recommended songs",
+        "song_from_strategy": "From strategy",
+        "trending_songs": "Trending now",
+        "copy_link": "Copy link",
+        "copied": "Copied!",
+        "no_songs": "No songs (API unavailable)",
+        "views": "views",
+        "upload_youtube": "Upload to YouTube",
+        "upload_tiktok": "Open TikTok Upload",
+        "uploading": "Uploading...",
+        "upload_ok": "Uploaded!",
+        "upload_fail": "Upload failed",
+        "only_approved": "Only approved shorts",
     },
     "pt": {
         "title": "Painel de Revisão de Shorts",
@@ -111,6 +140,7 @@ I18N = {
         "notes_placeholder": "Notas: o que ficou bom, o que melhorar, o que está errado...",
         "add_frame": "+ Marcar frame com problema",
         "btn_approve": "Aprovar",
+        "btn_disapprove": "Desaprovar",
         "btn_edit": "Pedir edição",
         "btn_reject": "Rejeitar",
         "no_video": "Sem vídeo",
@@ -130,6 +160,19 @@ I18N = {
         "strategy": "Estratégia",
         "view_strategy": "Ver estratégia de publicação",
         "no_strategy": "Sem estratégia (executar ex17)",
+        "recommended_songs": "🎵 Músicas recomendadas",
+        "song_from_strategy": "Da estratégia",
+        "trending_songs": "Trending agora",
+        "copy_link": "Copiar link",
+        "copied": "Copiado!",
+        "no_songs": "Sem músicas (API indisponível)",
+        "views": "views",
+        "upload_youtube": "Enviar ao YouTube",
+        "upload_tiktok": "Abrir TikTok Upload",
+        "uploading": "Enviando...",
+        "upload_ok": "Enviado!",
+        "upload_fail": "Erro ao enviar",
+        "only_approved": "Somente shorts aprovados",
     },
 }
 
@@ -179,6 +222,7 @@ def _build_html(lang: str = "es") -> str:
         .stat-label {{ font-size: 0.85em; color: #888; margin-top: 4px; }}
         .stat.pending .stat-num {{ color: #f0ad4e; }}
         .stat.approved .stat-num {{ color: #5cb85c; }}
+        .stat.disapproved .stat-num {{ color: #e67e22; }}
         .stat.rejected .stat-num {{ color: #d9534f; }}
 
         .shorts-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }}
@@ -195,6 +239,7 @@ def _build_html(lang: str = "es") -> str:
         .status-approved {{ background: #5cb85c33; color: #5cb85c; }}
         .status-rejected {{ background: #d9534f33; color: #d9534f; }}
         .status-needs_edit {{ background: #5bc0de33; color: #5bc0de; }}
+        .status-disapproved {{ background: #f0ad4e33; color: #f0ad4e; }}
 
         .review-form {{ margin-top: 12px; padding-top: 12px; border-top: 1px solid #ffffff15; }}
         .stars {{ display: flex; gap: 4px; margin-bottom: 10px; direction: rtl; }}
@@ -211,6 +256,7 @@ def _build_html(lang: str = "es") -> str:
                font-size: 0.85em; transition: opacity 0.2s; }}
         .btn:hover {{ opacity: 0.85; }}
         .btn-approve {{ background: #5cb85c; color: #fff; }}
+        .btn-disapprove {{ background: #f0ad4e; color: #fff; }}
         .btn-reject {{ background: #d9534f; color: #fff; }}
         .btn-edit {{ background: #5bc0de; color: #fff; }}
 
@@ -248,6 +294,46 @@ def _build_html(lang: str = "es") -> str:
         .strategy-row:last-child {{ border: none; }}
         .strategy-key {{ color: #888; }}
         .strategy-val {{ color: #e0e0e0; text-align: right; max-width: 60%; }}
+
+        .songs-section {{ margin-top: 12px; }}
+        .songs-toggle {{ display: inline-block; color: #f0ad4e; font-size: 0.9em; font-weight: 600;
+                         cursor: pointer; border-bottom: 1px dashed #f0ad4e40; }}
+        .songs-toggle:hover {{ border-color: #f0ad4e; }}
+        .songs-panel {{ background: #1a1a2e; border-radius: 12px; padding: 14px; margin-top: 8px;
+                        display: none; }}
+        .songs-panel.open {{ display: block; }}
+        .song-item {{ display: flex; align-items: center; gap: 10px; padding: 8px;
+                      border-radius: 8px; transition: background 0.15s; }}
+        .song-item:hover {{ background: #ffffff08; }}
+        .song-thumb {{ width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }}
+        .song-info {{ flex: 1; min-width: 0; }}
+        .song-title {{ font-size: 0.85em; font-weight: 600; white-space: nowrap;
+                       overflow: hidden; text-overflow: ellipsis; }}
+        .song-artist {{ font-size: 0.75em; color: #888; white-space: nowrap;
+                        overflow: hidden; text-overflow: ellipsis; }}
+        .song-meta {{ font-size: 0.7em; color: #666; }}
+        .song-badge {{ font-size: 0.65em; padding: 2px 6px; border-radius: 4px;
+                       font-weight: 600; margin-left: 6px; }}
+        .song-badge.strategy {{ background: #5cb85c33; color: #5cb85c; }}
+        .song-badge.trending {{ background: #f0ad4e33; color: #f0ad4e; }}
+        .song-copy {{ background: none; border: 1px solid #ffffff20; color: #888;
+                      padding: 3px 8px; border-radius: 4px; cursor: pointer;
+                      font-size: 0.7em; white-space: nowrap; flex-shrink: 0; }}
+        .song-copy:hover {{ border-color: #5bc0de; color: #5bc0de; }}
+        .song-copy.copied {{ border-color: #5cb85c; color: #5cb85c; }}
+        .song-divider {{ font-size: 0.75em; color: #666; margin: 8px 0 4px; padding-top: 8px;
+                         border-top: 1px solid #ffffff10; }}
+
+        .upload-group {{ display: flex; gap: 8px; margin-top: 8px; }}
+        .btn-upload {{ padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer;
+                       font-weight: 600; font-size: 0.8em; transition: opacity 0.2s;
+                       display: flex; align-items: center; gap: 6px; }}
+        .btn-upload:hover {{ opacity: 0.85; }}
+        .btn-upload:disabled {{ opacity: 0.4; cursor: not-allowed; }}
+        .btn-youtube {{ background: #FF0000; color: #fff; }}
+        .btn-tiktok {{ background: #25F4EE; color: #000; }}
+        .persona-select {{ background: #0d1b2a; border: 1px solid #ffffff20; border-radius: 6px;
+                           color: #e0e0e0; padding: 6px 8px; font-size: 0.75em; }}
     </style>
 </head>
 <body>
@@ -285,6 +371,7 @@ def _build_html(lang: str = "es") -> str:
             document.getElementById('stats').innerHTML = `
                 <div class="stat pending"><div class="stat-num">${'${stats.pending}'}</div><div class="stat-label">${'${T.pending}'}</div></div>
                 <div class="stat approved"><div class="stat-num">${'${stats.approved}'}</div><div class="stat-label">${'${T.approved}'}</div></div>
+                <div class="stat disapproved"><div class="stat-num">${'${stats.disapproved || 0}'}</div><div class="stat-label">${'${T.btn_disapprove}'}</div></div>
                 <div class="stat rejected"><div class="stat-num">${'${stats.rejected}'}</div><div class="stat-label">${'${T.rejected}'}</div></div>
                 <div class="stat"><div class="stat-num">${'${stats.total}'}</div><div class="stat-label">${'${T.total}'}</div></div>
             `;
@@ -309,6 +396,10 @@ def _build_html(lang: str = "es") -> str:
                             ${'${s.rating ? "★".repeat(s.rating) : ""}'}
                         </div>
                         ${'${strat ? `<a class="strategy-link" href="#" onclick="toggleStrategy(${s.id}); return false;">${T.view_strategy}</a><div class="strategy-panel" id="strat-${s.id}">${renderStrategyPanel(strat)}</div>` : `<span style="font-size:0.8em;color:#666">${T.no_strategy}</span>`}'}
+                        <div class="songs-section">
+                            <span class="songs-toggle" onclick="toggleSongs(${'${s.id}'}, '${'${s.theme_query || ""}'}')">${'${T.recommended_songs}'}</span>
+                            <div class="songs-panel" id="songs-${'${s.id}'}"></div>
+                        </div>
                         <div class="review-form">
                             <div class="stars">
                                 ${'${[5,4,3,2,1].map(n => `<input type="radio" name="rating-${s.id}" id="star-${s.id}-${n}" value="${n}"><label for="star-${s.id}-${n}">★</label>`).join("")}'}
@@ -319,8 +410,22 @@ def _build_html(lang: str = "es") -> str:
                             </div>
                             <div class="btn-group">
                                 <button class="btn btn-approve" onclick="submitReview(${'${s.id}'}, 'approved')">${'${T.btn_approve}'}</button>
+                                <button class="btn btn-disapprove" onclick="submitReview(${'${s.id}'}, 'disapproved')">${'${T.btn_disapprove}'}</button>
                                 <button class="btn btn-edit" onclick="submitReview(${'${s.id}'}, 'needs_edit')">${'${T.btn_edit}'}</button>
                                 <button class="btn btn-reject" onclick="submitReview(${'${s.id}'}, 'rejected')">${'${T.btn_reject}'}</button>
+                            </div>
+                            <div class="upload-group">
+                                <select class="persona-select" id="persona-${'${s.id}'}">
+                                    <option value="deep_mind">Deep Mind</option>
+                                    <option value="cinephile">Cinephile</option>
+                                    <option value="pop_oracle">Pop Oracle</option>
+                                </select>
+                                <button class="btn-upload btn-youtube" id="yt-${'${s.id}'}"
+                                    ${'${s.review_status === "approved" ? "" : "disabled"}'}
+                                    onclick="uploadYouTube(${'${s.id}'})">▶ YT</button>
+                                <button class="btn-upload btn-tiktok" id="tt-${'${s.id}'}"
+                                    ${'${s.review_status === "approved" ? "" : "disabled"}'}
+                                    onclick="uploadTikTok(${'${s.id}'})">♪ TT</button>
                             </div>
                         </div>
                     </div>
@@ -392,6 +497,126 @@ def _build_html(lang: str = "es") -> str:
                 alert(T.error_save);
             }}
         }}
+
+        // ── Songs section ──
+        let songsCache = null;
+
+        async function toggleSongs(shortId, theme) {{
+            const panel = document.getElementById(`songs-${'${shortId}'}`);
+            if (panel.classList.contains('open')) {{
+                panel.classList.remove('open');
+                return;
+            }}
+            panel.innerHTML = '<div style="color:#666;font-size:0.8em;padding:8px">Cargando...</div>';
+            panel.classList.add('open');
+
+            // Load songs once
+            if (!songsCache) {{
+                try {{
+                    const resp = await fetch('/api/songs');
+                    songsCache = await resp.json();
+                }} catch(e) {{
+                    panel.innerHTML = `<div style="color:#666;font-size:0.8em;padding:8px">${'${T.no_songs}'}</div>`;
+                    return;
+                }}
+            }}
+
+            renderSongsPanel(panel, shortId, theme, songsCache);
+        }}
+
+        function renderSongsPanel(panel, shortId, theme, data) {{
+            let html = '';
+            const strat = data.strategy_songs[theme] || null;
+
+            // 1. Song from ex17 strategy (if exists)
+            if (strat) {{
+                html += `<div class="song-divider">${'${T.song_from_strategy}'}</div>`;
+                html += renderSongItem(strat, 'strategy');
+            }}
+
+            // 2. Trending songs (top 8)
+            const trending = data.trending || [];
+            if (trending.length) {{
+                html += `<div class="song-divider">${'${T.trending_songs}'}</div>`;
+                trending.slice(0, 8).forEach(s => {{
+                    html += renderSongItem(s, 'trending');
+                }});
+            }}
+
+            if (!html) {{
+                html = `<div style="color:#666;font-size:0.8em;padding:8px">${'${T.no_songs}'}</div>`;
+            }}
+
+            panel.innerHTML = html;
+        }}
+
+        function renderSongItem(song, badge) {{
+            const thumb = song.thumbnail
+                ? `<img class="song-thumb" src="${'${song.thumbnail}'}" alt="">`
+                : `<div class="song-thumb" style="background:#333;display:flex;align-items:center;justify-content:center">🎵</div>`;
+            const url = song.youtube_url || song.source || '';
+            const badgeHtml = badge === 'strategy'
+                ? `<span class="song-badge strategy">${'${T.song_from_strategy}'}</span>`
+                : `<span class="song-badge trending">${'${song.views || ""}'} ${'${T.views}'}</span>`;
+            return `
+                <div class="song-item">
+                    ${'${thumb}'}
+                    <div class="song-info">
+                        <div class="song-title">${'${song.title || "?"}'} ${'${badgeHtml}'}</div>
+                        <div class="song-artist">${'${song.artist || ""}'}</div>
+                        <div class="song-meta">${'${song.duration || ""}'} ${'${song.selection_reason ? "— " + song.selection_reason : ""}'}</div>
+                    </div>
+                    ${'${url ? `<button class="song-copy" data-url="${url}" onclick="copySongLink(this)">` + T.copy_link + `</button>` : ""}'}
+                </div>
+            `;
+        }}
+
+        function copySongLink(btn) {{
+            const url = btn.getAttribute('data-url');
+            navigator.clipboard.writeText(url).then(() => {{
+                btn.textContent = T.copied;
+                btn.classList.add('copied');
+                setTimeout(() => {{
+                    btn.textContent = T.copy_link;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }});
+        }}
+
+        // ── Upload actions ──
+        function getPersona(shortId) {{
+            return document.getElementById(`persona-${'${shortId}'}`)?.value || 'deep_mind';
+        }}
+
+        async function uploadPlatform(shortId, platform) {{
+            const btn = document.getElementById(`${'${platform === "youtube" ? "yt" : "tt"}'}-${'${shortId}'}`);
+            const persona = getPersona(shortId);
+            btn.textContent = T.uploading;
+            btn.disabled = true;
+            try {{
+                const resp = await fetch(`/api/upload/${'${platform}'}/${'${shortId}'}`, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ persona }})
+                }});
+                const data = await resp.json();
+                if (data.ok) {{
+                    btn.textContent = T.upload_ok;
+                    btn.style.background = '#5cb85c';
+                }} else {{
+                    btn.textContent = data.error?.substring(0, 40) || T.upload_fail;
+                    btn.style.background = '#d9534f';
+                    btn.disabled = false;
+                }}
+            }} catch(e) {{
+                btn.textContent = T.upload_fail;
+                btn.style.background = '#d9534f';
+                btn.disabled = false;
+            }}
+        }}
+
+        function uploadYouTube(shortId) {{ uploadPlatform(shortId, 'youtube'); }}
+        function uploadTikTok(shortId) {{ uploadPlatform(shortId, 'tiktok'); }}
 
         function renderHistory(logs) {{
             const container = document.getElementById('history');
@@ -473,7 +698,7 @@ def _create_app(settings: Settings, lang: str = "es"):
         shorts = [dict(row) for row in cur.fetchall()]
 
         # Stats
-        stats = {"total": len(shorts), "pending": 0, "approved": 0, "rejected": 0}
+        stats = {"total": len(shorts), "pending": 0, "approved": 0, "disapproved": 0, "rejected": 0}
         for s in shorts:
             st = s.get("review_status") or "pending"
             if st in stats:
@@ -492,6 +717,105 @@ def _create_app(settings: Settings, lang: str = "es"):
 
         conn.close()
         return JSONResponse({"shorts": shorts, "stats": stats, "logs": logs, "strategies": strategies})
+
+    @app.get("/api/songs")
+    async def get_songs():
+        """Return trending songs + strategy-recommended songs for each theme."""
+        # 1. Trending songs from yt-api or local DB
+        trending = []
+        try:
+            import requests as _req
+            api_url = os.environ.get("API_URL", "http://localhost:8001")
+            resp = _req.get(f"{api_url}/api/trending-songs", timeout=5)
+            if resp.status_code == 200:
+                trending = resp.json().get("songs", [])[:20]
+        except Exception:
+            pass
+
+        # 2. Strategy songs from ex17 (per theme)
+        strategy_songs = {}
+        strategies = _load_strategies(output_dir)
+        for theme, plats in strategies.items():
+            for plat_data in plats.values():
+                if isinstance(plat_data, dict) and plat_data.get("sound"):
+                    strategy_songs[theme] = plat_data["sound"]
+                    break
+
+        return JSONResponse({"trending": trending, "strategy_songs": strategy_songs})
+
+    @app.post("/api/upload/youtube/{short_id}")
+    async def upload_youtube(short_id: int, request: Request):
+        """Upload an approved short to YouTube via ex12."""
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        persona = body.get("persona", "")
+
+        conn = get_db(data_dir)
+        cur = conn.execute("SELECT * FROM shorts WHERE id = ?", (short_id,))
+        short = cur.fetchone()
+        if not short:
+            conn.close()
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+
+        short = dict(short)
+        video_path = short.get("output_file", "")
+        if not video_path or not Path(video_path).exists():
+            conn.close()
+            return JSONResponse({"ok": False, "error": "video file not found"})
+
+        try:
+            from exercises.ex12_upload import run as upload_run
+            result_path = upload_run(
+                settings,
+                video=video_path,
+                title=short.get("title", "Short"),
+                privacy="unlisted",
+                persona=persona,
+            )
+            conn.close()
+            return JSONResponse({"ok": True, "result": str(result_path)})
+        except Exception as e:
+            conn.close()
+            return JSONResponse({"ok": False, "error": str(e)[:200]})
+
+    @app.post("/api/upload/tiktok/{short_id}")
+    async def upload_tiktok(short_id: int, request: Request):
+        """Upload an approved short to TikTok inbox via ex36."""
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            pass
+        persona = body.get("persona", "")
+
+        conn = get_db(data_dir)
+        cur = conn.execute("SELECT * FROM shorts WHERE id = ?", (short_id,))
+        short = cur.fetchone()
+        if not short:
+            conn.close()
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+
+        short = dict(short)
+        video_path = short.get("output_file", "")
+        if not video_path or not Path(video_path).exists():
+            conn.close()
+            return JSONResponse({"ok": False, "error": "video file not found"})
+
+        try:
+            from exercises.ex36_tiktok_upload import get_access_token, upload_to_inbox
+            access_token = get_access_token(persona or "default")
+            if not access_token:
+                conn.close()
+                return JSONResponse({"ok": False, "error": "No TikTok token. Run: python src/main.py ex36 --persona " + (persona or "default")})
+            result = upload_to_inbox(video_path, access_token)
+            conn.close()
+            return JSONResponse(result)
+        except Exception as e:
+            conn.close()
+            return JSONResponse({"ok": False, "error": str(e)[:200]})
 
     @app.post("/api/review/{short_id}")
     async def submit_review(short_id: int, request: Request):
@@ -534,8 +858,8 @@ def _create_app(settings: Settings, lang: str = "es"):
             (body.get("status", "pending"), short_id),
         )
 
-        # Feed back into quote scoring if rejected/needs_edit
-        if body.get("status") in ("rejected", "needs_edit"):
+        # Feed back into quote scoring if negative review
+        if body.get("status") in ("rejected", "needs_edit", "disapproved"):
             _apply_feedback_to_quotes(conn, short_id, body)
 
         conn.commit()
@@ -599,8 +923,9 @@ def _apply_feedback_to_quotes(conn, short_id: int, body: dict):
     except (json.JSONDecodeError, TypeError):
         return
 
-    # Decrease viral_score for quotes in rejected shorts
-    penalty = 2 if body.get("status") == "rejected" else 1
+    # Decrease viral_score: rejected=2, disapproved=1.5, needs_edit=1
+    status = body.get("status", "")
+    penalty = 2 if status == "rejected" else (1.5 if status == "disapproved" else 1)
     for qid in quote_ids:
         conn.execute(
             "UPDATE quotes SET viral_score = MAX(1, COALESCE(viral_score, 5) - ?) WHERE id = ?",
