@@ -1,0 +1,200 @@
+# YouTube Shorts Content Pipeline - Automated
+#
+# Corre DIARIAMENTE para:
+#   - Recopilar trends (Google Trends → DB → carrusel frontend)
+#   - Descubrir películas y quotes nuevas
+#   - Clasificar y preparar contenido
+#   - Learning cycle (analizar qué funciona)
+#
+# La SUBIDA de video (ex11 + ex12) solo corre cada 3 días
+# y requiere GPU/OAuth → se ejecuta local, no en Actions.
+#
+# Excluye los días 15-18 de cada mes.
+
+name: Content Pipeline
+
+on:
+  schedule:
+    # Corre a las 6:00 AM UTC (1:00 AM Colombia) todos los días
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Tema para buscar (e.g., "epic villain moment")'
+        required: false
+        default: ''
+      max_movies:
+        description: 'Máximo de películas a descubrir'
+        required: false
+        default: '8'
+      skip_discovery:
+        description: 'Saltar descubrimiento (usar BD existente)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+  OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+  OPENSUBTITLES_USERNAME: ${{ secrets.OPENSUBTITLES_USERNAME }}
+  OPENSUBTITLES_PASSWORD: ${{ secrets.OPENSUBTITLES_PASSWORD }}
+  OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+  TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+  YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+
+jobs:
+  check-date:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.date_check.outputs.should_run }}
+    steps:
+      - name: Check if today is between 15-18
+        id: date_check
+        run: |
+          DAY=$(date +%d)
+          if [ "$DAY" -ge 15 ] && [ "$DAY" -le 18 ]; then
+            echo "Skipping: day $DAY is in blackout window (15-18)"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "Day $DAY: pipeline will run"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+  pipeline:
+    needs: check-date
+    if: needs.check-date.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          # Whisper es opcional en CI (no hay GPU)
+          # pip install openai-whisper
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Restore database
+        uses: actions/cache@v4
+        with:
+          path: data/
+          key: pipeline-db-${{ github.run_number }}
+          restore-keys: |
+            pipeline-db-
+
+      - name: Determine query
+        id: query
+        run: |
+          if [ -n "${{ inputs.query }}" ]; then
+            echo "q=${{ inputs.query }}" >> $GITHUB_OUTPUT
+          else
+            # Rotar queries automáticamente por día de la semana
+            QUERIES=(
+              "epic villain monologue"
+              "emotional movie scene"
+              "plot twist revelation"
+              "heroic sacrifice moment"
+              "romantic cinema quote"
+              "dark humor movie scene"
+              "inspirational speech"
+            )
+            DOW=$(date +%u)  # 1=Monday, 7=Sunday
+            IDX=$(( (DOW - 1) % ${#QUERIES[@]} ))
+            echo "q=${QUERIES[$IDX]}" >> $GITHUB_OUTPUT
+          fi
+          echo "Using query: $(cat $GITHUB_OUTPUT | grep q= | cut -d= -f2)"
+
+      # ── Discovery Phase ──
+      - name: "ex04: Discover movies & quotes"
+        if: inputs.skip_discovery != 'true'
+        working-directory: src
+        run: python main.py ex04 --query "${{ steps.query.outputs.q }}" --max-movies ${{ inputs.max_movies || '8' }} --mode trending
+
+      - name: "ex05: Download subtitles"
+        if: inputs.skip_discovery != 'true'
+        working-directory: src
+        run: python main.py ex05 --max-downloads 5
+
+      - name: "ex06: Match quotes with timestamps"
+        working-directory: src
+        run: python main.py ex06 --threshold 72 --with-chroma
+
+      # ── Classification Phase ──
+      - name: "ex10: Classify quotes (Gemini)"
+        working-directory: src
+        run: python main.py ex10 --batch-size 50
+
+      # ── Content Creation Phase ──
+      - name: "ex07: Search scenes"
+        working-directory: src
+        run: python main.py ex07 --query "${{ steps.query.outputs.q }}" --max-results 5
+
+      - name: "ex09: Curate groups"
+        working-directory: src
+        run: python main.py ex09 --query "${{ steps.query.outputs.q }}" --max-results 5 --group-size 3
+
+      - name: "ex08: Growth pack (hashtags + songs)"
+        working-directory: src
+        run: python main.py ex08 --query "${{ steps.query.outputs.q }}" --country-code CO
+
+      - name: "ex18: Narration script"
+        working-directory: src
+        run: python main.py ex18 --query "${{ steps.query.outputs.q }}" --lang es --narration-style reflective
+
+      - name: "ex17: Publish strategy"
+        working-directory: src
+        run: python main.py ex17 --query "${{ steps.query.outputs.q }}" --platform both --country-code CO
+
+      # ── Learning Cycle ──
+      - name: "ex31: Lesson taxonomy"
+        working-directory: src
+        run: python main.py ex31 --batch-size 50
+
+      - name: "ex32: Lesson performance"
+        working-directory: src
+        run: python main.py ex32
+
+      - name: "ex33: Curriculum planner"
+        working-directory: src
+        run: python main.py ex33 --plan-size 10
+
+      - name: "ex35: Export data"
+        working-directory: src
+        run: python main.py ex35
+
+      # ── Save artifacts ──
+      - name: Upload pipeline outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pipeline-outputs-${{ github.run_number }}
+          path: |
+            outputs/publish/
+            outputs/analytics/
+            outputs/narration/
+            outputs/metadata/
+            outputs/manifests/
+            outputs/curation/
+            outputs/exports/
+            outputs/logs/
+          retention-days: 30
+
+      - name: Save database for next run
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/
+          key: pipeline-db-${{ github.run_number }}

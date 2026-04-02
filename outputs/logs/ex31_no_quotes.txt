@@ -1,0 +1,2 @@
+ex31: All quotes already classified or none have category.
+Run ex10 first.

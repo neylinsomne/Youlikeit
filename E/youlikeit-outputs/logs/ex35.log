@@ -1,0 +1,7 @@
+2026-03-19 14:37:36,891 | INFO | Extract: 5 movies, 130 quotes, 0 shorts
+2026-03-19 14:37:36,895 | INFO |   Exported movies: 5 rows → movies.csv
+2026-03-19 14:37:36,899 | INFO |   Exported quotes: 130 rows → quotes.csv
+2026-03-19 14:37:36,904 | INFO |   Exported subtitles: 3 rows → subtitles.csv
+2026-03-19 14:37:36,914 | INFO |   Exported curriculum_plan: 15 rows → curriculum_plan.csv
+2026-03-19 14:37:36,931 | INFO |   DB backup: shorts_pipeline_backup_20260319_143736.db
+2026-03-19 14:37:36,940 | INFO | Export complete: E:/youlikeit-outputs/exports/20260319_143736 (7 files)

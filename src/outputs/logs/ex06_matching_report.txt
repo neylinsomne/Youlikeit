@@ -1,0 +1,36 @@
+ex06 - Match Quotes to Timestamps
+========================================
+Matched: 30 | Unmatched: 48
+
+  [99%] Zootopia 2: "Hopps and Wilde in pursuit of suspect!" @ 00:05:33-00:05:41
+  [100%] Zootopia 2: "Stop in the name of the law!" @ 00:05:20-00:05:23
+  [98%] Zootopia 2: "[looking around Nick's apartment]Yikes... No wonder you neve" @ 00:17:56-00:18:01
+  [89%] Zootopia 2: "Stop pulling my ears, stop pulling my ears! Never pull a bun" @ 00:29:14-00:29:17
+  [94%] Zootopia 2: "We have to solve this case." @ 00:55:02-00:55:06
+  [100%] Zootopia 2: "You know, I used to dream... of infiltrating a place like th" @ 00:21:28-00:21:33
+  [100%] Zootopia 2: "Check the perimeter, snoop a little, we find nothing, we bai" @ 00:18:12-00:18:15
+  [98%] Zootopia 2: "We took an oath to protect this city, and justice doesn't ru" @ 00:34:27-00:34:32
+  [100%] Zootopia 2: "The sooner everyone sees a fox and a bunny can be great part" @ 00:13:47-00:13:51
+  [100%] Zootopia 2: "Sorry, could you show me that clip again? Wasn't wearing my " @ 00:09:08-00:09:12
+  [100%] Zootopia 2: "Play it smart, stay off the radar, and don't let them get to" @ 00:13:15-00:13:18
+  [97%] Zootopia 2: "No snake has set foot in Zootopia in forever, okay? Even if " @ 00:17:46-00:17:51
+  [100%] Zootopia 2: "Well, can't win 'em all." @ 00:05:25-00:05:27
+  [100%] Zootopia 2: "Oh, is my discomfort hilarious to you?" @ 00:40:22-00:40:25
+  [100%] Zootopia 2: "You know, this is not your worst idea.[Judy: Wow, that was a" @ 00:21:31-00:21:40
+  [96%] Zootopia 2: "You're the one who said we needed a bust. Just follow my lea" @ 00:03:19-00:03:23
+  [98%] Zootopia 2: "You want to fit in? Commando is not gonna cut it. It's not j" @ 00:22:28-00:22:33
+  [94%] Zootopia 2: "Carrots, hey, I would like to call a partner meeting!" @ 00:07:11-00:07:15
+  [98%] Zootopia 2: "Hey, Flash, Flash, 100-yard dash! Partner's in trouble, need" @ 01:10:44-01:10:47
+  [100%] Zootopia 2: "I'm really sorry. I have to help my family!" @ 00:47:02-00:47:07
+  [100%] Zootopia 2: "Hurt him? Snakes never hurt anyone. We aren't the bad guys. " @ 00:27:09-00:27:11
+  [100%] Zootopia 2: "We shall succeed." @ 01:11:40-01:11:42
+  [100%] Zootopia 2: "Permission to hug?" @ 01:20:23-01:20:25
+  [100%] Zootopia 2: "If you wanna talk to a reptile, I am your gal." @ 00:35:35-00:35:38
+  [97%] Zootopia 2: "When Zootopia was founded, this whole neighborhood got cut o" @ 00:37:11-00:37:14
+  [100%] Zootopia 2: "Breathe it in!" @ 00:36:49-00:36:51
+  [88%] Zootopia 2: "Zootopia has a secret reptile population." @ 00:07:48-00:07:56
+  [96%] Zootopia 2: "It takes two to tango, but a threesome to be some!" @ 00:36:33-00:36:41
+  [96%] Zootopia 2: "It takes a threesome to be some, but a fourway to bust your " @ 01:26:34-01:26:40
+  [97%] Zootopia 2: "I'M GONNABURNIT ALL TO THE GROUND!I'M A REALLYNXLEY![maniaca" @ 01:32:43-01:32:50
+
+Total quotes with timestamps: 30

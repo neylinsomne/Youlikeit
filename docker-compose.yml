@@ -1,0 +1,88 @@
+# YouLikeIt - Pipeline
+# Single image shared across services to save disk space (~2GB total vs ~12GB before)
+
+services:
+  # Main pipeline worker (GPU)
+  ytlab:
+    build: .
+    image: youlikeit:latest
+    container_name: ytlab
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    env_file: .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, video]
+    command: ["bash", "-lc", "tail -f /dev/null"]
+
+  # API REST (reuses same image)
+  api:
+    image: youlikeit:latest
+    container_name: yt-api
+    depends_on: [ytlab]
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    command: ["python", "src/main.py", "ex29", "--host", "0.0.0.0", "--port", "8001"]
+    restart: unless-stopped
+
+  # Fish Speech TTS (GPU)
+  fish-speech:
+    build:
+      context: .
+      dockerfile: Dockerfile.fish
+      args:
+        HF_TOKEN: ${HF_TOKEN:-}
+    image: youlikeit-fish:latest
+    container_name: yt-fish-speech
+    ports:
+      - "7860:7860"
+      - "8080:8080"
+    volumes:
+      - fish-speech-models:/app/checkpoints
+      - ./outputs/voice_samples/references:/app/references
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - DEVICE=cuda
+      - TORCHAUDIO_BACKEND=soundfile
+    command: []
+    restart: unless-stopped
+
+  # Frontend React (production build served by Node)
+  frontend:
+    image: node:22-alpine
+    container_name: yt-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend-react:/app
+    ports:
+      - "5180:5180"
+    environment:
+      - VITE_API_URL=http://localhost:8001
+    command: ["sh", "-c", "npm install --silent 2>/dev/null; npx vite --host 0.0.0.0 --port 5180"]
+    restart: unless-stopped
+
+volumes:
+  fish-speech-models:

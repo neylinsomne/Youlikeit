@@ -1,0 +1,16 @@
+{
+  "name": "youlikeit-twick-render",
+  "version": "1.0.0",
+  "description": "Twick render server for YouLikeIt pipeline",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "better-sqlite3": "^11.0.0"
+  }
+}

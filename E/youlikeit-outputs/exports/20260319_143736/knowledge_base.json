@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "category": "pattern",
+    "topic": "curriculum",
+    "title": "Curriculum plan: 5 entries, 4 types",
+    "content": "{\"plan_size\": 5, \"unique_types\": 4, \"type_coverage\": 50.0, \"has_performance_data\": false}",
+    "confidence": 0.7,
+    "source": "curriculum_planner",
+    "source_id": null,
+    "times_validated": 0,
+    "times_contradicted": 0,
+    "is_active": 1,
+    "created_at": "2026-03-19 07:28:32",
+    "updated_at": null
+  },
+  {
+    "id": 2,
+    "category": "insight",
+    "topic": "pedagogy",
+    "title": "Lesson distribution: 30 quotes classified",
+    "content": "{\"critical_thinking\": 26, \"resilience\": 2, \"decision_making\": 1, \"empathy\": 1}",
+    "confidence": 0.7,
+    "source": "lesson_taxonomy",
+    "source_id": null,
+    "times_validated": 0,
+    "times_contradicted": 0,
+    "is_active": 1,
+    "created_at": "2026-03-19 07:41:22",
+    "updated_at": null
+  },
+  {
+    "id": 3,
+    "category": "pattern",
+    "topic": "curriculum",
+    "title": "Curriculum plan: 7 entries, 4 types",
+    "content": "{\"plan_size\": 7, \"unique_types\": 4, \"type_coverage\": 50.0, \"has_performance_data\": false}",
+    "confidence": 0.7,
+    "source": "curriculum_planner",
+    "source_id": null,
+    "times_validated": 0,
+    "times_contradicted": 0,
+    "is_active": 1,
+    "created_at": "2026-03-19 07:41:34",
+    "updated_at": null
+  },
+  {
+    "id": 4,
+    "category": "pattern",
+    "topic": "curriculum",
+    "title": "Curriculum plan: 3 entries, 3 types",
+    "content": "{\"plan_size\": 3, \"unique_types\": 3, \"type_coverage\": 37.5, \"has_performance_data\": false}",
+    "confidence": 0.7,
+    "source": "curriculum_planner",
+    "source_id": null,
+    "times_validated": 0,
+    "times_contradicted": 0,
+    "is_active": 1,
+    "created_at": "2026-03-19 07:44:13",
+    "updated_at": null
+  }
+]

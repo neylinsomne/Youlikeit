@@ -1,0 +1,49 @@
+ex33 - Curriculum Plan
+============================================================
+Plan size: 5 shorts
+Type diversity: 4/8 learning types
+Performance data available: No (round-robin mode)
+
+─── Planned Content ───
+
+  # 1  [critical_thinking        ]
+       query: "plot twist revelación"
+       dramatic | surprise | no data yet
+       reason: diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500
+
+  # 2  [emotional_intelligence   ]
+       query: "despedida conmovedora"
+       romance | sadness | no data yet
+       reason: diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500
+
+  # 3  [ethics                   ]
+       query: "corrupción poder"
+       villain | anger | no data yet
+       reason: diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500
+
+  # 4  [creativity               ]
+       query: "solución ingeniosa"
+       comedy | joy | no data yet
+       reason: diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500
+
+  # 5  [critical_thinking        ]
+       query: "villano tiene razón"
+       villain | surprise | no data yet
+       reason: diversity_score=0.50 | coverage_gap=0.50 | total_score=0.500
+
+─── Current Distribution (quotes by learning_type) ───
+  critical_thinking            0 ( 0.0%) █  ← UNDER
+  emotional_intelligence       0 ( 0.0%) █  ← UNDER
+  ethics                       0 ( 0.0%) █  ← UNDER
+  creativity                   0 ( 0.0%) █  ← UNDER
+  resilience                   0 ( 0.0%) █  ← UNDER
+  self_awareness               0 ( 0.0%) █  ← UNDER
+  empathy                      0 ( 0.0%) █  ← UNDER
+  decision_making              0 ( 0.0%) █  ← UNDER
+
+─── Coverage by Curriculum Area ───
+  character          0 ( 0.0%)
+  relationships      0 ( 0.0%)
+  society            0 ( 0.0%)
+  self               0 ( 0.0%)
+  conflict           0 ( 0.0%)

@@ -1,0 +1,41 @@
+════════════════════════════════════════════════════════════
+  CHANNEL STATUS REPORT
+  Generated: 2026-03-19 14:37 UTC
+════════════════════════════════════════════════════════════
+
+─── Pipeline Coverage ───
+  Movies discovered:             5
+  Quotes extracted:            130
+  Quotes with timestamps:       30
+  Quotes classified:            30
+  Quotes with lesson type:      30
+  Shorts total:                  0
+
+
+─── Performance ───
+  Total views:                   0
+  Total likes:                   0
+  Avg engagement rate:      0.0000
+  Avg retention:              0.00%
+  Analytics entries:             0
+
+─── Content Distribution ───
+  Categories:
+    dramatic          18 ██████████████████████████████
+    action             9 ███████████████
+    motivational       2 ███
+    romance            1 █
+  Learning types:
+    critical_thinking           26 ██████████████████████████████
+    resilience                   2 ██
+    empathy                      1 █
+    decision_making              1 █
+
+─── Intelligence ───
+  Active insights:           4
+  Audience segments:         0
+
+─── Curriculum Plan ───
+    planned           15
+
+════════════════════════════════════════════════════════════

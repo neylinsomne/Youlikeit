@@ -1,0 +1,12 @@
+2026-03-15 07:41:04,570 | INFO | Fetching trending movies...
+2026-03-15 07:41:05,085 | INFO | Fetching popular classics...
+2026-03-15 07:41:05,633 | INFO |   Total raw results: 80
+2026-03-15 07:41:05,706 | INFO | Saved 3 movies to database
+2026-03-15 07:41:05,706 | INFO | Scraping quotes from Wikiquote...
+2026-03-15 07:41:05,706 | INFO |   Wikiquote: War Machine
+2026-03-15 07:41:06,600 | INFO |     Extracted 18 quotes
+2026-03-15 07:41:06,601 | INFO |   Wikiquote: Zootopia 2
+2026-03-15 07:41:07,566 | INFO |     Extracted 30 quotes
+2026-03-15 07:41:07,566 | INFO |   Wikiquote: Hoppers
+2026-03-15 07:41:08,468 | INFO |     Extracted 30 quotes
+2026-03-15 07:41:08,473 | INFO | Report saved to outputs/logs/ex04_discover_report.txt

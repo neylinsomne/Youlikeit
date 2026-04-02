@@ -1,0 +1,32 @@
+ex10 - Quote Classification Report
+==================================================
+Provider: gemini
+Quotes to classify: 12
+Classified: 12 | Errors: 0
+
+[ 6/10] dramatic     | neutral  | dialogue   | Zootopia 2: "We took an oath to protect this city, and justice doesn't ru"
+[ 3/10] dramatic     | surprise | dialogue   | Zootopia 2: "You want to fit in? Commando is not gonna cut it. It's not j"
+[ 5/10] dramatic     | neutral  | monologue  | Zootopia 2: "[looking around Nick's apartment]Yikes... No wonder you neve"
+[ 5/10] romance      | surprise | dialogue   | Zootopia 2: "No snake has set foot in Zootopia in forever, okay? Even if "
+[ 3/10] dramatic     | neutral  | monologue  | Zootopia 2: "When Zootopia was founded, this whole neighborhood got cut o"
+[ 5/10] dramatic     | surprise | dialogue   | Zootopia 2: "You're the one who said we needed a bust. Just follow my lea"
+[ 7/10] action       | neutral  | dialogue   | Zootopia 2: "It takes two to tango, but a threesome to be some!"
+[ 6/10] action       | neutral  | dialogue   | Zootopia 2: "It takes a threesome to be some, but a fourway to bust your "
+[ 7/10] dramatic     | neutral  | dialogue   | Zootopia 2: "We have to solve this case."
+[ 7/10] action       | neutral  | dialogue   | Zootopia 2: "Carrots, hey, I would like to call a partner meeting!"
+[ 6/10] action       | neutral  | dialogue   | Zootopia 2: "Stop pulling my ears, stop pulling my ears! Never pull a bun"
+[ 7/10] dramatic     | neutral  | dialogue   | Zootopia 2: "Zootopia has a secret reptile population."
+
+Category distribution:
+  dramatic: 18
+  action: 9
+  motivational: 2
+  romance: 1
+
+Viral score distribution:
+  Score 8: 1 quotes
+  Score 7: 11 quotes
+  Score 6: 8 quotes
+  Score 5: 4 quotes
+  Score 4: 1 quotes
+  Score 3: 5 quotes

@@ -1,0 +1,36 @@
+2026-03-15 07:41:29,442 | INFO | Found 78 quotes without timestamps
+2026-03-15 07:41:29,443 | WARNING | No subtitles for: War Machine (run ex05 first)
+2026-03-15 07:41:29,445 | INFO | Loading SRT for: Zootopia 2
+2026-03-15 07:41:29,478 | INFO |   2114 subtitle events loaded
+2026-03-15 07:41:29,531 | INFO |   MATCH [99%]: "Hopps and Wilde in pursuit of suspect!..." -> 00:05:33 - 00:05:41
+2026-03-15 07:41:29,539 | INFO |   MATCH [100%]: "Stop in the name of the law!..." -> 00:05:20 - 00:05:23
+2026-03-15 07:41:29,590 | INFO |   MATCH [98%]: "[looking around Nick's apartment]Yikes... No wonde..." -> 00:17:56 - 00:18:01
+2026-03-15 07:41:29,669 | INFO |   MATCH [89%]: "Stop pulling my ears, stop pulling my ears! Never ..." -> 00:29:14 - 00:29:17
+2026-03-15 07:41:29,717 | INFO |   MATCH [94%]: "We have to solve this case...." -> 00:55:02 - 00:55:06
+2026-03-15 07:41:29,773 | INFO |   MATCH [100%]: "You know, I used to dream... of infiltrating a pla..." -> 00:21:28 - 00:21:33
+2026-03-15 07:41:29,867 | INFO |   MATCH [100%]: "Check the perimeter, snoop a little, we find nothi..." -> 00:18:12 - 00:18:15
+2026-03-15 07:41:29,922 | INFO |   MATCH [98%]: "We took an oath to protect this city, and justice ..." -> 00:34:27 - 00:34:32
+2026-03-15 07:41:29,989 | INFO |   MATCH [100%]: "The sooner everyone sees a fox and a bunny can be ..." -> 00:13:47 - 00:13:51
+2026-03-15 07:41:30,101 | INFO |   MATCH [100%]: "Sorry, could you show me that clip again? Wasn't w..." -> 00:09:08 - 00:09:12
+2026-03-15 07:41:30,185 | INFO |   MATCH [100%]: "Play it smart, stay off the radar, and don't let t..." -> 00:13:15 - 00:13:18
+2026-03-15 07:41:30,251 | INFO |   MATCH [97%]: "No snake has set foot in Zootopia in forever, okay..." -> 00:17:46 - 00:17:51
+2026-03-15 07:41:30,258 | INFO |   MATCH [100%]: "Well, can't win 'em all...." -> 00:05:25 - 00:05:27
+2026-03-15 07:41:30,267 | INFO |   MATCH [100%]: "Oh, is my discomfort hilarious to you?..." -> 00:40:22 - 00:40:25
+2026-03-15 07:41:30,340 | INFO |   MATCH [100%]: "You know, this is not your worst idea.[Judy: Wow, ..." -> 00:21:31 - 00:21:40
+2026-03-15 07:41:30,410 | INFO |   MATCH [96%]: "You're the one who said we needed a bust. Just fol..." -> 00:03:19 - 00:03:23
+2026-03-15 07:41:30,488 | INFO |   MATCH [98%]: "You want to fit in? Commando is not gonna cut it. ..." -> 00:22:28 - 00:22:33
+2026-03-15 07:41:30,542 | INFO |   MATCH [94%]: "Carrots, hey, I would like to call a partner meeti..." -> 00:07:11 - 00:07:15
+2026-03-15 07:41:30,619 | INFO |   MATCH [98%]: "Hey, Flash, Flash, 100-yard dash! Partner's in tro..." -> 01:10:44 - 01:10:47
+2026-03-15 07:41:30,669 | INFO |   MATCH [100%]: "I'm really sorry. I have to help my family!..." -> 00:47:02 - 00:47:07
+2026-03-15 07:41:30,775 | INFO |   MATCH [100%]: "Hurt him? Snakes never hurt anyone. We aren't the ..." -> 00:27:09 - 00:27:11
+2026-03-15 07:41:30,785 | INFO |   MATCH [100%]: "We shall succeed...." -> 01:11:40 - 01:11:42
+2026-03-15 07:41:30,796 | INFO |   MATCH [100%]: "Permission to hug?..." -> 01:20:23 - 01:20:25
+2026-03-15 07:41:30,804 | INFO |   MATCH [100%]: "If you wanna talk to a reptile, I am your gal...." -> 00:35:35 - 00:35:38
+2026-03-15 07:41:30,903 | INFO |   MATCH [97%]: "When Zootopia was founded, this whole neighborhood..." -> 00:37:11 - 00:37:14
+2026-03-15 07:41:30,911 | INFO |   MATCH [100%]: "Breathe it in!..." -> 00:36:49 - 00:36:51
+2026-03-15 07:41:30,961 | INFO |   MATCH [88%]: "Zootopia has a secret reptile population...." -> 00:07:48 - 00:07:56
+2026-03-15 07:41:31,014 | INFO |   MATCH [96%]: "It takes two to tango, but a threesome to be some!..." -> 00:36:33 - 00:36:41
+2026-03-15 07:41:31,077 | INFO |   MATCH [96%]: "It takes a threesome to be some, but a fourway to ..." -> 01:26:34 - 01:26:40
+2026-03-15 07:41:31,130 | INFO |   MATCH [97%]: "I'M GONNABURNIT ALL TO THE GROUND!I'M A REALLYNXLE..." -> 01:32:43 - 01:32:50
+2026-03-15 07:41:31,131 | WARNING | No subtitles for: Hoppers (run ex05 first)
+2026-03-15 07:41:31,134 | INFO | Report saved to outputs/logs/ex06_matching_report.txt

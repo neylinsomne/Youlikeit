@@ -1,0 +1,14 @@
+ex05 - Download Subtitles
+========================================
+Downloaded: 1 | Failed: 2
+
+Download priority ranking:
+  #1 War Machine (quotes=18, score=796.0341)
+  #2 Zootopia 2 (quotes=30, score=470.8567)
+  #3 Hoppers (quotes=30, score=462.1191)
+
+  FAIL: War Machine (no subtitles found)
+  OK: Zootopia 2 (opensubtitles)
+  FAIL: Hoppers (no subtitles found)
+
+Total subtitles in DB: 1

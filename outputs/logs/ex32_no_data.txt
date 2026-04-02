@@ -1,0 +1,2 @@
+ex32: No quotes with learning_type found.
+Run ex31 first to classify quotes, then ex19/ex24 for metrics.
