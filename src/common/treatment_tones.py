@@ -137,6 +137,13 @@ PERSONA_TONE_AFFINITY = {
         "emotional": 0.85,    # Strong — raw reactions, vulnerability
         "comparative": 0.9,   # Perfect — fiction meets real life
     },
+    "latam": {
+        "critical": 0.7,      # Can critique novelas — "por que triunfo Betty?"
+        "narrative": 0.9,     # Very natural — born storyteller
+        "analytical": 0.5,    # Can do it but not his strength
+        "emotional": 0.85,    # Strong — novelas ARE emotion
+        "comparative": 0.95,  # Perfect — this country vs that country
+    },
 }
 
 

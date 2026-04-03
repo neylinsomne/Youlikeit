@@ -115,13 +115,42 @@ PERSONA_SIGNATURE_TONES = {
     "deep_mind": "critical",      # His brand: philosophical provocation
     "cinephile": "analytical",    # His brand: craft breakdown
     "pop_oracle": "comparative",  # Her brand: fiction meets reality
+    "latam": "comparative",       # His brand: cross-country novela comparison
+}
+
+# Language per persona
+PERSONA_LANG = {
+    "deep_mind": "en",
+    "cinephile": "en",
+    "pop_oracle": "en",
+    "latam": "es",
 }
 
 
 # ── Theme pool ──────────────────────────────────────────────────
 
-def _get_available_themes(conn: sqlite3.Connection) -> list[str]:
-    """Get themes from DB that have content ready (quotes matched)."""
+def _get_available_themes(conn: sqlite3.Connection, include_culture: bool = True, persona: str = "") -> list[str]:
+    """Get themes from DB (quotes) + live culture feed. LatAm persona gets Spanish sources."""
+    themes = []
+
+    # LatAm persona uses completely different sources
+    if persona == "latam":
+        try:
+            from common.latam_discovery import generate_latam_themes
+            latam_themes = generate_latam_themes(max_themes=10)
+            themes.extend([t["query"] for t in latam_themes])
+        except Exception:
+            pass
+
+        if len(themes) < 3:
+            themes.extend([
+                "Betty la Fea", "Al Fondo Hay Sitio", "Rebelde",
+                "El Secreto de sus Ojos", "La Casa de las Flores",
+                "Pasión de Gavilanes",
+            ])
+        return themes
+
+    # English personas: quotes DB + US culture feed
     rows = conn.execute("""
         SELECT DISTINCT q.category as theme, COUNT(*) as n
         FROM quotes q
@@ -130,10 +159,21 @@ def _get_available_themes(conn: sqlite3.Connection) -> list[str]:
         HAVING n >= 3
         ORDER BY n DESC
     """).fetchall()
+    themes.extend([r["theme"] for r in rows if r["theme"]])
 
-    themes = [r["theme"] for r in rows if r["theme"]]
+    if include_culture:
+        try:
+            from common.culture_feed import (
+                fetch_rss_headlines,
+                extract_themes_from_culture,
+            )
+            headlines = fetch_rss_headlines(max_per_feed=3)
+            culture_themes = extract_themes_from_culture(headlines, max_themes=8)
+            for ct in culture_themes:
+                themes.append(ct["query"])
+        except Exception:
+            pass
 
-    # Fallback themes if DB is sparse
     if len(themes) < 3:
         themes.extend([
             "villain monologue", "epic fight scene", "emotional farewell",
@@ -154,12 +194,14 @@ def _get_recently_used_themes(conn: sqlite3.Connection, days: int = 9) -> set[st
 
 def _pick_theme(conn: sqlite3.Connection, persona: str) -> str:
     """Pick a theme that hasn't been used recently."""
-    available = _get_available_themes(conn)
+    available = _get_available_themes(conn, persona=persona)
     recent = _get_recently_used_themes(conn)
     fresh = [t for t in available if t not in recent]
     if fresh:
         return fresh[0]
-    return available[0] if available else "epic movie moment"
+    if available:
+        return available[0]
+    return "novela latinoamericana" if persona == "latam" else "epic movie moment"
 
 
 # ── Batch planner ───────────────────────────────────────────────
@@ -180,13 +222,14 @@ def plan_batch(
         recommend_next_content,
     )
 
-    personas = personas or ["deep_mind", "cinephile", "pop_oracle"]
+    personas = personas or ["deep_mind", "pop_oracle", "latam"]
     batch = []
 
     for persona in personas:
         theme = force_theme or _pick_theme(conn, persona)
         query = f"{theme} {series}".strip() if series else theme
         affinities = PERSONA_TONE_AFFINITY.get(persona, {})
+        lang = PERSONA_LANG.get(persona, "en")
 
         # ── Video 1: NARRATION (safe) ──
         batch.append({
@@ -196,6 +239,7 @@ def plan_batch(
             "query": query,
             "tone": "narrative",
             "style": "reflective",
+            "lang": lang,
             "reason": "safe_baseline",
             "affinity": affinities.get("narrative", 0.5),
         })
@@ -209,6 +253,7 @@ def plan_batch(
             "query": query,
             "tone": sig_tone,
             "style": TONE_TO_STYLE.get(sig_tone, "reflective"),
+            "lang": lang,
             "reason": "signature_identity",
             "affinity": affinities.get(sig_tone, 0.5),
         })
@@ -234,6 +279,7 @@ def plan_batch(
             "query": query,
             "tone": test_tone,
             "style": TONE_TO_STYLE.get(test_tone, "reflective"),
+            "lang": lang,
             "reason": test_rec.get("reason", "experiment"),
             "affinity": affinities.get(test_tone, 0.5),
         })
@@ -262,7 +308,8 @@ def format_batch_plan(batch: list[dict]) -> str:
         type_icon = {"narration": "📖", "personality": "🎭", "test": "🧪"}
         icon = type_icon.get(v["video_type"], "?")
 
-        lines.append(f"  {icon} {v['video_type'].upper():12s} | tone: {v['tone']:12s} | aff: {v['affinity']:.1f} | {v['reason']}")
+        lang_flag = "🇪🇸" if v.get('lang') == 'es' else "🇺🇸"
+        lines.append(f"  {icon} {v['video_type'].upper():12s} | {lang_flag} {v.get('lang','en'):2s} | tone: {v['tone']:12s} | aff: {v['affinity']:.1f} | {v['reason']}")
         lines.append(f"     theme: {v['theme']}")
         lines.append(f"     style: {v['style']}")
         lines.append("")
