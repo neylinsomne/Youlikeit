@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>YouLikeIt | Pro Pipeline Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed-variant": "#004e5f",
+              "error": "#ffb4ab",
+              "on-primary-container": "#00586b",
+              "on-primary": "#003642",
+              "on-secondary-container": "#b1b5c0",
+              "inverse-on-surface": "#2f3035",
+              "on-surface-variant": "#bbc9cf",
+              "surface": "#111317",
+              "on-tertiary-container": "#005c3b",
+              "on-background": "#e2e2e8",
+              "on-error": "#690005",
+              "on-secondary-fixed-variant": "#424750",
+              "surface-bright": "#37393e",
+              "surface-container-high": "#282a2e",
+              "primary": "#a8e8ff",
+              "surface-container-low": "#1a1c20",
+              "on-error-container": "#ffdad6",
+              "surface-container-highest": "#333539",
+              "error-container": "#93000a",
+              "on-secondary": "#2c3139",
+              "tertiary-fixed": "#4dffb2",
+              "tertiary-fixed-dim": "#00e297",
+              "on-secondary-fixed": "#171c24",
+              "outline": "#859398",
+              "on-tertiary": "#003822",
+              "tertiary-container": "#00de94",
+              "inverse-surface": "#e2e2e8",
+              "secondary-fixed": "#dee2ed",
+              "on-tertiary-fixed": "#002112",
+              "outline-variant": "#3c494e",
+              "on-primary-fixed": "#001f27",
+              "tertiary": "#00feaa",
+              "secondary": "#c2c6d1",
+              "surface-container": "#1e2024",
+              "background": "#111317",
+              "on-tertiary-fixed-variant": "#005234",
+              "primary-fixed": "#b4ebff",
+              "secondary-fixed-dim": "#c2c6d1",
+              "surface-variant": "#333539",
+              "surface-container-lowest": "#0c0e12",
+              "on-surface": "#e2e2e8",
+              "surface-tint": "#3cd7ff",
+              "primary-container": "#00d4ff",
+              "primary-fixed-dim": "#3cd7ff",
+              "inverse-primary": "#00677e",
+              "surface-dim": "#111317",
+              "secondary-container": "#424750"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #111317;
+      }
+      .glass-card {
+        background: rgba(51, 53, 57, 0.6);
+        backdrop-filter: blur(20px);
+      }
+      .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #333539; border-radius: 10px; }
+      .kinetic-grid {
+        background-image: radial-gradient(circle at 2px 2px, rgba(60, 73, 78, 0.15) 1px, transparent 0);
+        background-size: 24px 24px;
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary/30">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // --- Shared Components ---
+
+        const Sidebar = () => {
+            const location = useLocation();
+            const navItems = [
+                { path: "/", icon: "home", label: "Home" },
+                { path: "/analytics", icon: "dashboard_customize", label: "Manager" },
+                { path: "/editor", icon: "movie", label: "Películas" },
+                { path: "/review", icon: "format_quote", label: "Quotes" },
+                { path: "/shorts", icon: "bolt", label: "Shorts" },
+                { path: "#", icon: "description", label: "Curriculum" },
+                { path: "#", icon: "ios_share", label: "Exportar" },
+            ];
+
+            return (
+                <aside className="fixed left-0 top-0 h-full z-40 flex flex-col py-6 px-4 bg-[#1a1c20] w-64 border-r border-[#333539]/30">
+                    <div className="mb-10 px-2">
+                        <h1 className="text-xl font-black text-[#00d4ff] tracking-tighter font-headline">YouLikeIt</h1>
+                        <p className="font-headline tracking-wide uppercase text-[10px] font-bold text-[#e2e2e8]/40">Pro Pipeline</p>
+                    </div>
+                    <nav className="flex-1 space-y-1">
+                        {navItems.map((item) => {
+                            const isActive = location.pathname === item.path;
+                            return (
+                                <Link 
+                                    key={item.label}
+                                    to={item.path}
+                                    className={`flex items-center gap-3 px-3 py-2 transition-all rounded-lg font-headline tracking-wide uppercase text-[10px] font-bold ${
+                                        isActive 
+                                        ? "bg-[#3cd7ff]/10 text-[#3cd7ff]" 
+                                        : "text-[#e2e2e8]/60 hover:text-[#e2e2e8] hover:bg-[#1e2024]"
+                                    }`}
+                                >
+                                    <span className="material-symbols-outlined text-sm">{item.icon}</span>
+                                    {item.label}
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                    <div className="mt-auto space-y-4">
+                        <div className="p-3 bg-surface-container rounded-xl border border-outline-variant/15">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-tertiary uppercase tracking-widest">GPU Status</span>
+                                <span className="flex h-2 w-2 rounded-full bg-tertiary"></span>
+                            </div>
+                            <div className="text-xs font-headline font-bold">RTX 5060 <span className="text-on-surface-variant font-normal">Active</span></div>
+                            <div className="w-full bg-surface-container-highest h-1 rounded-full mt-2 overflow-hidden">
+                                <div className="bg-tertiary h-full w-[42%]"></div>
+                            </div>
+                        </div>
+                        <button className="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary py-3 rounded-lg font-headline font-bold text-xs uppercase tracking-widest scale-95 active:scale-90 transition-transform">
+                            New Run
+                        </button>
+                    </div>
+                </aside>
+            );
+        };
+
+        const Header = ({ title = "Pipeline Lead" }) => (
+            <header className="fixed top-0 right-0 left-64 z-50 h-16 bg-[#111317]/80 backdrop-blur-xl flex items-center justify-between px-8 border-b border-[#3c494e]/15 shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
+                <div className="flex items-center flex-1 max-w-xl">
+                    <div className="relative w-full group">
+                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm group-focus-within:text-primary transition-colors">search</span>
+                        <input className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-sm font-body focus:ring-1 focus:ring-primary transition-all" placeholder="Search pipeline data..." type="text"/>
+                    </div>
+                </div>
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4 text-on-surface-variant">
+                        <span className="material-symbols-outlined cursor-pointer hover:text-primary transition-colors">sensors</span>
+                        <span className="material-symbols-outlined cursor-pointer hover:text-primary transition-colors">notifications</span>
+                        <span className="material-symbols-outlined cursor-pointer hover:text-primary transition-colors">settings</span>
+                    </div>
+                    <div className="h-8 w-[1px] bg-outline-variant/30"></div>
+                    <div className="flex items-center gap-3">
+                        <div className="text-right">
+                            <div className="text-xs font-headline font-bold text-on-surface uppercase">{title}</div>
+                            <div className="text-[10px] text-tertiary font-mono">0 COST API MODE</div>
+                        </div>
+                        <img className="w-10 h-10 rounded-lg object-cover ring-2 ring-primary/20" alt="Avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiMwtAmO-upBAR6WSNWzrrIlCQjyemonYWT-5D9Xt-L9tWJG3F61sP7FI12TWAROMWoFCX37Wwkj8OkbhvbUqQspsziC7aVu3h4sORGKq9IBSGx3oj4w4LzyS749nveItdXkfwWR74TXidXQOmH1HhVm4QWYqapgx-Y-7j2DUfvhe5aKitVuCCgZiMZ44k-niYE3wxCLz58Hiyx_T9HsefqIIdn4XxyzfgVtJrYb9QTW8u61_phlxiDniuLs9vMGHC4IPNrlpbKlu2"/>
+                    </div>
+                </div>
+            </header>
+        );
+
+        // --- Page Components ---
+
+        const DashboardPage = () => (
+            <div className="min-h-screen">
+                <Sidebar />
+                <Header />
+                <main className="pt-24 pl-72 pr-8 pb-12 min-h-screen">
+                    <div className="flex items-end justify-between mb-8">
+                        <div>
+                            <h2 className="text-3xl font-black font-headline tracking-tighter text-on-surface mb-1 uppercase">Dashboard Overview</h2>
+                            <div className="flex items-center gap-2 text-on-surface-variant text-sm">
+                                <span className="text-primary font-mono">/shorts/pipeline_v2.0</span>
+                                <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+                                <span>System Online</span>
+                            </div>
+                        </div>
+                        <div className="flex gap-4">
+                            <div className="text-right px-4 border-r border-outline-variant/30">
+                                <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Active Threads</div>
+                                <div className="text-xl font-headline font-bold text-tertiary">256</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Queue Latency</div>
+                                <div className="text-xl font-headline font-bold text-on-surface">12ms</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-8 bg-surface-container rounded-xl p-6 border border-outline-variant/10">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="font-headline font-bold text-sm tracking-widest uppercase flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary" style={{fontVariationSettings: "'FILL' 1"}}>analytics</span>
+                                Live Pipeline Status
+                            </h3>
+                            <span className="bg-tertiary/10 text-tertiary px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter ring-1 ring-tertiary/20">Processing: Anime Recaps</span>
+                        </div>
+                        <div className="relative flex items-center justify-between px-10">
+                            <div className="absolute top-1/2 left-0 w-full h-px bg-outline-variant/20 -translate-y-1/2 z-0"></div>
+                            <div className="relative z-10 flex flex-col items-center">
+                                <div className="w-10 h-10 rounded-full bg-surface-container-highest border-2 border-primary flex items-center justify-center text-primary mb-3">
+                                    <span className="material-symbols-outlined">download</span>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Extraction</span>
+                                <span className="text-[9px] text-on-surface-variant mt-1 font-mono">COMPLETE</span>
+                            </div>
+                            <div className="relative z-10 flex flex-col items-center">
+                                <div className="w-12 h-12 rounded-full bg-primary-container border-4 border-surface flex items-center justify-center text-on-primary-container shadow-[0_0_20px_rgba(0,212,255,0.4)] mb-3">
+                                    <span className="material-symbols-outlined text-lg">movie_edit</span>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface">Production</span>
+                                <span className="text-[9px] text-primary mt-1 font-mono">RENDERING 84%</span>
+                            </div>
+                            <div className="relative z-10 flex flex-col items-center">
+                                <div className="w-10 h-10 rounded-full bg-surface-container-highest border-2 border-outline-variant flex items-center justify-center text-on-surface-variant mb-3">
+                                    <span className="material-symbols-outlined">upload</span>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Uploading</span>
+                                <span className="text-[9px] text-on-surface-variant mt-1 font-mono">QUEUED</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-6">
+                        <div className="col-span-12 lg:col-span-8 grid grid-cols-2 gap-6">
+                            <div className="bg-surface-container rounded-xl p-5 border border-outline-variant/10">
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-xs font-headline font-bold tracking-widest uppercase text-on-surface-variant">Aprender: Retention</span>
+                                    <span className="material-symbols-outlined text-primary text-sm">trending_up</span>
+                                </div>
+                                <div className="h-32 flex items-end gap-1 px-2">
+                                    <div className="flex-1 bg-surface-container-highest rounded-t-sm" style={{height: "40%"}}></div>
+                                    <div className="flex-1 bg-surface-container-highest rounded-t-sm" style={{height: "55%"}}></div>
+                                    <div className="flex-1 bg-primary/40 rounded-t-sm" style={{height: "75%"}}></div>
+                                    <div className="flex-1 bg-primary/60 rounded-t-sm" style={{height: "65%"}}></div>
+                                    <div className="flex-1 bg-primary/80 rounded-t-sm" style={{height: "90%"}}></div>
+                                    <div className="flex-1 bg-primary rounded-t-sm" style={{height: "85%"}}></div>
+                                    <div className="flex-1 bg-surface-container-highest rounded-t-sm" style={{height: "30%"}}></div>
+                                </div>
+                                <div className="flex justify-between mt-3 text-[10px] font-mono text-on-surface-variant">
+                                    <span>MON</span><span>WED</span><span>FRI</span><span>SUN</span>
+                                </div>
+                            </div>
+                            <div className="bg-surface-container rounded-xl p-5 border border-outline-variant/10">
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-xs font-headline font-bold tracking-widest uppercase text-on-surface-variant">Medir: Demographics</span>
+                                    <span className="material-symbols-outlined text-tertiary text-sm">pie_chart</span>
+                                </div>
+                                <div className="flex items-center gap-6">
+                                    <div className="relative w-24 h-24 rounded-full border-[10px] border-surface-container-highest flex items-center justify-center">
+                                        <div className="absolute inset-0 rounded-full border-[10px] border-tertiary border-r-transparent border-b-transparent -rotate-45"></div>
+                                        <span className="text-xs font-bold font-headline">72%</span>
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center justify-between text-[10px]">
+                                            <span className="text-on-surface-variant">Gen Z</span>
+                                            <span className="font-bold">72%</span>
+                                        </div>
+                                        <div className="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+                                            <div className="bg-tertiary h-full w-[72%]"></div>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[10px]">
+                                            <span className="text-on-surface-variant">Millennials</span>
+                                            <span className="font-bold">18%</span>
+                                        </div>
+                                        <div className="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+                                            <div className="bg-primary h-full w-[18%]"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="col-span-2 bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+                                <div className="p-5 border-b border-outline-variant/10 flex items-center justify-between">
+                                    <h3 className="text-xs font-headline font-bold tracking-widest uppercase">Content Ingestion Stream</h3>
+                                    <div className="flex gap-2">
+                                        <button className="bg-surface-container-highest text-[10px] font-bold px-3 py-1 rounded">ALL</button>
+                                        <button className="text-[10px] font-bold px-3 py-1 text-on-surface-variant">MOVIES</button>
+                                        <button className="text-[10px] font-bold px-3 py-1 text-on-surface-variant">ANIME</button>
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-outline-variant/10">
+                                    {[1, 2].map((i) => (
+                                        <div key={i} className="p-4 flex items-center gap-4 hover:bg-[#1e2024] transition-colors group">
+                                            <div className="w-12 h-16 bg-surface-container-lowest rounded overflow-hidden flex-shrink-0">
+                                                <img className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" src={i === 1 ? "https://lh3.googleusercontent.com/aida-public/AB6AXuCRiW4qopJrEZgZxnXR7MO-vzCyzu__XDaKiX4BEAjfDtmbKPWW8fHr-MsfGa-DQKTFPhSdVdV8LqCIaAx7cI5ULJgSOjvK-aptHtd2JGD17DCaPQE4aEZIRFJvynrVkqA2-nN-UqY3D4PVwIBddZcFH7jxqzbpeXhq_Q4URiIdyqRt4DlDkfDwBeA_n5KQQRNEpq-bixpjPz2wRiOLaW_0vuThIv9rcCk34Ev68AXIlUKb3tm4bQBKLOO27vfYse_-Y-Pn5U0x2Sqj" : "https://lh3.googleusercontent.com/aida-public/AB6AXuDGmBradSMljiYk_4Eb97wlPHgkRYJsjAA_aDGYiprz_f5hZTlo3Wo4PI53gBtGcCJ8xmwYN33N2nKk7iGazG6nDk7MZU4SF4mRF868GGguqk7y68aq5HiRLU4ezIGxDC1TIeqi6f1yjF6AcTX0T6z39o0jvuZ2VQw_AHYq9Hq3bN7g7Avf-mevJc_n_e2OFfZ9EaQlu7y7x22-6VUCKxPfzX47-150OWvznfeRXMyCGslj-YyxTCOTnIhkqLsmZU7txHoHR8Yni4UT"} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="text-xs font-bold text-on-surface">{i === 1 ? "Cyberpunk: Edgerunners Recap" : "Suzume No Tojimari Scene Extraction"}</div>
+                                                <div className="text-[10px] text-on-surface-variant">Source: {i === 1 ? "Netflix API" : "Crunchyroll Hub"} • Metadata Attached</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] font-bold text-tertiary uppercase">Valid</div>
+                                                <div className="text-[9px] text-on-surface-variant font-mono">{i === 1 ? "4.2GB" : "1.8GB"} RAW</div>
+                                            </div>
+                                            <span className="material-symbols-outlined text-on-surface-variant text-sm cursor-pointer hover:text-primary">more_vert</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="col-span-12 lg:col-span-4 space-y-6">
+                            <div className="bg-surface-container rounded-xl p-5 border border-outline-variant/10">
+                                <h3 className="text-xs font-headline font-bold tracking-widest uppercase mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">auto_graph</span>
+                                    Trend Highlights
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="glass-card p-3 rounded-lg border border-primary/20">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="bg-primary/20 text-primary text-[9px] font-bold px-2 py-0.5 rounded">MOVIES</span>
+                                            <span className="text-[10px] font-mono text-primary">+142%</span>
+                                        </div>
+                                        <div className="text-xs font-bold text-on-surface mb-1">#DunePartTwo Theory</div>
+                                        <p className="text-[10px] text-on-surface-variant leading-relaxed">High search volume detected in North American markets. Recommended for extraction.</p>
+                                    </div>
+                                    <div className="bg-surface-container-highest p-3 rounded-lg">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="bg-tertiary/20 text-tertiary text-[9px] font-bold px-2 py-0.5 rounded">ANIME</span>
+                                            <span className="text-[10px] font-mono text-tertiary">+89%</span>
+                                        </div>
+                                        <div className="text-xs font-bold text-on-surface mb-1">#SoloLeveling Final</div>
+                                        <p className="text-[10px] text-on-surface-variant leading-relaxed">Viral engagement peaking. Pipeline ready for scene-split automation.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+
+        const ReviewPage = () => (
+            <div className="min-h-screen">
+                <Sidebar />
+                <Header title="Admin Pipeline" />
+                <main className="pl-64 pt-16 h-screen flex flex-col bg-background">
+                    <div className="flex-1 flex overflow-hidden">
+                        <section className="flex-1 flex flex-col p-6 overflow-y-auto custom-scrollbar">
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 className="text-2xl font-headline font-black text-on-surface tracking-tight">Reviewing: Short_#4022</h2>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="bg-tertiary-container text-on-tertiary-container text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">Ready for Review</span>
+                                        <span className="text-on-surface-variant text-[10px] uppercase font-bold tracking-widest">• 00:58 Duration</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="bg-error-container text-on-error-container px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+                                        <span className="material-symbols-outlined text-sm">close</span>Reject
+                                    </button>
+                                    <button className="bg-gradient-to-br from-[#a8e8ff] to-[#00d4ff] text-[#003642] px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+                                        <span className="material-symbols-outlined text-sm">publish</span>Upload Now
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="relative aspect-video bg-surface-container-lowest rounded-xl overflow-hidden shadow-2xl group border border-outline-variant/10">
+                                <img className="w-full h-full object-cover opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBD9B4KwKrbfGyH24-XoZtB6Qtmu1rmHX5sZvxjo057jJ956KjyRO0VdH9Sy6H43sNSTrJuWq13CXJGEWasdMtFapZN2tr7jlADzZ5PAfqELMZqmWN6v8D_m37Kr67Z755ONHZg2dojv4L0wF1GAkFiQPDdh3MgaFvJL7eV8QkWGxvcO6W4AZCFFCkExdWIhlR21koMiNjlbOWIc8l_-DyNj68y4FXofD68Iia5TUMjCLbcj3MgEjWP1lHigeEquJnDrTf1Glwirs7t" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent flex flex-col justify-end p-6">
+                                    <div className="flex items-center justify-center gap-8 mb-4">
+                                        <button className="text-on-surface hover:text-primary"><span className="material-symbols-outlined text-3xl" style={{fontVariationSettings: "'FILL' 1"}}>skip_previous</span></button>
+                                        <button className="w-16 h-16 bg-primary text-on-primary rounded-full flex items-center justify-center hover:scale-105"><span className="material-symbols-outlined text-4xl" style={{fontVariationSettings: "'FILL' 1"}}>play_arrow</span></button>
+                                        <button className="text-on-surface hover:text-primary"><span className="material-symbols-outlined text-3xl" style={{fontVariationSettings: "'FILL' 1"}}>skip_next</span></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-8">
+                                <h3 className="font-headline text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-4">Report Discrepancies</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {['Voice/Audio', 'Content', 'Movement', 'Other'].map((item, idx) => (
+                                        <button key={item} className={`p-4 rounded-xl flex flex-col items-center gap-3 transition-all ${idx === 2 ? 'bg-primary/10 border border-primary' : 'bg-surface-container border border-outline-variant/20 hover:bg-surface-container-high'}`}>
+                                            <span className={`material-symbols-outlined text-primary ${idx === 2 ? 'fill-1' : ''}`}>
+                                                {['record_voice_over', 'article', 'videocam', 'more_horiz'][idx]}
+                                            </span>
+                                            <span className={`text-xs font-bold uppercase tracking-tight ${idx === 2 ? 'text-primary' : ''}`}>{item}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </section>
+                        <aside className="w-80 bg-surface-container-low border-l border-[#333539]/30 flex flex-col">
+                            <div className="p-6 border-b border-[#333539]/30">
+                                <h3 className="font-headline font-black text-on-surface uppercase text-xs tracking-widest">Recently Produced</h3>
+                                <p className="text-[10px] text-on-surface-variant mt-1">Waiting for final approval</p>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="bg-surface-container p-3 rounded-xl border border-outline-variant/5 hover:border-primary/30 group cursor-pointer">
+                                        <div className="relative aspect-video rounded-lg overflow-hidden mb-3">
+                                            <img className="w-full h-full object-cover" src={i === 1 ? "https://lh3.googleusercontent.com/aida-public/AB6AXuA3KCO83XBqK9JyMMakNuNNQX6G1afscEQJB_xVVuBrjYWcPs6D2hVZcSFkwb5XWYrTtVK6Z378F8yE2pAtFFqkglNlEVKWo22FzcTIAqO4H8jdHa5gnsaRRRxHEVKuQ3uuqeFR4vgMpq5zJ92lTELxpb4iwNeLMRzYYJwAFJSWEohtapWclYGg-LDqCzwu-OQWQqqHEs0oZwWtyQWTw5kjMkD-FntZJKgFwR-0qwkdtmuvuei7YVI0pdqOXiTGJlNkOQ4gBM-p9_Ik" : "https://lh3.googleusercontent.com/aida-public/AB6AXuBCQXG0-bF6B_iBtFZpD4CaoSAFCSeimkxqwADKrriFylCAWwzrYVNAHCNLmO_yP_Ww2fa3zF_hn1sJHAm_UsTUdLsSukURec86XnH2Cddpl5CurfRT8guDZsyDkLR47ktTNcfgSMA-wESUfhU0rPGdtg745c7xCSz7ol4YB382z1uXKzBp5_FVp6Mtkf5ccveuxRMqrlFUHsguf7Ale1QVBzYceuYy-2sIaSCTaACG48IHcl0PtFTOAev-NE63bg1HLKWobzD32zlT"} />
+                                        </div>
+                                        <h4 className="text-[11px] font-bold text-on-surface uppercase tracking-tight truncate">Clip_#00{i}_Final</h4>
+                                        <div className="flex items-center justify-between mt-2">
+                                            <span className="text-[9px] text-tertiary font-bold flex items-center gap-1">
+                                                <span className="w-1 h-1 bg-tertiary rounded-full animate-pulse"></span>RENDERED
+                                            </span>
+                                            <span className="text-[9px] text-on-surface-variant uppercase">2m ago</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </aside>
+                    </div>
+                </main>
+            </div>
+        );
+
+        const AnalyticsPage = () => (
+            <div className="min-h-screen">
+                <Sidebar />
+                <Header title="Medir & Aprender" />
+                <main className="ml-64 pt-20 px-8 pb-12 kinetic-grid min-h-screen">
+                    <header className="mb-10 flex justify-between items-end">
+                        <div>
+                            <h2 className="text-4xl font-black font-headline text-on-surface tracking-tighter mb-1">Medir & Aprender</h2>
+                            <div className="flex items-center gap-3">
+                                <span className="px-2 py-0.5 bg-tertiary-container/20 text-tertiary-fixed-dim text-[10px] font-bold rounded uppercase tracking-widest border border-tertiary/10">Self-Improving Pipeline Active</span>
+                            </div>
+                        </div>
+                    </header>
+                    <div className="grid grid-cols-12 gap-6">
+                        <div className="col-span-12 lg:col-span-8 bg-surface-container rounded-xl p-6">
+                            <h3 className="text-sm font-bold font-headline uppercase tracking-widest text-primary flex items-center gap-2 mb-8">
+                                <span className="material-symbols-outlined text-sm">query_stats</span> Retention Analysis
+                            </h3>
+                            <div className="h-64 flex items-end gap-1 relative">
+                                {[100, 98, 94, 82, 85, 88, 80, 78, 72, 75, 68, 60, 58].map((h, i) => (
+                                    <div key={i} className="flex-1 bg-gradient-to-t from-primary/40 to-primary rounded-t-sm" style={{height: `${h}%`}}></div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="col-span-12 lg:col-span-4 bg-primary/5 rounded-xl border border-primary/20 p-6 flex flex-col">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-primary" style={{fontVariationSettings: "'FILL' 1"}}>auto_awesome</span>
+                                </div>
+                                <h3 className="text-sm font-bold font-headline uppercase tracking-widest">AI Insights</h3>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="bg-surface-container-lowest p-4 rounded-lg border-l-2 border-tertiary">
+                                    <p className="text-xs font-bold text-tertiary mb-1">Engagement Optimization</p>
+                                    <p className="text-[11px] leading-relaxed text-on-surface-variant">"Increase pace in the first 3 seconds. Retention drops significantly at transition-marker 02."</p>
+                                </div>
+                            </div>
+                            <button className="mt-auto w-full py-3 bg-primary text-on-primary text-xs font-bold rounded-lg uppercase tracking-widest">Apply to Next Run</button>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+
+        const EditorPage = () => (
+            <div className="min-h-screen">
+                <Sidebar />
+                <Header title="Creative Studio" />
+                <main className="pl-64 pt-16 min-h-screen bg-surface">
+                    <div className="p-6 grid grid-cols-12 gap-6 h-[calc(100vh-64px)] overflow-hidden">
+                        <div className="col-span-8 flex flex-col gap-6 overflow-hidden">
+                            <div className="relative aspect-video bg-surface-container-lowest rounded-xl overflow-hidden shadow-2xl border border-outline-variant/10">
+                                <img className="w-full h-full object-cover opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKlU8eahPDpiIuiL8Q6laJA0oFBoJ2_oBrZEIJoYynx7mbG4EDBt2neJOxCaSACWUCu3jUDLasWqOGmqVTRbYYlkFTFRq2YuCMZU5GqkQ7liqrQLawA620pN1KJ8gCwmHA26vxSuYTzgmCqjDk_vta9lbta1uTzdZDA87IRyCd8pylQUstS8JvoruHFlEEPO1jurKlGr9ipFECGDsauc7q7NKnSjiivdY_ZMiIHOM2GAyACO0mYl9Qh86ZvPoU72_eY4-qz9VNDBTW" />
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-8 glass-panel px-6 py-3 rounded-full border border-white/5">
+                                    <span className="material-symbols-outlined text-on-surface cursor-pointer">skip_previous</span>
+                                    <button className="w-12 h-12 flex items-center justify-center bg-primary text-on-primary rounded-full"><span className="material-symbols-outlined fill-1">play_arrow</span></button>
+                                    <span className="material-symbols-outlined text-on-surface cursor-pointer">skip_next</span>
+                                </div>
+                            </div>
+                            <div className="flex-grow flex flex-col gap-4 bg-surface-container-low rounded-xl p-4 border border-outline-variant/10 overflow-hidden">
+                                <h3 className="font-headline text-xs font-bold text-primary tracking-widest uppercase">Clip Library: Movie & Manga</h3>
+                                <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
+                                    {[1, 2, 3, 4, 5].map(i => (
+                                        <div key={i} className="min-w-[140px] group cursor-pointer">
+                                            <div className="relative aspect-[9/16] rounded-lg overflow-hidden border border-outline-variant/20 group-hover:border-primary/50">
+                                                <img className="w-full h-full object-cover" src={`https://lh3.googleusercontent.com/aida-public/AB6AXuD8v0j4ynbVPK56ceK3Cef52t3RUpXQTP_1epV3oLnjT8eMBzKQ6U1FChhuF2_c3qSOV1AOtLdCOlVPvHP5Mv7w5RCG7Rx2DEPajC0FasDQTItlELsU5MSQzx8vys4M98H2IUNcvHMxiLEEafa2mcEk1VeGSSN-vrfnXj1NnZEu-8YE-kpKqEosfL6oHS25SbaXY6-ST5vCxGu-F4xSFROg_rpCCf5FQRPbC01J8SWFR6gjzrL6C_BjyrzzeGYLv8SPcnLklJptlfdC`} />
+                                            </div>
+                                            <p className="mt-2 text-[10px] font-bold truncate">Neon Sequence 0{i}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="col-span-4 flex flex-col gap-6 overflow-hidden">
+                            <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant/10">
+                                <h3 className="font-headline text-xs font-black text-primary tracking-tight mb-4 uppercase">Metadata Editor</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-on-surface-variant uppercase mb-1.5">Short Title</label>
+                                        <input className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-xs text-on-surface font-bold" value="THE RISE OF NEON: CHAPTER 1" readOnly />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-on-surface-variant uppercase mb-1.5">Hashtags</label>
+                                        <textarea className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-xs text-on-surface" rows="3" defaultValue="#AnimeEdit #MangaArt #Shorts #YouLikeIt" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mt-auto flex flex-col gap-3">
+                                <button className="w-full py-4 bg-surface-container-highest text-on-surface font-headline text-xs font-bold uppercase tracking-widest rounded-xl">Guardar Progreso</button>
+                                <button className="w-full py-4 bg-gradient-to-br from-[#a8e8ff] to-[#00d4ff] text-on-primary font-headline text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20">Subir y revisión final</button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        );
+
+        // --- App Component ---
+
+        const App = () => {
+            return (
+                <MemoryRouter>
+                    <Routes>
+                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/review" element={<ReviewPage />} />
+                        <Route path="/analytics" element={<AnalyticsPage />} />
+                        <Route path="/editor" element={<EditorPage />} />
+                        <Route path="/shorts" element={<EditorPage />} /> {/* Using editor as placeholder for shorts tab */}
+                    </Routes>
+                </MemoryRouter>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

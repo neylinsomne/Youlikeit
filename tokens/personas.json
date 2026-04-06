@@ -36,11 +36,12 @@
       "description_template": "{{reflection}} | {{series}} | Deep Mind"
     },
     "youtube": {
-      "channel_name": "",
+      "channel_name": "Oh mizhir de cine y general (profundo)",
+      "channel_id": "",
       "token_file": "tokens/youtube_deep_mind.json"
     },
     "tiktok": {
-      "account_name": "",
+      "account_name": "Oh mizhir de cine y general (profundo)",
       "token_file": "tokens/tiktok_deep_mind.json"
     }
   },
@@ -81,11 +82,12 @@
       "description_template": "{{technique}} — {{creator}} vs {{creator2}} | Cinephile"
     },
     "youtube": {
-      "channel_name": "",
+      "channel_name": "OH que sera (contenido Latino)",
+      "channel_id": "UCJYJm9sdN-ro6VWfuipPbRw",
       "token_file": "tokens/youtube_cinephile.json"
     },
     "tiktok": {
-      "account_name": "",
+      "account_name": "OH que sera (contenido Latino)",
       "token_file": "tokens/tiktok_cinephile.json"
     }
   },
@@ -128,11 +130,12 @@
       "description_template": "{{hot_take}} 🔥 | {{series}} | Pop Oracle"
     },
     "youtube": {
-      "channel_name": "",
+      "channel_name": "Oh tarab de farandula",
+      "channel_id": "",
       "token_file": "tokens/youtube_pop_oracle.json"
     },
     "tiktok": {
-      "account_name": "",
+      "account_name": "Oh tarab de farandula",
       "token_file": "tokens/tiktok_pop_oracle.json"
     }
   }

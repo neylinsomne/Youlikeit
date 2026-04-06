@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config:*)",
+      "Bash(ls -la *.md)",
+      "Bash(docker port:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8001/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5180/)",
+      "Bash(\"/c/Users/Usuario/AppData/Local/Programs/Python/Python312/python.exe\" -m pip install fastapi uvicorn -q)",
+      "Bash(MSYS_NO_PATHCONV=1 docker run -d --name ytlab-review -p 8000:8000 -v \"d:/Youlikeit/youtube-automatizacion-ejercicios:/workspace\" --workdir /workspace youlikeit:latest python src/main.py ex15 --host 0.0.0.0 --port 8000 --lang en)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/)",
+      "Bash(curl -s \"https://api.themoviedb.org/3/discover/tv?api_key=be7256304035f73b8a3bcc113e17e49b&with_original_language=es&sort_by=popularity.desc&with_origin_country=CO&page=1\")",
+      "Bash(python3 -c ':*)",
+      "Bash(/c/Users/Usuario/AppData/Local/Programs/Python/Python312/python.exe -c ':*)",
+      "WebFetch(domain:help.opus.pro)",
+      "WebFetch(domain:aistudio.google.com)",
+      "WebFetch(domain:developers.googleblog.com)"
+    ]
+  }
+}

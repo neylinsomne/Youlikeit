@@ -11,6 +11,7 @@ necesita un scope nuevo, se solicita incremental consent.
 
 También puede usarse como ejercicio para verificar que OAuth funciona:
   python src/main.py ex34 --check
+    python src/main.py ex34 --check --persona deep_mind
 
 Uso como módulo:
   from exercises.ex34_oauth_manager import get_youtube_service, get_analytics_service
@@ -239,6 +240,7 @@ def get_both_services(secrets_path: Path | None = None, log=None) -> tuple:
 def run(
     settings: Settings,
     check: bool = True,
+    persona: str = "",
 ) -> Path:
     """Verify OAuth setup and list available scopes."""
     log = build_logger("ex34", settings.output_dir / "logs" / "ex34.log")
@@ -265,7 +267,24 @@ def run(
         return report_path
 
     # 2. Check existing token
-    token_path = _get_token_path(secrets)
+    token_path = _get_token_path(secrets, persona)
+    if persona:
+        report_lines.append(f"Persona: {persona}")
+
+    if check:
+        report_lines.append("")
+        report_lines.append("OAuth check: running authentication flow...")
+        creds_check = authenticate(
+            secrets_path=secrets,
+            scopes=DEFAULT_SCOPES,
+            log=log,
+            persona=persona,
+        )
+        if creds_check and getattr(creds_check, "valid", False):
+            report_lines.append("OAuth check: OK")
+        else:
+            report_lines.append("OAuth check: FAILED")
+
     if token_path.exists():
         report_lines.append(f"Token file: {token_path} (exists)")
 
@@ -284,7 +303,7 @@ def run(
             report_lines.append("Token file exists but could not load credentials")
     else:
         report_lines.append(f"Token file: {token_path} (not created yet)")
-        report_lines.append("Run ex12 or ex24 to trigger OAuth consent flow")
+        report_lines.append("Run ex34 --check, ex12 or ex24 to trigger OAuth consent flow")
 
     # 3. Check if Google API libraries are installed
     try:

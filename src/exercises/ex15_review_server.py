@@ -81,6 +81,8 @@ I18N = {
         "upload_ok": "¡Subido!",
         "upload_fail": "Error al subir",
         "only_approved": "Solo shorts aprobados",
+        "media_file": "Archivo",
+        "privacy_unlisted": "Privacidad: no listado",
     },
     "en": {
         "title": "Shorts Review Dashboard",
@@ -127,6 +129,8 @@ I18N = {
         "upload_ok": "Uploaded!",
         "upload_fail": "Upload failed",
         "only_approved": "Only approved shorts",
+        "media_file": "File",
+        "privacy_unlisted": "Privacy: unlisted",
     },
     "pt": {
         "title": "Painel de Revisão de Shorts",
@@ -173,6 +177,8 @@ I18N = {
         "upload_ok": "Enviado!",
         "upload_fail": "Erro ao enviar",
         "only_approved": "Somente shorts aprovados",
+        "media_file": "Arquivo",
+        "privacy_unlisted": "Privacidade: não listado",
     },
 }
 
@@ -233,6 +239,7 @@ def _build_html(lang: str = "es") -> str:
         .short-title {{ font-size: 1.1em; font-weight: 600; margin-bottom: 8px; }}
         .short-meta {{ font-size: 0.85em; color: #888; margin-bottom: 12px; }}
         .short-meta span {{ margin-right: 12px; }}
+        .media-file {{ margin-top: 6px; font-size: 0.78em; color: #7e8ba3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
         .status-badge {{ display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }}
         .status-pending {{ background: #f0ad4e33; color: #f0ad4e; }}
@@ -394,6 +401,7 @@ def _build_html(lang: str = "es") -> str:
                             <span>${'${T.theme}'}: ${'${s.theme_query || "-"}'}</span>
                             <span class="status-badge status-${'${s.review_status || "pending"}'}">${'${s.review_status || "pending"}'}</span>
                             ${'${s.rating ? "★".repeat(s.rating) : ""}'}
+                            <div class="media-file" title="${'${s.output_file || ""}'}">${'${T.media_file}'}: ${'${s.output_file || "-"}'}</div>
                         </div>
                         ${'${strat ? `<a class="strategy-link" href="#" onclick="toggleStrategy(${s.id}); return false;">${T.view_strategy}</a><div class="strategy-panel" id="strat-${s.id}">${renderStrategyPanel(strat)}</div>` : `<span style="font-size:0.8em;color:#666">${T.no_strategy}</span>`}'}
                         <div class="songs-section">
@@ -601,7 +609,11 @@ def _build_html(lang: str = "es") -> str:
                 }});
                 const data = await resp.json();
                 if (data.ok) {{
-                    btn.textContent = T.upload_ok;
+                    if (platform === 'youtube') {{
+                        btn.textContent = `${'${T.upload_ok}'} · ${'${T.privacy_unlisted}'}`;
+                    }} else {{
+                        btn.textContent = T.upload_ok;
+                    }}
                     btn.style.background = '#5cb85c';
                 }} else {{
                     btn.textContent = data.error?.substring(0, 40) || T.upload_fail;
@@ -761,6 +773,10 @@ def _create_app(settings: Settings, lang: str = "es"):
             return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
 
         short = dict(short)
+        if short.get("status") != "approved":
+            conn.close()
+            return JSONResponse({"ok": False, "error": "Only approved shorts can be uploaded"}, status_code=400)
+
         video_path = short.get("output_file", "")
         if not video_path or not Path(video_path).exists():
             conn.close()
@@ -776,7 +792,7 @@ def _create_app(settings: Settings, lang: str = "es"):
                 persona=persona,
             )
             conn.close()
-            return JSONResponse({"ok": True, "result": str(result_path)})
+            return JSONResponse({"ok": True, "result": str(result_path), "privacy": "unlisted"})
         except Exception as e:
             conn.close()
             return JSONResponse({"ok": False, "error": str(e)[:200]})

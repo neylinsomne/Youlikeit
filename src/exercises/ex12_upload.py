@@ -144,7 +144,7 @@ def run(
     settings: Settings,
     video_path: str = "",
     title: str = "",
-    privacy: str = "private",
+    privacy: str = "unlisted",
     query: str = "",
     persona: str = "",
     video: str = "",

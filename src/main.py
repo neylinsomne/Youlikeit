@@ -42,6 +42,7 @@ from exercises import (
     ex37_manga_classify,
     ex38_manga_panels,
     ex39_manga_wiki_scraper,
+    ex40_content_scheduler,
 )
 
 
@@ -86,6 +87,7 @@ EXERCISES = {
     "ex37": "Clasificar quotes de manga/anime (categoria, emocion, viral score)",
     "ex38": "Panel detection + OCR + Ken Burns video desde paginas de manga",
     "ex39": "Scraper de Fandom Wiki para panels iconicos de manga",
+    "ex40": "Scheduler 3x3 por personas (batch de contenido)",
 }
 
 
@@ -129,7 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ex12
     parser.add_argument("--video", default="", help="Ruta al video para subir (ex12)")
     parser.add_argument("--title", default="", help="Titulo del video (ex12)")
-    parser.add_argument("--privacy", default="private", help="Privacidad: private, unlisted, public (ex12)")
+    parser.add_argument("--privacy", default="unlisted", help="Privacidad: private, unlisted, public (ex12)")
     # ex13
     parser.add_argument("--export-gexf", action="store_true", help="Exportar grafo en GEXF para Gephi (ex13)")
     # ex14
@@ -148,6 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--voice-ref", default="", help="Ruta a audio de referencia para voice cloning (ex18)")
     parser.add_argument("--fish-url", default="", help="URL del servidor Fish Speech (ex18)")
     parser.add_argument("--no-llm", action="store_true", help="No usar LLM para guion, usar templates (ex18)")
+    parser.add_argument("--persona", default="", help="Persona/canal: deep_mind, cinephile, pop_oracle (OAuth por canal)")
     # ex19
     parser.add_argument("--days-back", type=int, default=30, help="Dias hacia atras para analytics (ex19)")
     # ex20
@@ -191,6 +194,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reading-order", default="rtl", choices=["rtl", "ltr"], help="Orden lectura: rtl manga, ltr manhwa (ex38)")
     parser.add_argument("--manga-lang", default="en", help="Idioma MangaDex: en, es, es-la, pt-br (ex38)")
     parser.add_argument("--chapter", default="", help="Capitulo especifico a descargar (ex38)")
+    # ex40
+    parser.add_argument("--series", default="", help="Serie a priorizar en el batch (ex40)")
+    parser.add_argument("--dry-run", action="store_true", help="Solo planificar batch, sin ejecutar (ex40)")
+    parser.add_argument("--theme", default="", help="Tema forzado para el batch (ex40)")
     # ex28 / ex29 / ex30 (port ya existe vía ex15)
 
     return parser
@@ -281,6 +288,7 @@ def main() -> None:
             title=args.title,
             privacy=args.privacy,
             query=args.query,
+            persona=args.persona,
         )
     elif args.exercise == "ex13":
         out = ex13_trend_graph.run(
@@ -326,6 +334,7 @@ def main() -> None:
             voice_ref=args.voice_ref,
             fish_url=args.fish_url,
             use_llm=not args.no_llm,
+            persona=args.persona,
         )
     elif args.exercise == "ex19":
         out = ex19_analytics.run(
@@ -418,6 +427,7 @@ def main() -> None:
         out = ex34_oauth_manager.run(
             settings,
             check=args.check_oauth,
+            persona=args.persona,
         )
     elif args.exercise == "ex35":
         out = ex35_data_export.run(
@@ -455,6 +465,14 @@ def main() -> None:
             series_title=args.series_title,
             max_chapters=args.max_pages,
             download_images=True,
+        )
+    elif args.exercise == "ex40":
+        out = ex40_content_scheduler.run(
+            settings,
+            series=args.series,
+            persona=args.persona,
+            dry_run=args.dry_run,
+            theme=args.theme,
         )
     else:
         raise ValueError("Ejercicio no soportado")

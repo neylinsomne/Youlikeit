@@ -55,6 +55,43 @@ function Invoke-Ex {
     }
 }
 
+function Set-PersonaDataContext {
+    param([string]$PersonaName)
+
+    if (-not $PersonaName) {
+        $env:DATA_DIR = "data"
+        return
+    }
+
+    $personaDataDir = Join-Path $PSScriptRoot ("data\\personas\\" + $PersonaName)
+    New-Item -ItemType Directory -Force -Path $personaDataDir | Out-Null
+    $env:DATA_DIR = $personaDataDir
+}
+
+function Set-PersonaChannelContext {
+    param([string]$PersonaName)
+
+    if (-not $PersonaName) {
+        return
+    }
+
+    $personasPath = Join-Path $PSScriptRoot "tokens\personas.json"
+    if (-not (Test-Path $personasPath)) {
+        return
+    }
+
+    try {
+        $personasCfg = Get-Content $personasPath -Raw | ConvertFrom-Json
+        $entry = $personasCfg.$PersonaName
+        if ($null -ne $entry -and $null -ne $entry.youtube -and $entry.youtube.channel_id) {
+            $env:YOUTUBE_CHANNEL_ID = [string]$entry.youtube.channel_id
+            Write-Log "  YOUTUBE_CHANNEL_ID: $($env:YOUTUBE_CHANNEL_ID)" "DarkGray"
+        }
+    } catch {
+        Write-Log "  WARN: No se pudo leer tokens/personas.json para $PersonaName" "Yellow"
+    }
+}
+
 # Detect execution mode
 $script:runInDocker = $false
 if ($UseDocker) {
@@ -119,6 +156,11 @@ foreach ($video in $batch) {
     Write-Log "── VIDEO $videoNum/$($batch.Count): $($p.ToUpper()) / $($vt.ToUpper()) ──" "Green"
     Write-Log "  Theme: $($video.theme) | Tone: $tone | Style: $style | Affinity: $($video.affinity)"
 
+    # Isolate DB + RAG (Chroma under DATA_DIR) per persona
+    Set-PersonaDataContext -PersonaName $p
+    Set-PersonaChannelContext -PersonaName $p
+    Write-Log "  DATA_DIR: $($env:DATA_DIR)" "DarkGray"
+
     # Content discovery (shared across types — cached by ex04-ex06)
     Write-Log "  [discover]" "DarkGray"
     Invoke-Ex "ex04" @("--query", "`"$q`"", "--max-movies", "12", "--mode", "trending")
@@ -158,11 +200,19 @@ if (-not $SkipLearning) {
     Write-Log ""
     Write-Log "STEP 4: LEARNING CYCLE" "Yellow"
 
-    Invoke-Ex "ex19" @("--days-back", "30")
-    Invoke-Ex "ex24" @("--days-back", "30")
-    Invoke-Ex "ex21" @("--min-samples", "3")
-    Invoke-Ex "ex22" @("--ab-action", "auto")
-    Invoke-Ex "ex23" @()
+    $learningPersonas = @($batch | Select-Object -ExpandProperty persona -Unique)
+    foreach ($lp in $learningPersonas) {
+        Write-Log "  [learning: $lp]" "DarkGray"
+        Set-PersonaDataContext -PersonaName $lp
+        Set-PersonaChannelContext -PersonaName $lp
+        Write-Log "  DATA_DIR: $($env:DATA_DIR)" "DarkGray"
+
+        Invoke-Ex "ex19" @("--days-back", "30")
+        Invoke-Ex "ex24" @("--days-back", "30")
+        Invoke-Ex "ex21" @("--min-samples", "3")
+        Invoke-Ex "ex22" @("--ab-action", "auto")
+        Invoke-Ex "ex23" @()
+    }
 
     Write-Log "  Learning cycle complete." "Green"
 }
