@@ -72,6 +72,10 @@ def _build_upload_metadata(
     category_id: str = "24",  # Entertainment
 ) -> dict:
     """Build the YouTube upload request body."""
+    # Ensure #Shorts is in title for YouTube to detect as Short
+    if "#shorts" not in title.lower():
+        title = f"{title} #Shorts"
+
     return {
         "snippet": {
             "title": title[:100],  # YouTube max title length
