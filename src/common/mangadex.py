@@ -26,11 +26,14 @@ _last_request = 0.0
 
 
 def _rate_limit():
+    """MangaDex at-home/server endpoint is stricter than main API.
+    Use 1.5s between requests to stay under detection threshold.
+    """
     global _last_request
     now = time.time()
     elapsed = now - _last_request
-    if elapsed < 0.25:
-        time.sleep(0.25 - elapsed)
+    if elapsed < 1.5:
+        time.sleep(1.5 - elapsed)
     _last_request = time.time()
 
 
@@ -134,8 +137,18 @@ def download_chapter_pages(
 
     Returns list of downloaded file paths.
     """
-    _rate_limit()
-    data = api_get(f"{BASE}/at-home/server/{chapter_id}")
+    # Retry loop: MangaDex sometimes returns 404 transiently on at-home/server
+    data = None
+    for attempt in range(3):
+        _rate_limit()
+        data = api_get(f"{BASE}/at-home/server/{chapter_id}")
+        if data and "chapter" in data:
+            break
+        if attempt < 2:
+            wait = (attempt + 1) * 3
+            log.info(f"  Retry {attempt + 1}/3 after {wait}s for chapter {chapter_id[:8]}...")
+            time.sleep(wait)
+
     if not data or "chapter" not in data:
         log.error(f"Failed to get pages for chapter {chapter_id}")
         return []
