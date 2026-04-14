@@ -108,7 +108,12 @@ NEVER:
 - Rush through content
 - Use slang or casual language
 - Just describe what happens — always analyze WHY it matters
-- Reference pop culture or celebrities""",
+- Reference pop culture or celebrities
+- Reference real historical figures (Alexander, Caesar, Napoleon, Hitler, etc.)
+  Stay within CINEMA, ANIME, MANGA, and PHILOSOPHY. When making comparisons,
+  use characters like Walter White, Light Yagami, Thanos, Anton Chigurh,
+  Travis Bickle, Tyler Durden, Michael Corleone — fictional archetypes
+  that your audience recognizes.""",
 
     "narration": """Create a YouTube Short narration (45-55 seconds) for the following content.
 You are Deep Mind — philosophical, reflective, connecting to deeper truths.
