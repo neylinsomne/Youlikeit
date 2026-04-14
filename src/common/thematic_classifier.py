@@ -323,6 +323,16 @@ def classify_arcs_from_seasons(
 
 # ── Level 3: Episode/scene moment extraction ────────────────────
 
+def _attach_stills_to_moments(moments: list[dict], episodes: list[dict]) -> list[dict]:
+    """Attach the TMDb still URL to each moment based on episode_number match."""
+    ep_map = {e.get("episode_number"): e.get("still") for e in episodes if e.get("still")}
+    for m in moments:
+        ep_num = m.get("episode_number")
+        if ep_num in ep_map:
+            m["still_url"] = ep_map[ep_num]
+    return moments
+
+
 def extract_iconic_moments(
     series_title: str,
     season_number: int,
@@ -389,6 +399,8 @@ Return JSON array (no markdown). For each iconic moment:
         result = _extract_json_array(text)
         if not result:
             log.warning(f"Could not parse moments from LLM response (first 300 chars): {text[:300]}")
+        else:
+            result = _attach_stills_to_moments(result, episodes)
         return result
     except Exception as e:
         log.warning(f"Iconic moments extraction failed: {e}")
@@ -431,8 +443,8 @@ def save_scene_moments(
         conn.execute("""
             INSERT INTO scene_moments
             (series_slug, season_number, episode_number, episode_name,
-             iconic_score, themes, emotion, moment_description, quote)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             iconic_score, themes, emotion, moment_description, quote, still_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             series_slug, season_number,
             m.get("episode_number", 0), m.get("episode_name", ""),
@@ -441,6 +453,7 @@ def save_scene_moments(
             m.get("emotion", "dark"),
             m.get("moment_description", ""),
             m.get("quote", ""),
+            m.get("still_url", ""),
         ))
     conn.commit()
 

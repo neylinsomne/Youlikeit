@@ -110,10 +110,15 @@ def generate_audio(segments, out_dir, rate, pitch):
 
 
 def render_video(narration_data, audio_files, full_audio, out_dir, vtype):
+    import sqlite3
     from common.animated_subs import generate_ass_subtitles
     from common.video_director import VideoDirector, EditDecision
     from common.panel_matcher import select_panels_for_narration
     from common.cross_ref_images import enrich_segments_with_cross_refs
+    from common.thematic_stills import (
+        ensure_series_classified,
+        get_thematic_stills_for_narration,
+    )
 
     sub_segments = [{
         "text": ns["text"], "start_s": ns["start_s"],
@@ -125,6 +130,20 @@ def render_video(narration_data, audio_files, full_audio, out_dir, vtype):
     image_paths = []
     for d in IMAGE_DIRS:
         image_paths += sorted(str(p) for p in Path(d).glob("*.[jp][pn]g"))
+
+    # THEMATIC: detect themes in narration → query iconic moments → download stills
+    # of specific episodes that match the themes. Most precise visual matching.
+    log.info("  Fetching thematic stills by episode themes...")
+    conn = sqlite3.connect("data/shorts_pipeline.db")
+    conn.row_factory = sqlite3.Row
+    ensure_series_classified(
+        conn, "Berserk: The Golden Age Arc", tmdb_id=211057, slug="berserk",
+    )
+    thematic_paths = get_thematic_stills_for_narration(conn, narration_data, "berserk")
+    if thematic_paths:
+        log.info(f"  Added {len(thematic_paths)} thematic stills (episode-specific)")
+        image_paths += thematic_paths
+    conn.close()
 
     # CROSS-REF: detect character mentions and fetch their images
     # Only TEST videos include the experimental pool (Marvel, DBZ, etc.)
