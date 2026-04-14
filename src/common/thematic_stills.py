@@ -126,9 +126,14 @@ def get_thematic_stills_for_segment(
     series_slug: str,
     max_candidates: int = 1,
     min_overlap: int = 1,
+    use_fandom: bool = True,
 ) -> list[dict]:
     """
     For a narration segment, find and download the best thematic stills.
+
+    Priority order:
+    1. Fandom wiki (named iconic scenes — highest quality match)
+    2. TMDb episode still (generic episode screenshot — fallback)
 
     Returns list of {path, moment_description, themes, episode_number, score}.
     """
@@ -165,21 +170,43 @@ def get_thematic_stills_for_segment(
     results = []
 
     for moment in scored[:max_candidates]:
-        still_url = moment.get("still_url")
-        if not still_url:
-            continue
-
+        ep_num = moment.get("episode_number")
+        season_num = moment.get("season_number", 1)
         slug = re.sub(r"[^a-z0-9]+", "_", series_slug)
-        prefix = f"{slug}_s{moment.get('season_number', 1)}e{moment.get('episode_number', 0)}"
-        path = _download_still(still_url, CACHE_DIR / slug, prefix)
+
+        path = None
+        source = None
+
+        # 1. Try Fandom wiki first (named iconic scenes = much better match)
+        if use_fandom and ep_num:
+            try:
+                from common.fandom_scraper import download_episode_iconic_scenes
+                fandom_paths = download_episode_iconic_scenes(
+                    series_slug, ep_num, season_num, max_images=2,
+                )
+                if fandom_paths:
+                    path = fandom_paths[0]
+                    source = "fandom"
+            except Exception as e:
+                log.debug(f"Fandom scrape failed: {e}")
+
+        # 2. Fall back to TMDb still_url
+        if not path and moment.get("still_url"):
+            prefix = f"{slug}_s{season_num}e{ep_num or 0}"
+            path = _download_still(
+                moment["still_url"], CACHE_DIR / slug, prefix,
+            )
+            if path:
+                source = "tmdb"
 
         if path:
             results.append({
                 "path": path,
+                "source": source,
                 "moment_description": moment.get("moment_description", ""),
                 "themes": moment.get("matched_themes", []),
                 "all_themes": moment.get("themes", []),
-                "episode_number": moment.get("episode_number"),
+                "episode_number": ep_num,
                 "episode_name": moment.get("episode_name", ""),
                 "emotion": moment.get("emotion"),
                 "quote": moment.get("quote", ""),
@@ -214,8 +241,9 @@ def get_thematic_stills_for_narration(
                 continue
             seen.add(s["path"])
             all_paths.append(s["path"])
+            src = s.get("source", "?")
             log.info(
-                f"  Thematic: '{text[:40]}' → Ep{s['episode_number']} "
+                f"  Thematic [{src}]: '{text[:40]}' -> Ep{s['episode_number']} "
                 f"(themes: {s['themes']}, score: {s['score']:.2f})"
             )
 
