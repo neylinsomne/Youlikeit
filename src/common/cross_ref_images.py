@@ -119,7 +119,39 @@ EXPERIMENTAL_CHARACTER_MAP = {
 _image_cache: dict[str, str] = {}
 
 
-def detect_references_in_text(text: str, include_experimental: bool = False) -> list[dict]:
+def _get_active_map(include_trending: bool = True, include_experimental: bool = False) -> dict:
+    """
+    Build the active character map by merging:
+    - CURATED (permanent, vetted)
+    - TRENDING (auto-fetched from AniList/MAL/TMDb every 24h) — optional
+    - EXPERIMENTAL (A/B testing) — optional
+    """
+    active = dict(CHARACTER_WORK_MAP)
+
+    if include_trending:
+        try:
+            from common.trending_anime import get_trending_character_map
+            trending = get_trending_character_map(top_n=10)
+            # Trending ADDS without overriding curated (curated wins on conflict)
+            for k, v in trending.items():
+                if k not in active:
+                    active[k] = v
+        except Exception as e:
+            log.debug(f"Trending fetch skipped: {e}")
+
+    if include_experimental:
+        for k, v in EXPERIMENTAL_CHARACTER_MAP.items():
+            if k not in active:
+                active[k] = {"experimental": True, **v}
+
+    return active
+
+
+def detect_references_in_text(
+    text: str,
+    include_experimental: bool = False,
+    include_trending: bool = True,
+) -> list[dict]:
     """
     Detect character/work references in a narration segment.
 
@@ -127,29 +159,28 @@ def detect_references_in_text(text: str, include_experimental: bool = False) -> 
         text: narration segment text
         include_experimental: if True, also match against EXPERIMENTAL_CHARACTER_MAP
                               (use only for A/B test videos, not default flow)
+        include_trending: if True, also check live trending anime characters
+                          (default True — auto-updates every 24h)
 
     Returns list of references: [{character, work, type, query}]
     """
     found = []
     text_lower = text.lower()
 
-    # Check curated map first (the default, trusted pool)
-    for char, info in CHARACTER_WORK_MAP.items():
-        if char in text_lower:
+    active_map = _get_active_map(
+        include_trending=include_trending,
+        include_experimental=include_experimental,
+    )
+
+    for char, info in active_map.items():
+        # Use word boundary to avoid substring false positives
+        # e.g., "eren" should not match inside "Frieren"
+        pattern = r"\b" + re.escape(char) + r"\b"
+        if re.search(pattern, text_lower):
             found.append({
                 "character": char,
                 **info,
             })
-
-    # Experimental pool (A/B testing only)
-    if include_experimental:
-        for char, info in EXPERIMENTAL_CHARACTER_MAP.items():
-            if char in text_lower:
-                found.append({
-                    "character": char,
-                    "experimental": True,
-                    **info,
-                })
 
     return found
 
@@ -281,6 +312,12 @@ def get_cross_ref_image(character: str, cache_dir: str = "data/cross_ref_images"
     """
     Get an image for a character reference.
     Returns local path or None if nothing found.
+
+    Priority order:
+    1. Local cache (already downloaded)
+    2. Trending map (if character has direct image URL from AniList)
+    3. Curated/experimental map → TMDb search
+    4. LLM detection → TMDb search
     """
     char_lower = character.lower().strip()
     cache_key = f"char:{char_lower}"
@@ -290,8 +327,20 @@ def get_cross_ref_image(character: str, cache_dir: str = "data/cross_ref_images"
         if Path(cached).exists():
             return cached
 
-    # Look up in known map
-    info = CHARACTER_WORK_MAP.get(char_lower)
+    # Try trending map first (it has direct character images from AniList)
+    active_map = _get_active_map(include_trending=True, include_experimental=False)
+    info = active_map.get(char_lower)
+
+    # Trending anime include a direct character_image URL — use that if available
+    if info and info.get("character_image"):
+        out_dir = Path(cache_dir)
+        slug = re.sub(r"[^a-z0-9]+", "_", char_lower)[:40]
+        path = download_image(info["character_image"], out_dir, f"{slug}_trending")
+        if path:
+            _image_cache[cache_key] = path
+            log.info(f"  Fetched (AniList): {character} -> {Path(path).name}")
+            return path
+
     if not info:
         # Try LLM
         refs = detect_references_llm(character)
@@ -301,19 +350,18 @@ def get_cross_ref_image(character: str, cache_dir: str = "data/cross_ref_images"
             log.info(f"No info for '{character}'")
             return None
 
-    # Fetch image URLs
+    # Fetch image URLs from TMDb
     urls = fetch_tmdb_images_for_query(info["query"], info.get("type", "tv"))
     if not urls:
         return None
 
-    # Download first good one
     out_dir = Path(cache_dir)
     slug = re.sub(r"[^a-z0-9]+", "_", char_lower)[:40]
     for i, url in enumerate(urls):
         path = download_image(url, out_dir, f"{slug}_{i}")
         if path:
             _image_cache[cache_key] = path
-            log.info(f"  Fetched: {character} → {Path(path).name}")
+            log.info(f"  Fetched (TMDb): {character} -> {Path(path).name}")
             return path
 
     return None
@@ -325,6 +373,7 @@ def enrich_segments_with_cross_refs(
     narration_segments: list[dict],
     cache_dir: str = "data/cross_ref_images",
     include_experimental: bool = False,
+    include_trending: bool = True,
 ) -> list[str]:
     """
     For each segment, if it mentions a known character, fetch and
@@ -333,8 +382,8 @@ def enrich_segments_with_cross_refs(
     Args:
         narration_segments: list of segments with text
         cache_dir: where to save downloaded images
-        include_experimental: include EXPERIMENTAL_CHARACTER_MAP
-                              (use for A/B test videos only)
+        include_experimental: include EXPERIMENTAL_CHARACTER_MAP (A/B test videos)
+        include_trending: include live trending anime from AniList/MAL/TMDb (default True)
 
     Returns list of additional image paths (to add to panel_matcher pool).
     """
@@ -343,7 +392,11 @@ def enrich_segments_with_cross_refs(
 
     for seg in narration_segments:
         text = seg.get("text", seg.get("narration_text", ""))
-        refs = detect_references_in_text(text, include_experimental=include_experimental)
+        refs = detect_references_in_text(
+            text,
+            include_experimental=include_experimental,
+            include_trending=include_trending,
+        )
 
         for ref in refs:
             char = ref["character"]
