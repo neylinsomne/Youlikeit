@@ -1,0 +1,121 @@
+name: Content Rotation (every 3 days)
+
+on:
+  # Cada 3 dias a las 02:00 UTC (21:00 Colombia dia anterior, 20:00 Mexico)
+  schedule:
+    - cron: '0 2 */3 * *'
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only generate scripts (no rendering)"
+        type: boolean
+        default: true
+      personas:
+        description: "Personas (space-separated)"
+        default: "deep_mind pop_oracle latam"
+
+jobs:
+  plan-and-scripts:
+    name: Plan rotation + generate scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests google-api-python-client google-auth \
+                      google-auth-oauthlib edge-tts
+
+      - name: Restore data cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/shorts_pipeline.db
+            data/trending_cache
+            data/cross_ref_images
+            data/fandom_stills
+            data/thematic_stills
+            data/thematic_cache
+          key: content-data-${{ github.run_id }}
+          restore-keys: |
+            content-data-
+
+      - name: Run rotation planner + script generation (CI-safe)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          PERSONAS="${{ github.event.inputs.personas || 'deep_mind pop_oracle latam' }}"
+          python scripts/run_rotation_batch.py \
+            --skip-render \
+            --personas $PERSONAS
+
+      - name: Upload rotation report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rotation-report-${{ github.run_number }}
+          path: |
+            outputs/rotation_plans/
+            outputs/produce/*/scripts.json
+          retention-days: 90
+
+      - name: Commit updated data cache
+        if: success()
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/shorts_pipeline.db data/trending_cache || true
+          git diff --staged --quiet || git commit -m "chore: update rotation data cache [skip ci]"
+          git push || true
+
+  # OPTIONAL: render + upload job (only if self-hosted runner with GPU available)
+  render-and-upload:
+    name: Render videos + upload to YouTube
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false'
+    needs: plan-and-scripts
+    runs-on: self-hosted  # Requires your own machine with Docker/GPU
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download scripts artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rotation-report-${{ github.run_number }}
+          path: outputs/
+
+      - name: Ensure Docker + Fish Speech services are up
+        run: |
+          docker compose up -d ytlab fish-speech
+
+      - name: Render all planned videos
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          docker compose exec -T ytlab python scripts/run_rotation_batch.py \
+            --personas deep_mind pop_oracle latam
+
+      - name: Upload to YouTube as unlisted
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          docker compose exec -T ytlab python scripts/run_rotation_batch.py \
+            --personas deep_mind pop_oracle latam \
+            --upload-youtube
