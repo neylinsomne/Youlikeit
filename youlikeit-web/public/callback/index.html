@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Authorization complete — YouLikeIt</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    h1, h2, h3 { font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em; }
+    .code-box {
+      font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+      word-break: break-all;
+      user-select: all;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#070710] text-white">
+
+  <main class="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-16">
+    <a href="/" class="flex items-center gap-2 opacity-80 hover:opacity-100 transition">
+      <span class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-[#5bc0de] to-[#ff6f91] text-[#070710] font-bold" style="font-family:'Space Grotesk'">YL</span>
+      <span class="text-lg font-semibold" style="font-family:'Space Grotesk'">YouLikeIt</span>
+    </a>
+
+    <div id="card" class="mt-10 w-full rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+      <p>Processing authorization…</p>
+    </div>
+
+    <p class="mt-8 text-center text-xs text-white/40">
+      <a href="/" class="hover:text-white">← Back to home</a>
+    </p>
+  </main>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const error = params.get('error');
+      const errorDesc = params.get('error_description');
+      const state = params.get('state');
+      const card = document.getElementById('card');
+
+      function escape(str) {
+        return String(str || '').replace(/[&<>"']/g, function (c) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+      }
+
+      function copyCode(btn) {
+        const text = document.getElementById('code-value').textContent;
+        navigator.clipboard.writeText(text).then(function () {
+          btn.textContent = 'Copied';
+          btn.classList.add('bg-emerald-500/20', 'text-emerald-300');
+          setTimeout(function () {
+            btn.textContent = 'Copy code';
+            btn.classList.remove('bg-emerald-500/20', 'text-emerald-300');
+          }, 1800);
+        });
+      }
+      window.copyCode = copyCode;
+
+      if (code) {
+        card.innerHTML = (
+          '<div class="grid h-12 w-12 mx-auto place-items-center rounded-full bg-emerald-500/20 text-emerald-300 text-xl">✓</div>' +
+          '<h1 class="mt-4 text-2xl font-bold text-emerald-300">Authorization complete</h1>' +
+          '<p class="mt-2 text-sm text-white/70">Copy the code below and paste it into the YouLikeIt CLI prompt to finish connecting your account.</p>' +
+          '<div id="code-value" class="code-box mt-6 rounded-lg border border-white/10 bg-[#0d0d18] p-4 text-left text-sm">' + escape(code) + '</div>' +
+          '<button onclick="copyCode(this)" class="mt-4 inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium hover:bg-white/10 transition">Copy code</button>' +
+          (state ? '<p class="mt-4 text-xs text-white/40">state: ' + escape(state) + '</p>' : '') +
+          '<p class="mt-6 text-xs text-white/40">You can safely close this window after copying.</p>'
+        );
+      } else if (error) {
+        card.innerHTML = (
+          '<div class="grid h-12 w-12 mx-auto place-items-center rounded-full bg-rose-500/20 text-rose-300 text-xl">!</div>' +
+          '<h1 class="mt-4 text-2xl font-bold text-rose-300">Authorization failed</h1>' +
+          '<p class="mt-2 text-sm text-white/70">' + escape(error) + (errorDesc ? ' — ' + escape(errorDesc) : '') + '</p>' +
+          '<p class="mt-6 text-xs text-white/40">Try the authorization flow again from the YouLikeIt CLI.</p>'
+        );
+      } else {
+        card.innerHTML = (
+          '<div class="grid h-12 w-12 mx-auto place-items-center rounded-full bg-amber-500/20 text-amber-300 text-xl">?</div>' +
+          '<h1 class="mt-4 text-2xl font-bold text-amber-300">No authorization data</h1>' +
+          '<p class="mt-2 text-sm text-white/70">This page is the OAuth callback for YouLikeIt. Open it through the platform authorization flow, not directly.</p>'
+        );
+      }
+    })();
+  </script>
+</body>
+</html>

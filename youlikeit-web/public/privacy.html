@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — YouLikeIt</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    h1, h2, h3 { font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0.75rem 0.75rem; vertical-align: top; }
+    th { color: #7ad7ff; font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  </style>
+</head>
+<body class="bg-[#070710] text-white">
+
+  <header class="sticky top-0 z-40 border-b border-white/5 bg-[#070710]/80 backdrop-blur-md">
+    <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+      <a href="/" class="flex items-center gap-2">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-[#5bc0de] to-[#ff6f91] text-[#070710] font-bold" style="font-family:'Space Grotesk'">YL</span>
+        <span class="text-lg font-semibold" style="font-family:'Space Grotesk'">YouLikeIt</span>
+      </a>
+      <nav class="hidden gap-6 text-sm text-white/70 md:flex">
+        <a href="/" class="hover:text-white">Home</a>
+        <a href="/dashboard.html" class="hover:text-white">Dashboard</a>
+        <a href="/terms.html" class="hover:text-white">Terms</a>
+        <a href="/contact.html" class="hover:text-white">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-3xl px-6 py-16">
+    <p class="text-xs uppercase tracking-widest text-[#7ad7ff]">Legal</p>
+    <h1 class="mt-2 text-4xl font-bold">Privacy Policy</h1>
+    <p class="mt-3 text-sm text-white/50">Last updated: May 4, 2026 · YouLikeIt is a personal-use software project.</p>
+
+    <article class="mt-12 space-y-10 text-white/80 leading-relaxed">
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">1. Overview</h2>
+        <p class="mt-3">
+          YouLikeIt ("we", "the Service") is a personal content-creation tool.
+          The Service does not operate any cloud servers and does not collect,
+          store, or transmit creator data to a YouLikeIt-controlled backend.
+          All processing and storage happens on the creator's own machine.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">2. Data we access</h2>
+        <p class="mt-3">
+          When the creator authorizes a connected platform, the Service
+          accesses only the data needed for that platform's specific purpose.
+        </p>
+
+        <h3 class="mt-6 text-lg font-semibold text-white">2.1 TikTok</h3>
+        <table class="mt-3 text-sm">
+          <thead>
+            <tr><th>Data</th><th>Purpose</th><th>Where it lives</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Open ID</td><td>Identify the connected account for uploads</td><td>Local only</td></tr>
+            <tr><td>Display name</td><td>Show in the local dashboard</td><td>Local only</td></tr>
+            <tr><td>Avatar URL</td><td>Display in the local dashboard</td><td>Not stored — fetched on render</td></tr>
+            <tr><td>OAuth tokens</td><td>Authenticate API requests for uploads</td><td>Local file, encrypted at rest where possible</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="mt-6 text-lg font-semibold text-white">2.2 YouTube</h3>
+        <table class="mt-3 text-sm">
+          <thead>
+            <tr><th>Data</th><th>Purpose</th><th>Where it lives</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Channel info</td><td>Upload to the correct channel</td><td>Local only</td></tr>
+            <tr><td>Upload permission</td><td>Publish unlisted videos on creator's behalf</td><td>Token stored locally</td></tr>
+            <tr><td>Analytics (read-only)</td><td>Show retention curves to the creator</td><td>Local only</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="mt-6 text-lg font-semibold text-white">2.3 Creator-generated content</h3>
+        <p class="mt-3">
+          Videos, narrations, scripts and metadata produced by the creator are
+          stored locally on the creator's machine. They are never uploaded to a
+          YouLikeIt-controlled backend.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">3. How we use the data</h2>
+        <p class="mt-3">We use the data only to:</p>
+        <ul class="mt-3 list-disc space-y-2 pl-6 text-white/75">
+          <li>Upload the creator's own video content to authorized accounts as drafts or unlisted videos.</li>
+          <li>Display the creator's own connected-account info in the local review dashboard.</li>
+          <li>Surface the creator's own performance metrics from each platform's analytics.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">4. Storage &amp; security</h2>
+        <p class="mt-3">
+          All data is stored locally on the creator's device. There is no
+          shared multi-tenant database. OAuth tokens are persisted in
+          gitignored JSON files within the project directory. We recommend:
+        </p>
+        <ul class="mt-3 list-disc space-y-2 pl-6 text-white/75">
+          <li>Never commit the <code class="text-[#7ad7ff]">tokens/</code> directory to source control.</li>
+          <li>Use disk encryption (FileVault / BitLocker / LUKS) on the creator's machine.</li>
+          <li>Revoke access from the platform's settings if the device is lost.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">5. Sharing</h2>
+        <p class="mt-3">
+          We do <strong class="text-white">not</strong> share, sell, or transfer
+          the creator's data to any third party. The only data transmission
+          occurs directly between the creator's device and the platforms they
+          have authorized (TikTok, YouTube).
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">6. Retention</h2>
+        <p class="mt-3">
+          Local data persists until the creator deletes it. Removal options:
+        </p>
+        <ul class="mt-3 list-disc space-y-2 pl-6 text-white/75">
+          <li>Delete the <code class="text-[#7ad7ff]">tokens/</code> directory (revokes local OAuth tokens).</li>
+          <li>Delete the <code class="text-[#7ad7ff]">data/</code> directory (clears local databases).</li>
+          <li>Revoke from <strong>TikTok Settings → Security → Manage app permissions</strong>.</li>
+          <li>Revoke from <strong>Google Account → Security → Third-party apps</strong>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">7. Your rights</h2>
+        <ul class="mt-3 list-disc space-y-2 pl-6 text-white/75">
+          <li><strong class="text-white">Access</strong> — All data is in plain JSON / SQLite files on the creator's device.</li>
+          <li><strong class="text-white">Delete</strong> — Remove any or all data at any time.</li>
+          <li><strong class="text-white">Revoke</strong> — Disconnect platform accounts at any time.</li>
+          <li><strong class="text-white">Portability</strong> — Standard formats, fully portable.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">8. Children's privacy</h2>
+        <p class="mt-3">
+          The Service is not intended for use by anyone under 13 years of age
+          and we do not knowingly collect data from children.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">9. Changes to this Policy</h2>
+        <p class="mt-3">
+          We may occasionally update this Privacy Policy. The "Last updated"
+          date above will reflect any change.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">10. Contact</h2>
+        <p class="mt-3">
+          Questions about this Privacy Policy? See the <a class="text-[#7ad7ff] underline hover:text-white" href="/contact.html">Contact page</a> or
+          reach us at
+          <a class="text-[#7ad7ff] underline hover:text-white" href="https://github.com/neylinsomne/Youlikeit">github.com/neylinsomne/Youlikeit</a>.
+        </p>
+      </section>
+
+    </article>
+
+    <p class="mt-16 text-center text-xs text-white/40">
+      <a href="/" class="hover:text-white">← Back to home</a>
+    </p>
+  </main>
+
+  <footer class="mt-12 border-t border-white/5 bg-[#070710]">
+    <p class="mx-auto max-w-3xl px-6 py-6 text-center text-xs text-white/40">© 2026 YouLikeIt · Personal project · vara-alta.lat</p>
+  </footer>
+
+</body>
+</html>

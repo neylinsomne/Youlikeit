@@ -1,0 +1,23 @@
+# YouLikeIt landing — deployed under youlikeit.vara-alta.lat via Cloudflare tunnel.
+# Network is shared with iug-cloudflared (Option A from DEPLOY_NEW_APP.md).
+
+services:
+  web:
+    build: .
+    image: youlikeit-web:latest
+    container_name: youlikeit-web-prod
+    restart: unless-stopped
+    networks:
+      - vara-alta-public
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  vara-alta-public:
+    external: true
+    # Reuse the existing network where iug-cloudflared lives.
+    # If/when migrated to a dedicated shared network, change this to vara-alta-shared.
+    name: estudio_inmobiliario_app-network
