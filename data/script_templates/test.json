@@ -1,0 +1,101 @@
+{
+  "video_type": "test",
+  "lang": "en",
+  "description": "Emotional gut-punch. Hook = slow vulnerable count or feeling. Body = repetition, raw honesty, single moment dwelling.",
+  "hook_cps": 1.0,
+  "personas": {
+    "deep_mind": {
+      "hooks": [
+        "I have watched this scene a hundred times.",
+        "There is a moment in {series} I cannot forget.",
+        "If you have ever been betrayed by someone you loved, you understand.",
+        "I do not have words for what this scene did to me.",
+        "{character} broke me in a single frame."
+      ],
+      "bodies": {
+        "betrayal": [
+          "And every single time, it breaks me.",
+          "{character} trusted them.",
+          "We trusted them too.",
+          "And one decision destroyed it all.",
+          "If you have ever been there, you know."
+        ],
+        "sacrifice": [
+          "{character} gave everything.",
+          "And the world barely noticed.",
+          "Some pain is too big to be loud.",
+          "It just sits inside.",
+          "Watching never makes it lighter."
+        ],
+        "loss": [
+          "There is no anger in this one.",
+          "Just absence.",
+          "{character} stopped, and the screen stopped with them.",
+          "And we sat there in the silence.",
+          "Some scenes are not seen. They are survived."
+        ],
+        "default": [
+          "I do not know how to write about this scene.",
+          "{character} barely speaks.",
+          "And it says everything.",
+          "Some moments have no plot. Only weight.",
+          "This one stays."
+        ]
+      },
+      "outros": [
+        "Did this hit you too?",
+        "Tell me which scene broke you.",
+        "We do not have to be okay. We just have to feel it.",
+        "Send this to whoever shared the silence with you."
+      ]
+    },
+    "pop_oracle": {
+      "hooks": [
+        "Crying in the club, this scene from {series}.",
+        "I have rewatched this clip 50 times today.",
+        "{series} did not have to do us like this.",
+        "Posting this with tears in my eyes.",
+        "If you cried during {series}, this is for you."
+      ],
+      "bodies": {
+        "default": [
+          "{character} did NOT deserve any of this.",
+          "And we are still not okay.",
+          "Every time it reappears in my feed, same reaction.",
+          "Tears. Every single time.",
+          "Streaming has no business hitting this hard."
+        ]
+      },
+      "outros": [
+        "Drop a heart if you also cried.",
+        "Tag whoever made you watch this with them.",
+        "We are healing in public, that is fine.",
+        "Subscribe for more shared trauma."
+      ]
+    },
+    "latam": {
+      "hooks": [
+        "He visto esta escena cien veces.",
+        "Hay un momento de {series} que no olvido.",
+        "Si alguien te traicionó como a {character}, entiendes.",
+        "No tengo palabras para esta escena.",
+        "{character} me rompió en un solo gesto."
+      ],
+      "bodies": {
+        "default": [
+          "Y cada vez que la veo, duele igual.",
+          "{character} confió.",
+          "Nosotros también.",
+          "Y todo se cayó en un segundo.",
+          "Si lo viviste, ya lo sabes."
+        ]
+      },
+      "outros": [
+        "¿A vos también te marcó esta escena?",
+        "Dime cuál fue la escena que te quebró.",
+        "No siempre estamos bien. Y está bien.",
+        "Mándale esto a quien la vio contigo."
+      ]
+    }
+  }
+}

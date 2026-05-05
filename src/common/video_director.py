@@ -87,6 +87,9 @@ class EditDecision:
         clip_start_s: float = 0, # for movie clips: start timestamp
         clip_end_s: float = 0,   # for movie clips: end timestamp
         j_cut_s: float = 0.3,   # audio leads visual by this much
+        is_hook: bool = False,  # mark first segment as the retention hook
+        hook_cps: float = 0.5,  # cuts per second during this segment (0.5 = current behavior)
+        hook_image_pool: list = None,  # extra images to rotate through during a hook
     ):
         self.visual_type = visual_type
         self.visual_path = visual_path
@@ -101,6 +104,9 @@ class EditDecision:
         self.clip_start_s = clip_start_s
         self.clip_end_s = clip_end_s
         self.j_cut_s = j_cut_s
+        self.is_hook = is_hook
+        self.hook_cps = hook_cps
+        self.hook_image_pool = hook_image_pool or []
 
 
 class VideoDirector:
@@ -510,6 +516,64 @@ class VideoDirector:
             log.info(f"Director v2 output: {Path(output_path).stat().st_size // 1024}KB")
 
         return output_path
+
+    def expand_hook(self, d: EditDecision) -> list:
+        """
+        Expand a hook EditDecision into N sub-decisions.
+
+        Splits the hook visually into N micro-segments (each shows a
+        different image) while keeping the audio continuous (the audio
+        is rendered separately at the merge step, not per sub-clip).
+
+        Returns the list of sub-decisions. If hook_cps < 1.0 or no
+        extra images are available, returns [d] unchanged so behavior
+        is identical to the pre-hook pipeline.
+        """
+        if not d.is_hook or d.hook_cps < 1.0:
+            return [d]
+
+        n_cuts = max(1, int(round(d.duration * d.hook_cps)))
+        if n_cuts <= 1:
+            return [d]
+
+        # Collect images: visual_path is the first, then hook_image_pool
+        pool = [d.visual_path] + [p for p in d.hook_image_pool if p and p != d.visual_path]
+        if len(pool) < 2:
+            # Not enough variety to do a hook — fall back to the default render
+            return [d]
+
+        # Chunk duration. Last sub-clip absorbs rounding error.
+        per = d.duration / n_cuts
+        sub_decisions = []
+        for i in range(n_cuts):
+            img = pool[i % len(pool)]
+            dur = per if i < n_cuts - 1 else d.duration - per * (n_cuts - 1)
+            sub = EditDecision(
+                visual_type=d.visual_type,
+                visual_path=img,
+                duration=dur,
+                # Audio belongs to the whole hook — only the first sub-clip
+                # carries the audio reference; the rest are silent visual fills
+                # because the merge step lays full_audio on top of the assembled
+                # video anyway.
+                narration_text=d.narration_text if i == 0 else "",
+                narration_audio=d.narration_audio if i == 0 else "",
+                emotion=d.emotion,
+                # Tighter zoom range for hooks — punchier feel
+                camera={
+                    "zoom_start": 1.0,
+                    "zoom_end": 1.05,
+                    "easing": "ease_out",
+                },
+                transition_in="cut",  # hard cuts inside the hook
+                transition_duration=0.0,
+                audio_mode="silent",
+                j_cut_s=0.0,
+                is_hook=False,  # the sub-clips themselves are not hooks
+                hook_cps=0.5,
+            )
+            sub_decisions.append(sub)
+        return sub_decisions
 
     def _render_panel_segment(self, d: EditDecision, output: str):
         """Render manga panel with Ken Burns + easing."""

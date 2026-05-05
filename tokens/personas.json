@@ -36,12 +36,15 @@
       "description_template": "{{reflection}} | {{series}} | Deep Mind"
     },
     "youtube": {
-      "channel_name": "Oh mizhir de cine y general (profundo)",
-      "channel_id": "",
+      "channel_name": "Nico Flor",
+      "channel_id": "UCT0HZKkg15LBEKUzfKUeRLQ",
+      "handle": "@NicoFlor-sq8jd",
       "token_file": "tokens/youtube_deep_mind.json"
     },
     "tiktok": {
-      "account_name": "Oh mizhir de cine y general (profundo)",
+      "account_name": "oh_mizhir",
+      "tiktok_url": "https://www.tiktok.com/@oh_mizhir",
+      "email": "insomnesoul@gmail.com",
       "token_file": "tokens/tiktok_deep_mind.json"
     }
   },
@@ -130,13 +133,71 @@
       "description_template": "{{hot_take}} 🔥 | {{series}} | Pop Oracle"
     },
     "youtube": {
-      "channel_name": "Oh tarab de farandula",
-      "channel_id": "",
+      "channel_name": "oh_tarab",
       "token_file": "tokens/youtube_pop_oracle.json"
     },
     "tiktok": {
-      "account_name": "Oh tarab de farandula",
+      "account_name": "oh_tarab",
+      "tiktok_url": "https://www.tiktok.com/@oh_tarab",
+      "email": "neylaction@gmail.com",
       "token_file": "tokens/tiktok_pop_oracle.json"
+    }
+  },
+  "latam": {
+    "display_name": "Voz Latina",
+    "lang": "es",
+    "voice": {
+      "engine": "edge-tts",
+      "name": "es-CO-GonzaloNeural",
+      "rate": "-3%",
+      "pitch": "-5Hz",
+      "by_emotion": {
+        "dark":    {"rate": "-5%", "pitch": "-8Hz"},
+        "tragic":  {"rate": "-8%", "pitch": "-5Hz"},
+        "epic":    {"rate": "+0%", "pitch": "-3Hz"},
+        "hopeful": {"rate": "+0%", "pitch": "+0Hz"}
+      }
+    },
+    "color_grade": {
+      "base": "eq=saturation=1.3:contrast=1.15:brightness=0.03",
+      "by_emotion": {
+        "dark":    "colorbalance=bs=0.05:rs=0.08",
+        "tragic":  "eq=saturation=0.9:contrast=1.1",
+        "epic":    "eq=saturation=1.5:contrast=1.2",
+        "hopeful": "colorbalance=rs=0.1:gs=0.08"
+      }
+    },
+    "pacing": {
+      "min_hold_s": 2.0,
+      "transition_s": 0.4,
+      "j_cut_s": 0.3,
+      "zoom_range": [1.0, 1.08]
+    },
+    "upload": {
+      "best_hours_utc": [0, 1, 2, 22, 23],
+      "title_style": "pregunta_debate",
+      "cta": "Comenta tu opinion",
+      "hashtag_core": ["#novelas", "#serieslatinoamericanas", "#cinelatino", "#fyp", "#parati"],
+      "hashtag_by_country": {
+        "CO": ["#colombia", "#novelascolombianas", "#betylafea"],
+        "MX": ["#mexico", "#telenovelas", "#televisa"],
+        "AR": ["#argentina", "#cineargentino", "#relatossalvajes"],
+        "CL": ["#chile", "#serieschilenas"],
+        "PE": ["#peru", "#alfondohaysitio"]
+      },
+      "description_template": "{{reflexion}} | {{series}} ({{pais}}) | Voz Latina"
+    },
+    "youtube": {
+      "channel_name": "Oh Que Sera",
+      "channel_id": "UCJYJm9sdN-ro6VWfuipPbRw",
+      "handle": "@oh_quesera",
+      "token_file": "tokens/youtube_latam.json"
+    },
+    "tiktok": {
+      "account_name": "oh_quesera",
+      "tiktok_url": "https://www.tiktok.com/@oh_quesera",
+      "email": "neylbernate@gmail.com",
+      "token_file": "tokens/tiktok_latam.json"
     }
   }
 }
