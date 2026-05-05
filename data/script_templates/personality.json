@@ -1,0 +1,94 @@
+{
+  "video_type": "personality",
+  "lang": "en",
+  "description": "Provocative declaration. Hook = contrarian statement. Body = compare to fictional antiheroes. Outro = invite debate.",
+  "hook_cps": 3.5,
+  "personas": {
+    "deep_mind": {
+      "hooks": [
+        "{character} was right. And you know it.",
+        "Stop calling {character} a hero.",
+        "{character} is the most underrated villain in fiction.",
+        "Everyone is wrong about {character}.",
+        "This is the take that will get me unfollowed."
+      ],
+      "bodies": {
+        "betrayal": [
+          "Every great antihero made the same choice.",
+          "Walter White. Light Yagami. Michael Corleone.",
+          "Each one chose the dream over the people.",
+          "The only difference? {character} was honest about the cost.",
+          "We call it betrayal because we cannot face our own ambition."
+        ],
+        "ambition": [
+          "Ambition is not the sin. Self-awareness is the sin.",
+          "Walter White lied to himself until he could not.",
+          "{character} never lied — to himself or to us.",
+          "That is what makes him uncomfortable.",
+          "He is the mirror we refuse to look into."
+        ],
+        "default": [
+          "Read the story again, but quietly.",
+          "{character} is not the monster of the story.",
+          "Light Yagami did less and we cheered.",
+          "Anton Chigurh did worse and we called him a masterpiece.",
+          "The discomfort is the point."
+        ]
+      },
+      "outros": [
+        "What would you sacrifice for your dream?",
+        "Disagree? Tell me why in the comments.",
+        "If this changed your read, send it to your friend who hates {character}.",
+        "I am listening. Convince me."
+      ]
+    },
+    "pop_oracle": {
+      "hooks": [
+        "Hot take: {character} was right.",
+        "Stop dragging {character}. Listen.",
+        "You misread {series} on the first watch.",
+        "{character} is the most misunderstood character on streaming.",
+        "Going to lose followers for this one."
+      ],
+      "bodies": {
+        "default": [
+          "Every era's antihero was the same.",
+          "Walter White. Joker. Tony Soprano.",
+          "We loved them. We made them iconic.",
+          "{character} is doing the exact same thing.",
+          "We are just not ready to admit it."
+        ]
+      },
+      "outros": [
+        "Agree or disagree? Comment below.",
+        "Send this to whoever is wrong about {series}.",
+        "Subscribe for more bad takes.",
+        "Catch me in the replies."
+      ]
+    },
+    "latam": {
+      "hooks": [
+        "{character} tenía razón. Y lo sabemos.",
+        "Dejen de criticar a {character}. Escuchen.",
+        "{character} es el villano más incomprendido del cine latino.",
+        "Esta opinión va a costarme seguidores.",
+        "Cambio de opinión: {character} no es el malo."
+      ],
+      "bodies": {
+        "default": [
+          "Cada gran antihéroe del cine hizo lo mismo.",
+          "Tony Soprano. Walter White. Vito Corleone.",
+          "Los celebramos. Los volvimos iconos.",
+          "{character} hace exactamente lo mismo.",
+          "Pero a él lo seguimos juzgando."
+        ]
+      },
+      "outros": [
+        "¿Te animas a defender a {character}? Comenta.",
+        "Mándale esto a quien no entendió la historia.",
+        "Sigue para más opiniones impopulares.",
+        "Nos leemos en los comentarios."
+      ]
+    }
+  }
+}

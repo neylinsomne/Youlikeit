@@ -1,0 +1,129 @@
+{
+  "video_type": "narration",
+  "lang": "en",
+  "description": "Immersive storytelling. Hook = scene-setting with tension. Body = build tension, deliver, reflect.",
+  "hook_cps": 2.0,
+  "personas": {
+    "deep_mind": {
+      "hooks": [
+        "It was the {keyword} that changed everything…",
+        "There was a moment {character} could not undo…",
+        "The day the world tilted on its axis…",
+        "One choice. Endless consequences…",
+        "He never spoke about that night again…"
+      ],
+      "bodies": {
+        "betrayal": [
+          "{character} stood at the edge of trust.",
+          "And when the smile cracked, the world cracked with it.",
+          "Brothers became sacrifices.",
+          "Family became fuel.",
+          "Some scars are not meant to heal."
+        ],
+        "sacrifice": [
+          "The price was always known.",
+          "{character} paid it anyway.",
+          "What is a dream worth, if it costs everyone?",
+          "And yet the dream went on, untouched.",
+          "Some choices echo through eternity."
+        ],
+        "ambition": [
+          "{character} reached for the unreachable.",
+          "Every step burned the ground behind.",
+          "And the world watched, unable to look away.",
+          "Greatness has a debt.",
+          "Eventually, the debt comes for everyone."
+        ],
+        "tragedy": [
+          "There is a quiet before the fall.",
+          "{character} did not see it coming.",
+          "The world ended without warning.",
+          "And what remained was silence.",
+          "Some endings refuse to be forgotten."
+        ],
+        "default": [
+          "{character} stood at the threshold.",
+          "Every choice came with a cost.",
+          "And the cost was never small.",
+          "The story turned on a single breath.",
+          "Maybe that is what it means to be human."
+        ]
+      },
+      "outros": [
+        "Maybe that is what makes us human.",
+        "Maybe the dream was the wound.",
+        "And maybe that is the point.",
+        "Some stories never end. They just continue inside us."
+      ]
+    },
+    "pop_oracle": {
+      "hooks": [
+        "OK so {series} just ruined me.",
+        "We need to talk about {character}.",
+        "Imagine signing up for one thing and getting THIS.",
+        "If you skipped {series}, this is your sign.",
+        "Plot twist: {series} is the most underrated thing on streaming."
+      ],
+      "bodies": {
+        "betrayal": [
+          "{character} pulled the rug under everyone.",
+          "The internet was NOT okay that night.",
+          "Twitter went dark for an hour.",
+          "And honestly? Same.",
+          "We were fed and devastated at once."
+        ],
+        "sacrifice": [
+          "{character} gave up everything for nothing.",
+          "And we have not stopped thinking about it.",
+          "The trade was unfair from the start.",
+          "But the show made us watch anyway.",
+          "Cinema."
+        ],
+        "default": [
+          "{character} did the most.",
+          "And we ate every second of it.",
+          "Every scene was a flex.",
+          "Honestly, no notes.",
+          "Add it to your watchlist yesterday."
+        ]
+      },
+      "outros": [
+        "Tell me you saw it. Drop the emoji.",
+        "Comment your hot take. I will read every one.",
+        "If this hit, send it to a friend. They need it.",
+        "Like, follow, repeat — you know the drill."
+      ]
+    },
+    "latam": {
+      "hooks": [
+        "Hubo una noche en {series} que lo cambió todo…",
+        "Nadie habla de la escena de {character}…",
+        "Una sola decisión. Y todo se rompió…",
+        "{series} tiene una escena que no se olvida…",
+        "Pocas series se atreven a contar lo que esta sí contó…"
+      ],
+      "bodies": {
+        "betrayal": [
+          "{character} traicionó a quien más confiaba en él.",
+          "Y la pantalla se llenó de silencio.",
+          "El golpe no fue físico. Fue emocional.",
+          "La novela cambió para siempre.",
+          "Y nosotros también."
+        ],
+        "default": [
+          "{character} cargó con una historia que no era suya.",
+          "Cada capítulo dolía un poco más.",
+          "La televisión latina sabe cuándo callar.",
+          "Y cuándo gritar.",
+          "Por eso se queda con uno."
+        ]
+      },
+      "outros": [
+        "¿Te marcó esta escena? Cuéntame.",
+        "¿Qué opinas? Dejá tu comentario.",
+        "Compartilo con quien la vio contigo.",
+        "Si llegaste hasta acá, gracias."
+      ]
+    }
+  }
+}

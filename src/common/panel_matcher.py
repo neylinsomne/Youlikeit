@@ -194,12 +194,18 @@ Return JSON array (no markdown):
 
 
 def _match_with_keywords(images: list[dict], segments: list[dict]) -> list[dict]:
-    """Fallback: match by keyword overlap between narration and image description."""
+    """Fallback: match by keyword overlap between narration and image description.
+
+    If keyword scoring yields 0 (descriptions are generic, no LLM was used),
+    fall back to a deterministic round-robin so each segment gets a *different*
+    image instead of the matcher collapsing to the first one for all.
+    """
+    used_paths: set[str] = set()
     for i, seg in enumerate(segments):
         text = seg.get("text", seg.get("narration_text", "")).lower()
         words = set(re.findall(r"\w{4,}", text))
 
-        best_score = -1
+        best_score = 0
         best_img = None
 
         for img in images:
@@ -221,9 +227,12 @@ def _match_with_keywords(images: list[dict], segments: list[dict]) -> list[dict]
                 best_score = overlap
                 best_img = img
 
-        if best_img:
+        # Only accept the keyword match if there is real overlap. Otherwise let
+        # _fill_unmatched assign a unique image via round-robin.
+        if best_img and best_score > 0 and best_img["path"] not in used_paths:
             seg["matched_image"] = best_img["path"]
             seg["match_reason"] = f"keyword overlap ({best_score})"
+            used_paths.add(best_img["path"])
 
     _fill_unmatched(segments, images)
     return segments

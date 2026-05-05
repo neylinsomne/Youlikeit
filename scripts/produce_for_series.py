@@ -74,10 +74,15 @@ def generate_audio(segments, out_dir, voice, rate, pitch):
         dur = float(probe.stdout.strip()) if probe.stdout.strip() else 3.0
         audio_files.append(wav_path)
         narration_data.append({
-            "text": text, "start_s": t, "duration_s": dur, "emotion": seg.get("emotion", "dark"),
+            "text": text,
+            "start_s": t,
+            "duration_s": dur,
+            "emotion": seg.get("emotion", "dark"),
+            "is_hook": bool(seg.get("is_hook", False)),
         })
         t += dur
-        log.info(f"    seg{i}: {dur:.1f}s — {text[:50]}")
+        hook_tag = " [HOOK]" if seg.get("is_hook") else ""
+        log.info(f"    seg{i}: {dur:.1f}s — {text[:50]}{hook_tag}")
 
     full_audio = str(out_dir / "full_audio.wav")
     concat_list = str(out_dir / "concat.txt")
@@ -131,12 +136,26 @@ def render_video(narration_data, audio_files, full_audio, image_paths, out_dir, 
     from common.animated_subs import generate_ass_subtitles
     from common.video_director import VideoDirector, EditDecision
     from common.panel_matcher import select_panels_for_narration
+    from common.script_generator import (
+        hook_cps_for_video_type, detect_hook_accent_word,
+    )
 
-    # Subtitles
-    sub_segments = [{
-        "text": ns["text"], "start_s": ns["start_s"],
-        "end_s": ns["start_s"] + ns["duration_s"], "emotion": ns["emotion"],
-    } for ns in narration_data]
+    hook_cps = hook_cps_for_video_type(vtype)
+
+    # Subtitles — propagate is_hook + accent_word for the Hook style
+    sub_segments = []
+    for ns in narration_data:
+        is_hook = bool(ns.get("is_hook", False))
+        seg = {
+            "text": ns["text"],
+            "start_s": ns["start_s"],
+            "end_s": ns["start_s"] + ns["duration_s"],
+            "emotion": ns["emotion"],
+            "is_hook": is_hook,
+        }
+        if is_hook:
+            seg["accent_word"] = detect_hook_accent_word(ns["text"], vtype) or ""
+        sub_segments.append(seg)
     ass_path = str(out_dir / "subtitles.ass")
     generate_ass_subtitles(sub_segments, ass_path, style="shorts", emotion="dark")
 
@@ -149,6 +168,7 @@ def render_video(narration_data, audio_files, full_audio, image_paths, out_dir, 
         "text": seg["text"][:60],
         "image": Path(seg.get("matched_image", "?")).name,
         "reason": seg.get("match_reason", ""),
+        "is_hook": bool(seg.get("is_hook", False)),
     } for seg in matched]
     (out_dir / "panel_matches.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -159,11 +179,16 @@ def render_video(narration_data, audio_files, full_audio, image_paths, out_dir, 
     import tempfile
     tmpdir = tempfile.mkdtemp(prefix=f"produce_{vtype}_")
 
+    # Build a hook image pool — distinct images that share theme/emotion
+    # so the hook can rotate between them without semantic drift
+    hook_pool = [p for p in image_paths if p][:8]
+
     edl = []
     for i, ns in enumerate(matched):
         image = ns.get("matched_image", image_paths[i % len(image_paths)])
         camera = director._camera_for_emotion(ns["emotion"])
         transition = director._transition_for_shift(ns["emotion"], i)
+        is_hook = bool(ns.get("is_hook", False))
         edl.append(EditDecision(
             visual_type="manga_panel",
             visual_path=image,
@@ -174,14 +199,27 @@ def render_video(narration_data, audio_files, full_audio, image_paths, out_dir, 
             camera=camera,
             transition_in=transition,
             j_cut_s=0.3 if i > 0 else 0,
+            is_hook=is_hook,
+            hook_cps=hook_cps if is_hook else 0.5,
+            hook_image_pool=hook_pool if is_hook else [],
         ))
 
     clip_paths = []
     for i, d in enumerate(edl):
-        clip = os.path.join(tmpdir, f"seg_{i:03d}.mp4")
-        director._render_panel_segment(d, clip)
-        if Path(clip).exists() and Path(clip).stat().st_size > 0:
-            clip_paths.append(clip)
+        # Expand the hook into N visual sub-cuts (no-op if not a hook
+        # or if hook_cps is too low to benefit)
+        sub_decisions = director.expand_hook(d) if d.is_hook else [d]
+        if d.is_hook and len(sub_decisions) > 1:
+            log.info(
+                f"    HOOK seg{i}: expanded into {len(sub_decisions)} sub-cuts "
+                f"(hook_cps={d.hook_cps}, duration={d.duration:.1f}s)"
+            )
+
+        for j, sd in enumerate(sub_decisions):
+            clip = os.path.join(tmpdir, f"seg_{i:03d}_{j:02d}.mp4")
+            director._render_panel_segment(sd, clip)
+            if Path(clip).exists() and Path(clip).stat().st_size > 0:
+                clip_paths.append(clip)
 
     video_only = os.path.join(tmpdir, "assembled.mp4")
     cf = os.path.join(tmpdir, "concat.txt")

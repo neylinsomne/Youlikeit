@@ -38,6 +38,12 @@ VIDEO_TYPES = {
         ),
         "tone_desc": "immersive storyteller, calm but gripping",
         "cta_style": "Follow for more stories.",
+        "hook_rule": (
+            "Segment 1 must be 4-7 words ending in an ellipsis (…). Set the scene "
+            "with tension. Avoid full sentences. Example: 'It was the night that "
+            "changed everything…'"
+        ),
+        "hook_cps": 2.0,  # cuts per second during the hook
     },
     "personality": {
         "label": "Personality (hot take)",
@@ -50,6 +56,12 @@ VIDEO_TYPES = {
         ),
         "tone_desc": "philosophical provocateur, challenging, uses rhetorical questions",
         "cta_style": "Agree or disagree? Comment.",
+        "hook_rule": (
+            "Segment 1 must be a contrarian declaration ending in a period — max 8 "
+            "words, no question marks, no ellipses. Pure assertion. "
+            "Example: 'Griffith was right. And you know it.'"
+        ),
+        "hook_cps": 3.5,
     },
     "test": {
         "label": "Test (emotional gut-punch)",
@@ -60,7 +72,24 @@ VIDEO_TYPES = {
         ),
         "tone_desc": "raw, emotional, vulnerable",
         "cta_style": "Did this hit you too?",
+        "hook_rule": (
+            "Segment 1 must reference a count or a feeling — slow, vulnerable, "
+            "max 9 words. Example: 'I have watched this scene a hundred times.' "
+            "or 'There is a moment I cannot forget.'"
+        ),
+        "hook_cps": 1.0,
     },
+}
+
+
+# ── Hook keyword detection ──────────────────────────────────────
+# Used to suggest which word in the first segment should be visually
+# emphasized (size 1.4x, accent color) by the subtitle renderer.
+
+HOOK_ACCENT_KEYWORDS = {
+    "narration": ["night", "everything", "changed", "moment", "world", "axis", "consequences"],
+    "personality": ["right", "wrong", "underrated", "overrated", "stop", "everyone", "no one"],
+    "test": ["hundred", "thousand", "every", "single", "broke", "cannot", "never"],
 }
 
 
@@ -150,6 +179,8 @@ def _build_prompt(
 
     lang = "Spanish" if persona == "latam" else "English"
 
+    hook_rule = spec.get("hook_rule", "")
+
     return f"""{persona_desc}
 
 Generate a YouTube Short script ({lang}) for the series "{series_title}".
@@ -166,6 +197,11 @@ SERIES DATA:
 ICONIC MOMENTS (pick 1-2 to anchor your script):
 {moments_text}
 
+HOOK RULE (segment 1 — first 3 seconds, the most important segment):
+{hook_rule}
+The first segment is the retention hook. It must work as a standalone sentence
+that makes a viewer NOT swipe away. Mark it with `"is_hook": true` in the JSON.
+
 CONSTRAINTS:
 - 5-6 segments of 1 short sentence each (5-12 words)
 - Each segment ends with natural pause (period, ellipsis)
@@ -176,7 +212,7 @@ CONSTRAINTS:
 
 Return JSON array (no markdown):
 [
-  {{"text": "first segment", "emotion": "dark"}},
+  {{"text": "first segment (HOOK)", "emotion": "dark", "is_hook": true}},
   {{"text": "second segment", "emotion": "tragic"}},
   ...
 ]"""
@@ -229,12 +265,30 @@ def generate_scripts_for_series(
     series_slug: str,
     series_title: str,
     persona: str = "deep_mind",
+    use_llm: bool = False,
+    seed_extra: str = "",
 ) -> dict:
     """
     Generate the 3 video scripts (narration, personality, test) for a series.
 
+    By default uses the deterministic, JSON-template-based algorithmic
+    generator (no LLM). Pass `use_llm=True` to fall back to the legacy
+    Gemini-driven path (kept for experimentation).
+
     Returns dict {video_type: [segments]} ready for the rendering pipeline.
     """
+    if not use_llm:
+        from common.algorithmic_script_generator import generate_scripts_algorithmic
+        log.info("Using algorithmic script generator (no LLM)")
+        return generate_scripts_algorithmic(
+            conn=conn,
+            series_slug=series_slug,
+            series_title=series_title,
+            persona=persona,
+            seed_extra=seed_extra,
+        )
+
+    # ── Legacy LLM path (opt-in) ────────────────────────────────
     context = _build_context(conn, series_slug, series_title)
 
     if not context.get("themes"):
@@ -254,16 +308,21 @@ def generate_scripts_for_series(
             if not segments:
                 log.warning(f"  {vtype}: LLM returned no segments, raw: {text[:200]}")
                 continue
-            # Validate schema
+            # Validate schema and force is_hook=True on first segment if not set
             clean = []
-            for s in segments:
-                if "text" in s:
-                    clean.append({
-                        "text": s["text"],
-                        "emotion": s.get("emotion", "dark"),
-                    })
+            for i, s in enumerate(segments):
+                if "text" not in s:
+                    continue
+                clean.append({
+                    "text": s["text"],
+                    "emotion": s.get("emotion", "dark"),
+                    "is_hook": bool(s.get("is_hook", i == 0)),
+                })
+            # Defensive: only the first segment can be the hook
+            for j, c in enumerate(clean):
+                c["is_hook"] = (j == 0)
             results[vtype] = clean
-            log.info(f"  {vtype}: {len(clean)} segments")
+            log.info(f"  {vtype}: {len(clean)} segments (hook='{clean[0]['text'][:40]}…')")
         except Exception as e:
             log.error(f"  {vtype} failed: {e}")
 
@@ -277,3 +336,29 @@ def voice_params_for_video_type(vtype: str) -> dict:
         "personality": {"rate": "-3%", "pitch": "-5Hz"},
         "test": {"rate": "-8%", "pitch": "-10Hz"},
     }.get(vtype, {"rate": "-5%", "pitch": "-8Hz"})
+
+
+def hook_cps_for_video_type(vtype: str) -> float:
+    """Cuts-per-second target for the hook (first segment) of each video type."""
+    spec = VIDEO_TYPES.get(vtype, {})
+    return spec.get("hook_cps", 1.0)
+
+
+def detect_hook_accent_word(text: str, vtype: str) -> str | None:
+    """
+    Pick the keyword to visually emphasize in the hook subtitle.
+    Returns the word found, or None if no candidate matches.
+    """
+    candidates = HOOK_ACCENT_KEYWORDS.get(vtype, [])
+    lower = text.lower()
+    for kw in candidates:
+        # Word boundary, case-insensitive
+        if re.search(r"\b" + re.escape(kw) + r"\b", lower):
+            return kw
+    # Fallback: longest noun-ish word > 5 chars
+    words = [w.strip(".,!?…\"'") for w in text.split()]
+    long_words = sorted(
+        [w for w in words if len(w) > 5 and w[0].isalpha()],
+        key=len, reverse=True,
+    )
+    return long_words[0] if long_words else None

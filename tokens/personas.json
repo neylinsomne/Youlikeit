@@ -36,11 +36,15 @@
       "description_template": "{{reflection}} | {{series}} | Deep Mind"
     },
     "youtube": {
-      "channel_name": "",
+      "channel_name": "Nico Flor",
+      "channel_id": "UCT0HZKkg15LBEKUzfKUeRLQ",
+      "handle": "@NicoFlor-sq8jd",
       "token_file": "tokens/youtube_deep_mind.json"
     },
     "tiktok": {
-      "account_name": "",
+      "account_name": "oh_mizhir",
+      "tiktok_url": "https://www.tiktok.com/@oh_mizhir",
+      "email": "insomnesoul@gmail.com",
       "token_file": "tokens/tiktok_deep_mind.json"
     }
   },
@@ -128,11 +132,13 @@
       "description_template": "{{hot_take}} 🔥 | {{series}} | Pop Oracle"
     },
     "youtube": {
-      "channel_name": "",
+      "channel_name": "oh_tarab",
       "token_file": "tokens/youtube_pop_oracle.json"
     },
     "tiktok": {
-      "account_name": "",
+      "account_name": "oh_tarab",
+      "tiktok_url": "https://www.tiktok.com/@oh_tarab",
+      "email": "neylaction@gmail.com",
       "token_file": "tokens/tiktok_pop_oracle.json"
     }
   },
@@ -181,11 +187,15 @@
       "description_template": "{{reflexion}} | {{series}} ({{pais}}) | Voz Latina"
     },
     "youtube": {
-      "channel_name": "",
+      "channel_name": "Oh Que Sera",
+      "channel_id": "UCJYJm9sdN-ro6VWfuipPbRw",
+      "handle": "@oh_quesera",
       "token_file": "tokens/youtube_latam.json"
     },
     "tiktok": {
-      "account_name": "",
+      "account_name": "oh_quesera",
+      "tiktok_url": "https://www.tiktok.com/@oh_quesera",
+      "email": "neylbernate@gmail.com",
       "token_file": "tokens/tiktok_latam.json"
     }
   }

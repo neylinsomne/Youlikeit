@@ -78,6 +78,8 @@ ScaledBorderAndShadow: yes
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Main,DejaVu Sans,72,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,40,40,400,1
 Style: Highlight,DejaVu Sans,78,&H00FFFF00,&H000000FF,&H00000000,&H80000000,-1,0,0,0,105,105,0,0,1,4,2,2,40,40,400,1
+Style: Hook,DejaVu Sans,100,&H00FFFFFF,&H000000FF,&H00000000,&HC0000000,-1,0,0,0,105,105,0,0,1,5,3,5,80,80,0,1
+Style: HookKey,DejaVu Sans,120,&H0000FFFF,&H000000FF,&H00000000,&HC0000000,-1,0,0,0,110,110,0,0,1,5,3,5,80,80,0,1
 Style: Small,DejaVu Sans,48,&H00CCCCCC,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,40,40,200,1
 
 [Events]
@@ -98,6 +100,10 @@ def _generate_shorts_style(segments: List[Dict], highlight_color: str) -> str:
     """
     YouTube Shorts style: full sentence with keyword highlights.
     Shows 1-2 lines at a time, key words pop in color.
+
+    If a segment has `is_hook=True`, it is rendered with the Hook/HookKey
+    styles instead — bigger, centered, with the accent keyword popped
+    even larger. The hook entry gets a snappier fade-in.
     """
     ass = _ass_header()
 
@@ -107,8 +113,38 @@ def _generate_shorts_style(segments: List[Dict], highlight_color: str) -> str:
         end = seg['end_s']
         emotion = seg.get('emotion', 'default')
         hl_color = HIGHLIGHT_COLORS.get(emotion, highlight_color)
+        is_hook = bool(seg.get('is_hook', False))
 
         if not text.strip():
+            continue
+
+        # ── Hook subtitle: bigger, centered, accent on the keyword ──
+        if is_hook:
+            accent_word = (seg.get('accent_word') or '').strip()
+            display_words = []
+            for word in text.split():
+                clean = re.sub(r'[^\w]', '', word.lower())
+                if accent_word and clean == accent_word.lower():
+                    # Embed an inline override to enlarge + accent the word
+                    display_words.append(
+                        f"{{\\rHookKey}}{word}{{\\rHook}}"
+                    )
+                else:
+                    display_words.append(word)
+            display_text = ' '.join(display_words)
+
+            # Wrap if too long for one line
+            if len(text) > 28:
+                words = display_words
+                mid = len(words) // 2
+                display_text = ' '.join(words[:mid]) + r"\N" + ' '.join(words[mid:])
+
+            # Snappy fade-in (50ms), normal fade-out
+            fade = "{\\fad(80,200)}"
+            ass += (
+                f"Dialogue: 0,{_format_time(start)},{_format_time(end)},"
+                f"Hook,,0,0,0,,{fade}{display_text}\n"
+            )
             continue
 
         # Split long text into chunks of ~8-12 words for readability

@@ -31,6 +31,10 @@ TESTABLE_VARIABLES = {
     "persona": "Same content narrated by different personas",
     "panel_count": "3 panels vs 5 panels per Short",
     "music_genre": "Orchestral vs ambient vs lo-fi suggestion",
+    # ── Hook / retention experiments ──
+    "hook_cps": "Cuts-per-second during the first 3 seconds (retention hook strength)",
+    "hook_style": "Hook subtitle style: large centered (Hook) vs default (Main)",
+    "hook_text": "Different hook openings: question vs declaration vs feeling-count",
 }
 
 
