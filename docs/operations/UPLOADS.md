@@ -1,4 +1,8 @@
-# Guia de APIs y costos: YouTube + TikTok
+# Uploads · APIs y costos: YouTube + TikTok
+
+> **Nota (2026-06-02):** movido desde `GUIA_APIS_YOUTUBE_TIKTOK.md` (root) a
+> `docs/operations/`. Doc load-bearing del dominio **uploads** (handler diferido;
+> publicación en pausa hasta que la calidad esté OK y TikTok OAuth pase review).
 
 Este documento resume como trabajar tendencias, hashtags y musica para Shorts/Reels/TikTok sin pagar al inicio.
 

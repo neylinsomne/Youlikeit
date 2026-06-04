@@ -212,7 +212,7 @@ acaban en pausa o ellipsis.
 
 Para que esto pase de teoria a videos reales, vamos a tocar tres modulos:
 
-### 7.1 `src/common/script_generator.py`
+### 7.1 `src/apps/production/script_generator.py`
 
 Agregar al prompt del LLM una instruccion explicita sobre el primer
 segmento:
@@ -228,7 +228,7 @@ HOOK_RULES = {
 Y enforce que el segmento 1 sea distinto de los demas (mas corto, mas
 denso emocionalmente).
 
-### 7.2 `src/common/video_director.py`
+### 7.2 `src/apps/production/video_director.py`
 
 Agregar un parametro `hook_cps` al EDL:
 
@@ -275,7 +275,7 @@ for i, ns in enumerate(narration_data):
 
 ### 7.4 Subtitulos en el hook
 
-`src/common/animated_subs.py` — para el primer segmento:
+`src/apps/production/animated_subs.py` — para el primer segmento:
 
 - Tamano: 1.4x mas grande que el cuerpo
 - Color: usar el `accent` de la persona (cyan / pink / orange) en la palabra clave
@@ -301,7 +301,7 @@ primer upload), hay que mirar:
 | **Share rate** | > 1.5% | Mejorar el outro / CTA |
 
 YouTube Analytics expone `audienceWatchRatio` segundo a segundo. La
-implementacion ya existe en `src/exercises/ex24_retention_curves.py`.
+implementacion ya existe en `scripts/legacy/exercises/ex24_retention_curves.py`.
 Lo que falta es comparar la curva de un video con `is_hook=True` vs
 los antiguos sin hook explicito.
 
@@ -321,10 +321,10 @@ Una vez tengamos 3-4 shorts con la nueva plantilla y 3-4 sin ella:
 8. Significance: p < 0.10 (somos chicos, no exigimos 0.05)
 
 Esto se conecta directo con el sistema de A/B existente en
-`src/common/ab_testing.py`. Solo hay que crear el test:
+`src/apps/scoring/ab_testing.py`. Solo hay que crear el test:
 
 ```python
-from common.ab_testing import create_ab_test
+from apps.scoring.ab_testing import create_ab_test
 create_ab_test(
     conn=conn,
     name="Hook CPS strength",
@@ -373,4 +373,4 @@ Si falla alguno → pedir edicion en el dashboard.
 - Hook frameworks usados por canales que crecen: PAS (Problem-Agitate-Solve),
   Question-Twist, Pattern Interrupt
 - Tu sistema ya esta hecho para A/B testing con significancia estadistica
-  (`src/common/ab_testing.py`) — solo falta enchufar el hook como variable
+  (`src/apps/scoring/ab_testing.py`) — solo falta enchufar el hook como variable

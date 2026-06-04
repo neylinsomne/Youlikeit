@@ -1,5 +1,10 @@
 # YouLikeIt — Arquitectura Multi-Persona
 
+> **Nota (2026-06-02):** movido desde el root del repo. El flujo end-to-end
+> canónico vive en [MLOPS_FLOW.md](MLOPS_FLOW.md); la fuente de verdad de los
+> datos de persona es `src/apps/content/personas.py` + `tokens/personas.json`. Aquí
+> queda el **diseño narrativo** (knowledge graph, rationale multi-persona).
+
 > Sistema de producción de contenido con múltiples personalidades,
 > knowledge graph local, y pipelines desacoplados.
 

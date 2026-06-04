@@ -33,7 +33,7 @@
 | Comando | Descripcion | Ejemplo |
 |---------|-------------|---------|
 | `/code-review` | Review de seguridad y calidad de cambios no commiteados | `/code-review` |
-| `/python-review` | Review de Python: PEP 8, type hints, seguridad | `/python-review src/main.py` |
+| `/python-review` | Review de Python: PEP 8, type hints, seguridad | `/python-review scripts/legacy/main.py` |
 | `/go-review` | Review de Go: patrones idiomaticos, concurrencia, errores | `/go-review cmd/server/main.go` |
 | `/rust-review` | Review de Rust: ownership, lifetimes, unsafe | `/rust-review src/lib.rs` |
 | `/cpp-review` | Review de C++: memory safety, idioms modernos | `/cpp-review src/engine.cpp` |
