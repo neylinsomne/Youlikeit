@@ -35,7 +35,6 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.chdir(os.path.join(os.path.dirname(__file__), ".."))
 
 from apps.scoring import ab_testing

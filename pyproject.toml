@@ -8,11 +8,21 @@ version = "0.1.0"
 description = "Pipeline algorítmico de short-form content con MLOps end-to-end"
 requires-python = ">=3.11"
 
+# CLI unificado. Las deps de runtime viven en requirements.txt (fuente de
+# verdad para Docker); el editable install se hace con `pip install -e . --no-deps`.
+[project.scripts]
+ylk = "cli.main:main"
+
+# src-layout: los paquetes (core, utils, apps.*, integrations, cli) viven bajo src/.
+[tool.setuptools.packages.find]
+where = ["src"]
+
 # ────────────────────────────────────────────────────────────────────
 # pytest config
 # ────────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 minversion = "8.0"
+pythonpath = ["src"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]

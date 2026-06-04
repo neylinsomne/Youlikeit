@@ -81,6 +81,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          pip install -e . --no-deps   # expone core/apps/integrations + CLI ylk
           # Whisper es opcional en CI (no hay GPU)
           # pip install openai-whisper
 

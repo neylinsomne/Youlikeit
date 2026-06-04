@@ -167,7 +167,7 @@ def main():
         mp3 = voice_dir / "sample.mp3"
         wav = voice_dir / "sample.wav"
         ref = str(wav) if wav.exists() else str(mp3)
-        print(f"  python src/main.py ex18 --query \"villain\" --lang {lang} --voice-ref {ref}")
+        print(f"  python scripts/legacy/main.py ex18 --query \"villain\" --lang {lang} --voice-ref {ref}")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 python-dotenv==1.1.1
 requests==2.32.4
 rich==14.1.0
+typer>=0.12.0      # CLI unificado `ylk` (entry point en pyproject)
 
 # Manga pipeline
 easyocr>=1.7.0

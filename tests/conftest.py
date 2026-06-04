@@ -18,11 +18,8 @@ from pathlib import Path
 
 import pytest
 
-# Garantiza que src/ esté en sys.path antes de cualquier import del SUT.
+# src/ se inyecta vía `pythonpath = ["src"]` en [tool.pytest.ini_options].
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
 
 
 # ── DB con schema completo ──────────────────────────────────────────
