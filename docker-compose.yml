@@ -39,7 +39,7 @@ services:
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-    command: ["python", "src/main.py", "ex29", "--host", "0.0.0.0", "--port", "8001"]
+    command: ["python", "scripts/legacy/main.py", "ex29", "--host", "0.0.0.0", "--port", "8001"]
     restart: unless-stopped
 
   # Fish Speech TTS (GPU)
