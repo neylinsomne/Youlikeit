@@ -158,6 +158,15 @@ python scripts/signals/verify_signals_flow.py --cleanup
 Si los 4 pasos pasan → el repo está en estado coherente y puedes empezar.
 Si alguno falla → primera tarea es **diagnóstico**, no implementación.
 
+### Cómo agregar funcionalidad (convención de scripts)
+
+Toda feature nueva es una **tupla de 4** alineada por dominio: lógica en
+`src/apps/<dominio>/`, entrada vía el CLI `ylk <dominio> <acción>` (o
+`scripts/<dominio>/`), tests en `tests/<dominio>/`, handbook en
+`docs/agents/<DOMINIO>_AGENT.md`. Detalle y regla Docker en
+[scripts/README.md](../../scripts/README.md). Deps nuevas → `requirements.txt` +
+`docker compose build` (nunca `pip install` suelto).
+
 ---
 
 ## Referencias cruzadas
