@@ -3,6 +3,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+Set-Location $RepoRoot
 
 $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 if (-not $task) {

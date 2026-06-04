@@ -6,7 +6,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-Set-Location $PSScriptRoot
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+Set-Location $RepoRoot
 
 $scriptPath = Join-Path $PSScriptRoot "run-content-flow.ps1"
 if (-not (Test-Path $scriptPath)) {

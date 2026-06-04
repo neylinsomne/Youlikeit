@@ -1,7 +1,7 @@
 # YouLikeIt - Windows Scheduled Tasks Setup
 # Run as Administrator: powershell -ExecutionPolicy Bypass -File setup-scheduled-tasks.ps1
 
-$ProjectDir = "D:\Youlikeit\youtube-automatizacion-ejercicios"
+$ProjectDir = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $LogDir = "$ProjectDir\outputs\logs\scheduler"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 

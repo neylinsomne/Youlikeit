@@ -15,8 +15,25 @@ scripts/
 ├── testing/           Runners pytest por dominio + audit completo
 ├── setup/             Voces, OAuth, descargas iniciales
 ├── uploads/           Subida a YouTube / TikTok
+├── ops/               .ps1 de operación (docker-*, run*, schedule*, sync-to-usb)
 └── legacy/            Pre-pytest + exercises ex00–ex40 + main.py — solo referencia
 ```
+
+## Operación (scripts/ops/)
+
+Los `.ps1` de operación viven en `scripts/ops/` y computan el repo root con
+`$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path`, así que se
+pueden invocar desde cualquier cwd:
+
+```powershell
+.\scripts\ops\docker-setup.ps1          # levantar entorno + deps + playwright
+.\scripts\ops\run.ps1 manga             # punto de entrada multi-pipeline
+.\scripts\ops\run-content-flow.ps1      # ciclo de contenido (Docker)
+.\scripts\ops\sync-to-usb.ps1           # backup outputs a USB E:
+```
+
+> `setup.ps1` (bootstrap del venv local) y `start-all.ps1`/`stop-all.ps1`
+> (lanzador multi-proyecto del owner) se quedan en el root.
 
 ## CLI unificado `ylk`
 

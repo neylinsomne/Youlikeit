@@ -1,5 +1,6 @@
 $ErrorActionPreference = "Stop"
-Set-Location "D:\Youlikeit"
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+Set-Location $RepoRoot
 
 docker compose up -d --build
 Write-Host "Servicios levantados. Estado:" -ForegroundColor Cyan

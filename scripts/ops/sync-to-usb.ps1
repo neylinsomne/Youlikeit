@@ -3,7 +3,8 @@
 #
 # Uso: .\sync-to-usb.ps1
 
-$Source = Join-Path $PSScriptRoot "outputs"
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$Source = Join-Path $RepoRoot "outputs"
 $Dest = "E:\youlikeit-outputs"
 
 if (-not (Test-Path "E:\")) {
