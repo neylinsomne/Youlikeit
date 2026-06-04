@@ -1,4 +1,4 @@
-# Sincroniza outputs del pipeline a la USB E:
+﻿# Sincroniza outputs del pipeline a la USB E:
 # Ejecutar después de cada corrida o como tarea programada
 #
 # Uso: .\sync-to-usb.ps1

@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # run-manga-flow.ps1 — Pipeline completo de manga/anime Shorts
 # Un solo click: descubre → clasifica → scrape wiki → OCR → video → metadata
 # ============================================================
