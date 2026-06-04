@@ -55,7 +55,7 @@ def log_to_db(
     output_path: str = "", script: dict | None = None,
 ):
     """Record production in content_produced table."""
-    from common.content_rotator import log_produced
+    from apps.production.content_rotator import log_produced
     conn = sqlite3.connect("data/shorts_pipeline.db")
     log_produced(
         conn, persona=persona, series_slug=slug, series_title=title,
@@ -151,7 +151,7 @@ def main():
 
     # Step 1: Plan rotation
     log.info("\nSTEP 1 — Planning rotation...")
-    from common.content_rotator import ContentRotator
+    from apps.production.content_rotator import ContentRotator
 
     rotator = ContentRotator()
     batch = rotator.plan_batch(

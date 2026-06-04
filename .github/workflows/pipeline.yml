@@ -123,9 +123,10 @@ jobs:
         run: |
           python -c "
           import sys, os, json, re, requests, time, subprocess, asyncio, glob
-          sys.path.insert(0, '.')
+          sys.path.insert(0, 'src')
+          sys.path.insert(0, 'scripts/legacy')
           from exercises.ex38_manga_panels import _detect_panels
-          from common.manga_camera import render_manga_short, classify_page
+          from apps.production.manga_camera import render_manga_short, classify_page
 
           SERIES = '${{ steps.config.outputs.series }}' or 'Berserk'
           MAX_EPS = int('${{ steps.config.outputs.max_eps }}' or '3')
@@ -134,7 +135,7 @@ jobs:
           print(f'=== Generating Short for {SERIES} ===')
 
           # 1. Get wiki summaries
-          import common.http_client as hc
+          import utils.http_client as hc
           subdomain_map = {'berserk':'berserk','one piece':'onepiece','naruto':'naruto','death note':'deathnote'}
           subdomain = subdomain_map.get(SERIES.lower(), SERIES.lower().replace(' ',''))
 

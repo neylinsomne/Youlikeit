@@ -104,8 +104,8 @@ def collect_image_pool(
     include_experimental=False,
 ):
     """Combine: manga pages + thematic stills + cross-ref images + fandom."""
-    from common.thematic_stills import get_thematic_stills_for_narration
-    from common.cross_ref_images import enrich_segments_with_cross_refs
+    from apps.production.thematic_stills import get_thematic_stills_for_narration
+    from apps.production.cross_ref_images import enrich_segments_with_cross_refs
 
     conn = sqlite3.connect("data/shorts_pipeline.db")
     conn.row_factory = sqlite3.Row
@@ -133,10 +133,10 @@ def collect_image_pool(
 
 def render_video(narration_data, audio_files, full_audio, image_paths, out_dir, vtype):
     """Render the final Short."""
-    from common.animated_subs import generate_ass_subtitles
-    from common.video_director import VideoDirector, EditDecision
-    from common.panel_matcher import select_panels_for_narration
-    from common.script_generator import (
+    from apps.production.animated_subs import generate_ass_subtitles
+    from apps.production.video_director import VideoDirector, EditDecision
+    from apps.production.panel_matcher import select_panels_for_narration
+    from apps.production.script_generator import (
         hook_cps_for_video_type, detect_hook_accent_word,
     )
 
@@ -275,14 +275,14 @@ def main():
     # Step 1: Ensure classified
     log.info(f"\n=== Series: {args.series} (slug={slug}) ===")
 
-    from common.thematic_stills import ensure_series_classified
+    from apps.production.thematic_stills import ensure_series_classified
     conn = sqlite3.connect("data/shorts_pipeline.db")
     conn.row_factory = sqlite3.Row
     ensure_series_classified(conn, args.series, tmdb_id=args.tmdb_id, slug=slug)
 
     # Step 2: Generate scripts
     log.info("\n=== Generating scripts via LLM ===")
-    from common.script_generator import generate_scripts_for_series, voice_params_for_video_type
+    from apps.production.script_generator import generate_scripts_for_series, voice_params_for_video_type
 
     scripts = generate_scripts_for_series(
         conn, slug, args.series, persona=args.persona,
@@ -357,6 +357,36 @@ def main():
         final = render_video(narration_data, audio_files, full_audio, images, out_dir, vtype)
         size_kb = Path(final).stat().st_size // 1024 if Path(final).exists() else 0
         log.info(f"  ✓ {final} ({size_kb}KB)")
+
+        # Hook quality gate (post-render). NO bloqueamos publicación todavía:
+        # block_on_fail=False mientras calibramos MIN_HOOK_SCORE contra
+        # retention real. Revisar después de 30 videos por persona × vtype.
+        # TODO(mlops): activar block_on_fail=True cuando umbral esté calibrado.
+        if Path(final).exists():
+            try:
+                from apps.scoring.hook_scorer import score_and_gate
+                from apps.production.script_generator import detect_hook_accent_word
+                hook_seg = narration_data[0] if narration_data else {}
+                hook_text = hook_seg.get("text", "")
+                accent = detect_hook_accent_word(hook_text, vtype) if hook_text else None
+                conn_score = sqlite3.connect("data/shorts_pipeline.db")
+                conn_score.row_factory = sqlite3.Row
+                score_and_gate(
+                    conn_score,
+                    video_path=final,
+                    vtype=vtype,
+                    hook_text=hook_text,
+                    accent_word=accent,
+                    edl=None,    # TODO(mlops): pasar EDL del director si lo exponemos
+                    first_sub_text=hook_text,
+                    persona=args.persona,
+                    series_slug=slug,
+                    use_llm=False,
+                    block_on_fail=False,
+                )
+                conn_score.close()
+            except Exception as e:
+                log.warning(f"  hook scoring skipped: {e}")
 
     print("\n=== DONE ===")
     for vtype in args.types:

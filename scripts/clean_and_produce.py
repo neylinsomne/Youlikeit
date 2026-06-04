@@ -32,8 +32,8 @@ log.info(f"Deleted {old} old shorts")
 # ── Step 1: Script ──
 log.info("=== Step 1: Generate script (Deep Mind) ===")
 
-from common.personas import get_persona, build_narration_prompt
-from common.video_director import get_director_prompt_addon
+from apps.content.personas import get_persona, build_narration_prompt
+from apps.production.video_director import get_director_prompt_addon
 
 persona = get_persona(conn, "deep_mind")
 cross_refs = conn.execute("""
@@ -76,7 +76,7 @@ with open(str(OUTPUT_DIR / "script.json"), "w") as f:
 # ── Step 2: Pages (English Eclipse chapters) ──
 log.info("=== Step 2: Download English Eclipse pages ===")
 
-from common.mangadex import search_manga, get_chapters, download_chapter_pages
+from integrations.mangadex import search_manga, get_chapters, download_chapter_pages
 
 pages = []
 manga_result = search_manga("Berserk")
@@ -179,7 +179,7 @@ log.info(f"Single voice audio: {total_duration:.1f}s")
 # ── Step 4: Render video ──
 log.info("=== Step 4: Render video clips ===")
 
-from common.video_director import VideoDirector, EditDecision
+from apps.production.video_director import VideoDirector, EditDecision
 director = VideoDirector(target_size=(1080, 1920), fps=30, use_gpu=True)
 
 import tempfile
@@ -256,7 +256,7 @@ subprocess.run(["ffmpeg", "-y", "-i", video_only, "-i", single_audio,
 # ── Step 6: Whisper sync subtitles ──
 log.info("=== Step 6: Whisper sync subtitles ===")
 
-from common.animated_subs import generate_ass_subtitles
+from apps.production.animated_subs import generate_ass_subtitles
 
 sub_segments = []
 try:
