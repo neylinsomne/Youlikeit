@@ -252,7 +252,7 @@ def _expand_hook(self, decision):
     return [decision]
 ```
 
-### 7.3 `scripts/produce_for_series.py`
+### 7.3 `scripts/production/produce_for_series.py`
 
 Marcar el primer segmento como `is_hook=True` y aplicarle el `hook_cps`
 correspondiente al video type:

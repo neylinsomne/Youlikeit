@@ -8,10 +8,11 @@ Flow:
   4. Optional: upload to YouTube as unlisted
 
 Usage:
-  python scripts/run_rotation_batch.py                     # Full batch
-  python scripts/run_rotation_batch.py --dry-run           # Scripts only
-  python scripts/run_rotation_batch.py --upload-youtube    # Also upload
-  python scripts/run_rotation_batch.py --personas deep_mind pop_oracle
+  python scripts/production/run_rotation_batch.py                  # Full batch
+  python scripts/production/run_rotation_batch.py --dry-run        # Scripts only
+  python scripts/production/run_rotation_batch.py --upload-youtube # Also upload
+  python scripts/production/run_rotation_batch.py --personas deep_mind pop_oracle
+  # o vía CLI: ylk rotate --personas deep_mind pop_oracle
 
 Use --skip-render on GitHub Actions CI where no GPU is available.
 """
@@ -25,8 +26,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-os.chdir(os.path.join(os.path.dirname(__file__), ".."))
+os.chdir(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger("orchestrator")
@@ -36,7 +36,7 @@ def run_produce(series_slug, series_title, tmdb_id, persona, dry_run=False):
     """Invoke produce_for_series.py as subprocess."""
     cmd = [
         sys.executable,
-        "scripts/produce_for_series.py",
+        "scripts/production/produce_for_series.py",
         "--series", series_title,
         "--tmdb-id", str(tmdb_id),
         "--slug", series_slug,

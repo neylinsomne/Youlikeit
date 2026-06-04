@@ -59,7 +59,7 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: |
           PERSONAS="${{ github.event.inputs.personas || 'deep_mind pop_oracle latam' }}"
-          python scripts/run_rotation_batch.py \
+          python scripts/production/run_rotation_batch.py \
             --skip-render \
             --personas $PERSONAS
 
@@ -109,13 +109,13 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
-          docker compose exec -T ytlab python scripts/run_rotation_batch.py \
+          docker compose exec -T ytlab python scripts/production/run_rotation_batch.py \
             --personas deep_mind pop_oracle latam
 
       - name: Upload to YouTube as unlisted
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          docker compose exec -T ytlab python scripts/run_rotation_batch.py \
+          docker compose exec -T ytlab python scripts/production/run_rotation_batch.py \
             --personas deep_mind pop_oracle latam \
             --upload-youtube

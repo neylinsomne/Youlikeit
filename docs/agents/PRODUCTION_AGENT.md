@@ -21,14 +21,14 @@
 | [src/apps/production/thematic_stills.py](../../src/apps/production/thematic_stills.py) | Fandom + TMDb fallback |
 | [src/apps/production/cross_ref_images.py](../../src/apps/production/cross_ref_images.py) | Cross-reference characters |
 | [src/apps/content/personas.py](../../src/apps/content/personas.py) | Persona prompts, voice, edit_style |
-| [scripts/produce_for_series.py](../../scripts/produce_for_series.py) | CLI core de producción 1 serie |
-| [scripts/run_rotation_batch.py](../../scripts/run_rotation_batch.py) | Orquestador batch |
-| [scripts/clean_and_produce.py](../../scripts/clean_and_produce.py) | Reset + produce |
+| [scripts/production/produce_for_series.py](../../scripts/production/produce_for_series.py) | CLI core de producción 1 serie |
+| [scripts/production/run_rotation_batch.py](../../scripts/production/run_rotation_batch.py) | Orquestador batch |
+| [scripts/production/clean_and_produce.py](../../scripts/production/clean_and_produce.py) | Reset + produce |
 | [tests/production/](../../tests/production/) | Suite pytest del dominio |
 
-> ⚠️ Estos scripts viven en `scripts/production/` solo conceptualmente — ver
-> sección "Movimiento diferido" abajo. Hoy siguen en `scripts/` plano por
-> motivos de subprocess calls. Mover bajo PR específica.
+> ✅ Estos scripts ya viven en `scripts/production/`. `run_rotation_batch.py`
+> invoca a `produce_for_series.py` por subprocess con path
+> `scripts/production/produce_for_series.py` (cwd = repo root vía `os.chdir`).
 
 ## Archivos que NO puedes tocar
 
@@ -101,7 +101,7 @@ Esto corre:
 
 Para verificación full con render (lento, requiere GPU):
 ```powershell
-python scripts/produce_for_series.py --series "Berserk" --persona deep_mind --dry-run
+python scripts/production/produce_for_series.py --series "Berserk" --persona deep_mind --dry-run
 ```
 
 ---
@@ -129,17 +129,13 @@ python scripts/produce_for_series.py --series "Berserk" --persona deep_mind --dr
 
 ---
 
-## Movimiento diferido (DOC pendiente)
+## Movimiento ejecutado (2026-06-03)
 
-Los scripts `produce_for_series.py`, `run_rotation_batch.py`, `clean_and_produce.py`
-actualmente **siguen en `scripts/` plano** y se referencian con subprocess
-desde `run_rotation_batch.py`. Antes de moverlos a `scripts/production/`:
+Los 3 runners se movieron de `scripts/` plano a `scripts/production/`:
 
-1. Actualizar paths de subprocess en `run_rotation_batch.py`
-2. Validar que no rompe el GHA `content-rotation.yml`
-3. Test smoke completo con un render real
-
-Esto está marcado como **T42 (Tier 3)** en `AGENT_TASKS.md`.
+1. ✅ Path de subprocess en `run_rotation_batch.py` → `scripts/production/produce_for_series.py`
+2. ✅ Path-math interno corregido (`__file__/../..` = repo root) + `os.chdir(ROOT)`
+3. ✅ GHA `content-rotation.yml` actualizado a la ruta nueva
 
 ---
 
