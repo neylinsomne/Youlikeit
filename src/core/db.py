@@ -1,7 +1,10 @@
 """SQLite database for storing movies, quotes, and timestamps."""
 
+import logging
 import sqlite3
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 SCHEMA = """
@@ -743,7 +746,49 @@ def get_db(data_dir: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     _migrate_columns(conn)
+    _ensure_domain_schemas(conn)
     return conn
+
+
+# Tablas cuya definición vive en módulos de dominio (init_*/ensure_*). Las
+# enganchamos aquí para que una DB fresca (`get_db`) tenga TODO el esquema en
+# un solo punto — evita "no such table" cuando un módulo consulta una tabla
+# que otro módulo debía crear. Imports diferidos: se resuelven en runtime,
+# cuando `core.db` ya está cargado, así no hay ciclos de import.
+_DOMAIN_SCHEMA_ENSURERS: list[tuple[str, str]] = [
+    ("apps.production.content_rotator", "init_rotation_db"),      # content_produced
+    ("apps.signals.brief_resolver",     "ensure_unresolved_schema"),  # unresolved_briefs_queue
+    ("apps.content.personas",           "init_personas_db"),      # personas, persona_*
+    ("apps.content.thematic_classifier", "init_db"),              # series_themes/arcs/scene_moments
+    ("apps.production.treatment_tones", "init_crossover_db"),     # content_variants, crossover_metrics
+    ("apps.scoring.hook_scorer",        "ensure_schema"),         # hook_scores (idempotente)
+]
+
+
+def _ensure_domain_schemas(conn: sqlite3.Connection) -> None:
+    """Crea tablas definidas en módulos de dominio. Best-effort e idempotente.
+
+    Cada `init_*` usa `CREATE TABLE IF NOT EXISTS`, así que llamarlas de más es
+    inofensivo. Un fallo de import (módulo ausente en un runtime mínimo, p.ej.
+    la cron de GHA que solo instala `requests`) no debe romper `get_db`.
+    """
+    import importlib
+    for module_path, fn_name in _DOMAIN_SCHEMA_ENSURERS:
+        try:
+            mod = importlib.import_module(module_path)
+        except ImportError as e:
+            # Módulo ausente en un runtime mínimo (p.ej. cron con solo requests):
+            # esperado, no es un error. DB sigue usable sin esas tablas.
+            log.debug("domain schema skip (import) %s: %s", module_path, e)
+            continue
+        try:
+            getattr(mod, fn_name)(conn)
+        except Exception as e:  # noqa: BLE001
+            # Un fallo AQUÍ (typo en un SCHEMA, init roto) NO debe romper get_db,
+            # pero sí es un bug real: lo logueamos en WARNING para que sea visible
+            # en vez de aparecer luego como "no such table" sin causa rastreable.
+            log.warning("domain schema ensure FAILED %s.%s: %s", module_path, fn_name, e)
+    conn.commit()
 
 
 class db_context:

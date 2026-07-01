@@ -6,7 +6,7 @@
 # Uso:
 #   .\scripts\testing\run_analytics.ps1
 #   .\scripts\testing\run_analytics.ps1 -SkipSmoke   # solo pytest
-#   .\scripts\testing\run_analytics.ps1 -Verbose
+#   .\scripts\testing\run_analytics.ps1 -Detailed    # pytest -vv
 
 [CmdletBinding()]
 param(

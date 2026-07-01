@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Verbose
+    [switch]$Detailed
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,7 +23,7 @@ function Skip($m) { Write-Host "  [SKIP] $m" -ForegroundColor Yellow }
 $ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $ROOT
 
-$VFlag = if ($Verbose) { "-vv" } else { "-q" }
+$VFlag = if ($Detailed) { "-vv" } else { "-q" }
 
 Section "FASE 1/2: pytest tests/scoring/"
 python -m pytest $VFlag tests/scoring/
@@ -37,7 +37,7 @@ if (Test-Path $produce) {
     if ($LASTEXITCODE -ne 0) { Fail "score_hooks fallo"; exit $LASTEXITCODE }
     Ok "scores escritos a out/hook_scores.csv"
 } else {
-    Skip "outputs/produce/ no existe — saltando batch score"
+    Skip "outputs/produce/ no existe - saltando batch score"
 }
 
 Write-Host ""

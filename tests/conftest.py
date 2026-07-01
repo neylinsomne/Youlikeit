@@ -189,8 +189,15 @@ def no_real_http(request, monkeypatch):
         )
 
     import requests
+    # Nivel Session (pooling) …
     monkeypatch.setattr(requests.Session, "get", lambda *a, **k: _forbidden(*a, **k))
     monkeypatch.setattr(requests.Session, "post", lambda *a, **k: _forbidden(*a, **k))
+    monkeypatch.setattr(requests.Session, "request", lambda *a, **k: _forbidden(*a, **k))
+    # … y nivel módulo (requests.get/post directos, p.ej. trending_anime.py).
+    # Sin esto, un módulo que llama requests.get(url, timeout=15) directo NO
+    # queda cubierto y el test se cuelga ~15s por request contra red real.
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _forbidden(*a, **k))
+    monkeypatch.setattr(requests, "post", lambda *a, **k: _forbidden(*a, **k))
 
 
 # ── Env vars seguras por default ───────────────────────────────────

@@ -16,7 +16,7 @@ param(
 
     [switch]$Install,
 
-    [switch]$Verbose
+    [switch]$Detailed
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,12 +39,12 @@ Set-Location $ROOT
 if ($Install) {
     Write-Section "Instalando dependencias de testing"
     python -m pip install -r requirements-dev.txt
-    if ($LASTEXITCODE -ne 0) { Write-Fail "pip install falló"; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Write-Fail "pip install fallo"; exit 1 }
     Write-Ok "deps instaladas"
 }
 
 # Verbosity flag para pytest
-$VFlag = if ($Verbose) { "-vv" } else { "-q" }
+$VFlag = if ($Detailed) { "-vv" } else { "-q" }
 
 switch ($Mode) {
     "quick" {

@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Verbose
+    [switch]$Detailed
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,7 +22,7 @@ function Fail($m) { Write-Host "  [FAIL] $m" -ForegroundColor Red }
 $ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $ROOT
 
-$VFlag = if ($Verbose) { "-vv" } else { "-q" }
+$VFlag = if ($Detailed) { "-vv" } else { "-q" }
 
 Section "FASE 1/2: pytest tests/production/"
 python -m pytest $VFlag tests/production/
@@ -31,8 +31,17 @@ Ok "tests/production/ verde"
 
 Section "FASE 2/2: smoke rotator (en seco, sin render)"
 python -c @"
-import sys
+import sys, logging
 sys.path.insert(0, 'src')
+# Smoke offline y determinista: el rotator llama a trending_anime (red real,
+# AniList/Jikan). Bloqueamos red + silenciamos WARNING para no depender de
+# rate limits externos ni ensuciar stderr (PowerShell lo trata como error).
+import requests
+def _b(*a, **k):
+    raise RuntimeError('offline smoke')
+requests.get = requests.post = _b
+requests.Session.get = requests.Session.post = _b
+logging.disable(logging.WARNING)
 from apps.production.content_rotator import ContentRotator, CATALOG
 r = ContentRotator()
 ok = 0

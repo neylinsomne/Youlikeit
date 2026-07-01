@@ -33,6 +33,7 @@ if sys.platform == "win32":
         pass
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT / "src"))   # estructura src/apps|core|utils
 os.chdir(str(ROOT))
 
 logging.basicConfig(

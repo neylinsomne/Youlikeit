@@ -41,12 +41,37 @@ if sys.platform == "win32":
         pass
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT / "src"))   # estructura src/apps|core|utils
 os.chdir(str(ROOT))
+
+# Smoke sobre DB de prueba (10 señales sintéticas): los invariantes HARD de
+# signals_validation asumen volumen de producción (>=80 señales/24h). En este
+# contexto de prueba bajamos los umbrales de volumen vía env (se leen al
+# importar signals_validation, por eso se setean ANTES de cualquier import).
+os.environ.setdefault("MIN_SIGNALS_24H", "1")
+os.environ.setdefault("MIN_SIGNALS_7D", "1")
 
 logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
+
+# Smoke offline: el flujo es sintético; el stage del rotator llama a
+# trending_anime (red real). Bloqueamos red + silenciamos el WARNING spam
+# para que el smoke sea determinista y no dependa de AniList/Jikan.
+def _go_offline():
+    import requests
+    def _b(*a, **k):
+        raise RuntimeError("HTTP real bloqueado (verify_signals_flow es smoke offline)")
+    for obj, attr in ((requests, "get"), (requests, "post"),
+                      (requests.Session, "get"), (requests.Session, "post")):
+        try:
+            setattr(obj, attr, _b)
+        except Exception:
+            pass
+    logging.disable(logging.WARNING)
+
+_go_offline()
 
 
 # ── Señales sintéticas (mismas semánticas que tests/conftest.sample_signals,
