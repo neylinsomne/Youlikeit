@@ -1,7 +1,9 @@
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
 .env
+.env.plausible
 client_secret.json
 client_secrets.json
 data/youtube_oauth_token.json
