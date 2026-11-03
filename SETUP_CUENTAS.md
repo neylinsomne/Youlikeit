@@ -2,6 +2,26 @@
 
 Todo es gratis. Ninguna pide tarjeta de crédito.
 
+> **Verificar en cualquier momento:** `ylk doctor` (hace una llamada mínima a cada
+> servicio y muestra OK / INVALID / MISSING sin imprimir valores).
+> Las keys viven en `.env` en la RAÍZ del repo (gitignored). Plantilla: `.env.example`.
+
+## Estado al 2026-11-03 y qué hacer (por prioridad para supercuts)
+
+| Credencial | Estado | Acción |
+|---|---|---|
+| `.env` raíz | **Faltaba** (las keys estaban solo en `youtube-automatizacion-ejercicios/.env`) | Creado a partir de esa carpeta. Editar ahí lo de abajo. |
+| Google API key (`YOUTUBE_API_KEY` = `GEMINI_API_KEY`, misma key) | **INVÁLIDA** (`API_KEY_INVALID`: borrada o rotada) | Crear nueva en [Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials) (habilitar YouTube Data API v3) y otra en [AI Studio](https://aistudio.google.com/apikey) para Gemini. |
+| Tokens OAuth de YouTube | **MUERTOS** (`invalid_grant`) | La app OAuth está en **Testing** → Google vence los refresh tokens a 7 días. Pantalla de consentimiento → **Publicar app** (En producción), luego re-autorizar cada canal (ver §4). |
+| `client_secrets.json` (cliente OAuth) | OK | Copiado a la raíz. |
+| `GROQ_API_KEY` | **FALTA** | Gratis en [console.groq.com/keys](https://console.groq.com/keys). Habilita ASR por API (Whisper large-v3-turbo) y LLM por API. |
+| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | **FALTAN** | [developers.tiktok.com/apps](https://developers.tiktok.com/apps). Sin auditoría: subida como borrador al inbox (la canción se elige en la app). |
+| `TMDB_API_KEY` | OK, pero **filtrada en el historial de git** | Rotar en [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api). |
+| OpenSubtitles / OMDb / Hugging Face (`HF_TOKEN`) | OK | — (`HF_TOKEN` se mapeó desde `HUGGINGFACE_API_KEY`, que el código no leía). |
+| `TRAKT_CLIENT_ID` | INVÁLIDA (403) | Opcional para supercuts. |
+| GitHub Actions secrets | **Ninguno configurado** (las crons corren sin keys) | Cuando las keys estén bien: `gh secret set NOMBRE` por cada una que usen los workflows. |
+| Ollama | Instalado, sin modelos | `ollama pull qwen3:8b` si quieres LLM local (si no, `LLM_PROVIDER=groq`). |
+
 ---
 
 ## OBLIGATORIAS (sin estas no corre el pipeline)
@@ -59,14 +79,15 @@ Todo es gratis. Ninguna pide tarjeta de crédito.
 - **Habilitar:** YouTube Data API v3 (buscar en la biblioteca de APIs)
 - **Crear credenciales:** OAuth 2.0 Client ID (tipo "Desktop app")
 - **Descargar** el archivo `client_secrets.json`
-- **Límite gratis:** 10,000 unidades/día = ~6 uploads/día
-- **Cuándo lo necesitas:** cuando quieras publicar Shorts automáticamente (aún no implementado)
+- **Límite:** desde junio 2026 `videos.insert` tiene cuota propia (~100 subidas/día por defecto)
+- **Cuándo lo necesitas:** publicación automática (Fase 4 del plan de supercuts)
 
 ### 5. Google Cloud — para OAuth de YouTube
 
 - Solo necesario si vas a usar la YouTube Data API (punto 4)
 - No requiere facturación para la cuota gratuita
-- **Pantalla de consentimiento OAuth:** configurar como "External" → modo "Testing" (no requiere verificación, soporta hasta 100 usuarios de prueba)
+- **Pantalla de consentimiento OAuth:** "External" y luego **Publicar app (En producción)**. En modo "Testing" los refresh tokens vencen a los 7 días y la subida automática se rompe cada semana. Sin verificar, Google muestra una advertencia al autorizar; basta con continuar (uso propio, < 100 usuarios).
+- **Publicar en público vía API** requiere la auditoría de YouTube API Services; sin ella los videos subidos quedan privados.
 
 ---
 

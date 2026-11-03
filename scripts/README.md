@@ -46,6 +46,9 @@ ylk produce --series "Berserk" --persona deep_mind --dry-run
 ylk rotate --personas deep_mind pop_oracle latam
 ylk score --rescore
 ylk analytics dashboard
+ylk media ingest "Horror Express" --year 1973   # fuente legítima → índice → ASR
+ylk media runs                     # tiempos por etapa del ETL
+ylk doctor                         # keys/tokens/stack sin mostrar valores
 ```
 
 Cada subcomando reenvía sus flags al runner subyacente (passthrough). El CLI vive
@@ -68,8 +71,10 @@ Un **runner** no contiene lógica de negocio: orquesta y delega. Plantilla en
 
 ## Regla Docker (integraciones / dependencias)
 
-- **Dependencias e integraciones de librerías van por Docker.** Una dep nueva se
-  agrega a [`requirements.txt`](../requirements.txt) y se reconstruye la imagen
+- **Dependencias e integraciones de librerías van por Docker.** Una dep liviana se
+  agrega a [`requirements.txt`](../requirements.txt) (base: CI + crons); una pesada
+  (torch, whisper, OCR, scenedetect) a [`requirements-gpu.txt`](../requirements-gpu.txt).
+  Luego se reconstruye la imagen
   (`docker compose build ytlab`). **Nunca** `pip install` suelto en el host.
 - El paquete se instala editable en la imagen (`pip install -e .`), por eso los
   scripts importan `from apps.signals… import` sin trucos de `sys.path`.

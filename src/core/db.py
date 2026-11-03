@@ -783,6 +783,7 @@ _DOMAIN_SCHEMA_ENSURERS: list[tuple[str, str]] = [
     ("apps.content.thematic_classifier", "init_db"),              # series_themes/arcs/scene_moments
     ("apps.production.treatment_tones", "init_crossover_db"),     # content_variants, crossover_metrics
     ("apps.scoring.hook_scorer",        "ensure_schema"),         # hook_scores (idempotente)
+    ("apps.media.schema",               "ensure_schema"),         # works, media_assets, shots, transcript_*
 ]
 
 

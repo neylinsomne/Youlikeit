@@ -64,6 +64,9 @@ filterwarnings = [
 
 # pytest-asyncio
 asyncio_mode = "auto"
+# Explícito: pytest-asyncio >=1.4.1 emite PytestDeprecationWarning si falta, y
+# filterwarnings="error" la vuelve INTERNALERROR (rompía el job de CI en un venv limpio).
+asyncio_default_fixture_loop_scope = "function"
 
 # ────────────────────────────────────────────────────────────────────
 # Coverage
