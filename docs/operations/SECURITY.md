@@ -28,10 +28,20 @@
 
 ## Qué NO se commitea (verificar en `.gitignore`)
 
-- [ ] `.env`
-- [ ] `tokens/` (OAuth de YT/TT)
+- [x] `.env`
+- [x] `tokens/` (OAuth de YT/TT) — agregado al `.gitignore` el 2026-11-03 (antes NO estaba).
+      Ojo: `tokens/personas.json` sigue versionado (config con emails/channel IDs).
+- [x] `.claude/settings.local.json` (permisos locales; pueden traer comandos con credenciales)
 - [ ] `data/*.db` (puede contener URLs/metadata sensibles, no secrets pero sí ruido)
-- [ ] cualquier `*credentials*.json` / `*client_secret*.json`
+- [x] `client_secret.json` / `client_secrets.json`
+
+### Incidente 2026-11-03 — secretos en reglas de permisos de Claude Code
+
+Reglas `allow` viejas de `.claude/settings.json` y `.claude/settings.local.json`
+traían en texto plano: la API key de TMDB, la contraseña de qBittorrent y un
+bearer de la API local (ex29). Se quitaron las reglas y `settings.local.json`
+dejó de versionarse, **pero siguen en el historial de git (GitHub)**:
+rotar la key de TMDB y cambiar la contraseña de qBittorrent / admin de ex29.
 
 ## Política de rotación
 

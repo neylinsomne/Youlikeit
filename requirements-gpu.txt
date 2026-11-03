@@ -1,0 +1,22 @@
+# Worker GPU (imagen Docker `ytlab` / máquina local con la RTX 5060).
+# Incluye la base liviana + todo lo pesado.
+-r requirements.txt
+
+# Manga pipeline (OCR + visión clásica)
+easyocr>=1.7.0
+opencv-python-headless>=4.9.0
+
+# Vector search (legacy ex06/ex07/ex29)
+chromadb>=0.5.0
+
+# Whisper legacy (ex05 fallback de subtítulos)
+openai-whisper>=20240930
+
+# Playwright (web scraping - install browsers separately)
+playwright==1.54.0
+
+# --- apps.media (Fase 1: extracción de regiones) ---
+# Cortes de plano clásicos (AdaptiveDetector), BSD-3
+scenedetect>=0.6.4
+# Transcripción local con tiempos por palabra (CTranslate2, sin torch)
+faster-whisper>=1.1.0

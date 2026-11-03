@@ -46,7 +46,8 @@ jobs:
       - name: Install minimal deps
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          pip install requests python-dotenv
+          pip install -e . --no-deps   # expone core/apps (src-layout)
 
       - name: Restore data cache
         uses: actions/cache@v4

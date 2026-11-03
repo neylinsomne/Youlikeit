@@ -7,6 +7,13 @@ __pycache__/
 client_secret.json
 client_secrets.json
 data/youtube_oauth_token.json
+# OAuth tokens por persona (youtube_<persona>.json, tiktok_<persona>.json)
+tokens/
+# Permisos locales de Claude Code (pueden contener comandos con credenciales)
+.claude/settings.local.json
+
+# Media cache: mezzanines por rango + proxies de análisis (regenerable)
+data/media_cache/
 
 # Clapshot runtime files
 data/clapshot/*.sock

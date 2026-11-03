@@ -57,7 +57,9 @@ def load_settings() -> Settings:
         remote_ssh_port=int(os.getenv("REMOTE_SSH_PORT", "22")),
         remote_movies_dir=os.getenv("REMOTE_MOVIES_DIR", "/home/movies"),
         remote_qbit_port=int(os.getenv("REMOTE_QBIT_PORT", "8090")),
-        local_movies_dir=os.getenv("LOCAL_MOVIES_DIR", "E:/movies"),
+        # MOVIES_DIR es el nombre que usan movie_source/ex11; LOCAL_MOVIES_DIR se
+        # mantiene como alias por compatibilidad con .env viejos.
+        local_movies_dir=os.getenv("MOVIES_DIR") or os.getenv("LOCAL_MOVIES_DIR", "E:/movies"),
         wireguard_enabled=_to_bool(os.getenv("WIREGUARD_ENABLED", "false"), default=False),
         # Proxy
         scrape_proxy_enabled=_to_bool(os.getenv("SCRAPE_PROXY_ENABLED", "false"), default=False),

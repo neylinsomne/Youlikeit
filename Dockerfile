@@ -8,8 +8,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Python deps (fuente de verdad de integraciones/librerías)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# requirements-gpu.txt incluye la base (requirements.txt) + lo pesado (OCR, whisper, scenedetect...)
+COPY requirements.txt requirements-gpu.txt ./
+RUN pip install --no-cache-dir -r requirements-gpu.txt
 
 # Editable install del paquete: expone core/utils/apps/integrations/cli como
 # imports limpios (sin sys.path hacks) y el CLI `ylk` en el PATH. Con el

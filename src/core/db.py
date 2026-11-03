@@ -674,6 +674,27 @@ CREATE TABLE IF NOT EXISTS scene_moments (
 );
 CREATE INDEX IF NOT EXISTS idx_scene_moments_slug ON scene_moments(series_slug);
 
+-- Work-level cross references (Berserk <-> Dark Souls, ...). Antes solo la creaba
+-- scripts/setup/seed_cross_refs.py, así que en una DB fresca fallaban culture_feed,
+-- ab_testing, clean_and_produce y /api/cross-references. Mismo DDL que el seed.
+CREATE TABLE IF NOT EXISTS cross_references (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_work TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    target_work TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_creator TEXT,
+    reference_type TEXT NOT NULL,
+    description_deep_mind TEXT,
+    description_cinephile TEXT,
+    description_pop_oracle TEXT,
+    themes TEXT,
+    strength REAL DEFAULT 0.7,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_cross_refs_source ON cross_references(source_work);
+CREATE INDEX IF NOT EXISTS idx_cross_refs_target ON cross_references(target_work);
+
 -- ============================================================
 -- Analytics — Plausible (owner: docs/agents/ANALYTICS_AGENT.md)
 -- Writes: scripts/analytics/*, src/apps/analytics/plausible_client.py
