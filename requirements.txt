@@ -19,9 +19,10 @@ networkx>=3.2.0
 # Media library indexing (apps.media): parsea "Show.S01E02.1080p.mkv" -> episodio
 guessit>=3.8.0
 
-# API + WebSocket
+# API + WebSocket (estudio local: apps.studio, `ylk studio`)
 fastapi>=0.115.0
 uvicorn>=0.32.0
+websockets>=12.0   # uvicorn sin [standard] no acepta upgrades a WS: /ws del estudio lo necesita
 
 # Analytics
 scipy>=1.14.0
@@ -30,6 +31,7 @@ scipy>=1.14.0
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.2.0
+cryptography>=42.0.0   # Fernet: tokens de YouTube cifrados en tokens/ (TOKEN_ENC_KEY)
 
 # TTS (free, no API key) — fallback de apps.supercut.tts
 edge-tts>=6.1.0

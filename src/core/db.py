@@ -789,6 +789,8 @@ _DOMAIN_SCHEMA_ENSURERS: list[tuple[str, str]] = [
     ("apps.scoring.hook_scorer",        "ensure_schema"),         # hook_scores (idempotente)
     ("apps.media.schema",               "ensure_schema"),         # works, media_assets, shots, transcript_*
     ("apps.moments.schema",             "ensure_schema"),         # moments, moment_labels, vocab, work_texts
+    ("apps.supercut.schema",            "ensure_schema"),         # lessons, lesson_items, lesson_issues, publications
+    ("apps.studio.schema",              "ensure_schema"),         # studio_jobs
 ]
 
 

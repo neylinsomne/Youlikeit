@@ -23,6 +23,7 @@ from cli.commands import moments as moments_cmd
 from cli.commands import production as production_cmd
 from cli.commands import scoring as scoring_cmd
 from cli.commands import signals as signals_cmd
+from cli.commands import studio as studio_cmd
 
 # Consolas Windows (cp1252) no codifican algunos glifos; forzamos UTF-8.
 for _stream in (sys.stdout, sys.stderr):
@@ -47,6 +48,7 @@ app.add_typer(moments_cmd.app, name="moments")
 production_cmd.register(app)
 scoring_cmd.register(app)
 doctor_cmd.register(app)
+studio_cmd.register(app)
 
 
 def main() -> None:

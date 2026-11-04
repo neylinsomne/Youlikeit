@@ -18,3 +18,6 @@ freezegun>=1.5.0              # mock datetime.now()
 # Calidad
 coverage[toml]>=7.6.0
 ruff>=0.6.0                   # linter rápido (opcional)
+
+# TestClient de starlette>=1.0 (tests/studio) exige httpx2 (sucesor oficial de httpx, Tom Christie / pydantic)
+httpx2>=2.0.0

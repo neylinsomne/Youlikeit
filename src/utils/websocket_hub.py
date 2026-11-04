@@ -26,7 +26,15 @@ import asyncio
 import json
 import time
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
+# A nivel de módulo a propósito: con `from __future__ import annotations` FastAPI resuelve
+# la anotación `websocket: WebSocket` con los globals del módulo; importada dentro de la
+# función no la encuentra, la trata como query param y cierra todo con 1008.
+try:
+    from fastapi import WebSocket, WebSocketDisconnect
+except ImportError:  # runtime mínimo (crons) sin fastapi: notify() sigue funcionando
+    WebSocket = WebSocketDisconnect = None  # type: ignore[assignment,misc]
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +61,7 @@ def bind_loop(loop: asyncio.AbstractEventLoop) -> None:
 def _build_event(source: str, stage: str, data: dict | None = None) -> dict:
     """Build a structured event."""
     return {
-        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "ts": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "source": source,
         "stage": stage,  # extract, transform, load, complete, error
         "data": data or {},
@@ -192,9 +200,7 @@ def create_ws_endpoint(app):
     Clients connect to ws://host:port/ws and receive all ETL events in real time.
     On connect, they receive the last 20 events as a catch-up buffer.
     """
-    try:
-        from fastapi import WebSocket, WebSocketDisconnect
-    except ImportError:
+    if WebSocket is None:
         return
 
     @app.websocket("/ws")
