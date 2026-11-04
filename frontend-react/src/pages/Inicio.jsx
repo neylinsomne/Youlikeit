@@ -77,10 +77,13 @@ function AccountsCard({ webBaseUrl }) {
         <AccountRow platform="YouTube" icon="smart_display">
           {youtube.loading && !youtube.data && <Spinner />}
           {youtube.error && <Pill tone="error">Error al leer</Pill>}
-          {youtube.data?.connected && (
+          {youtube.data?.connected && !youtube.data.warning && (
             <Pill tone="ok" icon="check_circle">
               {youtube.data.channel_title || 'Canal conectado'}
             </Pill>
+          )}
+          {youtube.data?.connected && youtube.data.warning && (
+            <Pill tone="warn" icon="warning" title={youtube.data.warning}>Falta un paso (ver Revisión)</Pill>
           )}
           {youtube.data && !youtube.data.connected && (
             <>

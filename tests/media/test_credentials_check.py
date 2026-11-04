@@ -38,3 +38,23 @@ def test_oauth_invalid_grant_hints_testing_mode(mocked_http, monkeypatch, tmp_pa
     assert out["OAuth client (client_secrets.json)"].status == "OK"
     assert out["OAuth youtube_deep_mind.json"].status == "INVALID"
     assert "Testing" in out["OAuth youtube_deep_mind.json"].detail
+
+
+@pytest.mark.integration
+def test_doctor_checks_the_studio_youtube_token(mocked_http, monkeypatch, tmp_path):
+    from cryptography.fernet import Fernet
+
+    from apps.publish import youtube
+    monkeypatch.setenv("TOKEN_ENC_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("TOKENS_DIR", str(tmp_path))
+    app = {"client_id": "cid", "client_secret": "cs"}
+    assert cc.check_youtube_studio(app).status == "MISSING"
+
+    youtube.save_token({"credentials": {"refresh_token": "RT-SECRET"}, "channel_title": "Mi canal"})
+    mocked_http.post("https://oauth2.googleapis.com/token", json={"access_token": "a"})
+    ok = cc.check_youtube_studio(app)
+    assert ok.status == "OK" and "Mi canal" in ok.detail and "RT-SECRET" not in ok.detail
+
+    youtube.save_token({"credentials": {"refresh_token": "RT-SECRET"}, "warning": "Habilita la API"})
+    mocked_http.post("https://oauth2.googleapis.com/token", json={"access_token": "a"})
+    assert cc.check_youtube_studio(app).status == "WARN"

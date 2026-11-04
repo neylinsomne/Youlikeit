@@ -160,7 +160,7 @@ def test_youtube_status_connect_callback_and_publish(client, anon, world, db, tm
     assert client.post(f"/api/lessons/{lid}/publish/youtube", json={"privacy": "private"}).status_code == 409
     yt.save_token({"credentials": {"refresh_token": "r", "token": "t", "client_id": "c", "client_secret": "s"},
                    "channel_title": "Canal"})
-    assert client.get("/api/publish/youtube/status").json() == {"connected": True, "channel_title": "Canal"}
+    assert client.get("/api/publish/youtube/status").json() == {"connected": True, "channel_title": "Canal", "warning": None}
     future = (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     assert client.post(f"/api/lessons/{lid}/publish/youtube",
                        json={"privacy": "public", "publish_at": future}).status_code == 422

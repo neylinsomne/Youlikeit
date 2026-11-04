@@ -73,6 +73,8 @@ def youtube_callback(state: str | None = None, code: str | None = None, error: s
     except youtube.YouTubeError as e:
         http = to_http(e)
         return _page("No se pudo conectar YouTube", str(e), http.status_code if http else 502)
+    if st.get("warning"):
+        return _page("YouTube conectado, pero falta un paso", st["warning"])
     return _page("YouTube conectado", f"Canal: {st.get('channel_title') or 'conectado'}. Ya puedes cerrar esta pestaña.")
 
 

@@ -102,36 +102,55 @@ def check_youtube_oauth(token_paths: list[Path] | None = None) -> list[Check]:
     app = _client_secrets()
     out = [Check("OAuth client (client_secrets.json)", "OK" if app else "MISSING",
                  app.get("project_id", "") if app else "falta client_secrets.json", "subir a YouTube")]
+    if token_paths is None:
+        out.append(check_youtube_studio(app))
     paths = token_paths if token_paths is not None else sorted(Path("tokens").glob("youtube_*.json"))
-    if not paths:
-        out.append(Check("YouTube OAuth tokens", "MISSING", "no hay tokens/youtube_<persona>.json",
-                         "subir a YouTube"))
-    for p in paths:
+    for p in paths:                                  # tokens por persona del producto anterior, si quedan
         try:
             t = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError) as e:
             out.append(Check(f"OAuth {p.name}", "ERROR", type(e).__name__, "subir a YouTube"))
             continue
-        cid = t.get("client_id") or app.get("client_id")
-        secret = t.get("client_secret") or app.get("client_secret")
-        if not t.get("refresh_token") or not cid:
-            out.append(Check(f"OAuth {p.name}", "INVALID", "sin refresh_token/client_id", "subir a YouTube"))
-            continue
-        try:
-            r = requests.post("https://oauth2.googleapis.com/token", timeout=T, data={
-                "client_id": cid, "client_secret": secret, "refresh_token": t["refresh_token"],
-                "grant_type": "refresh_token"})
-            body = r.json()
-        except (requests.RequestException, ValueError) as e:
-            out.append(Check(f"OAuth {p.name}", "ERROR", type(e).__name__, "subir a YouTube"))
-            continue
-        if "access_token" in body:
-            out.append(Check(f"OAuth {p.name}", "OK", "refresh OK", "subir a YouTube"))
-        else:
-            hint = " (app OAuth en 'Testing' vence tokens a 7 días → publicarla)" \
-                if body.get("error") == "invalid_grant" else ""
-            out.append(Check(f"OAuth {p.name}", "INVALID", f"{body.get('error')}{hint}", "subir a YouTube"))
+        out.append(_refresh_check(f"OAuth {p.name}", t, app))
     return out
+
+
+def _refresh_check(name: str, t: dict, app: dict) -> Check:
+    """Pide un access token con el refresh token (no lo guarda) para saber si sigue vivo."""
+    cid = t.get("client_id") or app.get("client_id")
+    secret = t.get("client_secret") or app.get("client_secret")
+    if not t.get("refresh_token") or not cid:
+        return Check(name, "INVALID", "sin refresh_token/client_id", "subir a YouTube")
+    try:
+        r = requests.post("https://oauth2.googleapis.com/token", timeout=T, data={
+            "client_id": cid, "client_secret": secret, "refresh_token": t["refresh_token"],
+            "grant_type": "refresh_token"})
+        body = r.json()
+    except (requests.RequestException, ValueError) as e:
+        return Check(name, "ERROR", type(e).__name__, "subir a YouTube")
+    if "access_token" in body:
+        return Check(name, "OK", "refresh OK", "subir a YouTube")
+    hint = " (app OAuth en 'Testing' vence tokens a 7 días → publicarla)" \
+        if body.get("error") == "invalid_grant" else ""
+    return Check(name, "INVALID", f"{body.get('error')}{hint}", "subir a YouTube")
+
+
+def check_youtube_studio(app: dict) -> Check:
+    """Token del estudio (tokens/youtube_studio.json.enc, cifrado con TOKEN_ENC_KEY)."""
+    from apps.publish import youtube
+    name = "YouTube del estudio"
+    try:
+        payload = youtube.load_token()
+    except youtube.YouTubeError as e:
+        return Check(name, "ERROR", str(e), "subir a YouTube")
+    if not payload:
+        return Check(name, "MISSING", "sin conectar: estudio → Revisión → Conectar YouTube", "subir a YouTube")
+    c = _refresh_check(name, payload.get("credentials") or {}, app)
+    if c.status != "OK":
+        return c
+    warning = payload.get("warning")
+    return Check(name, "WARN" if warning else "OK",
+                 (warning or f"canal: {payload.get('channel_title') or '?'}")[:160], "subir a YouTube")
 
 
 def check_local_stack() -> list[Check]:

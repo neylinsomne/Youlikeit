@@ -29,19 +29,26 @@ class FakeFlow:
 
 
 class FakeService:
-    def __init__(self, *, insert_error=None):
+    def __init__(self, *, insert_error=None, channels_error=None, channels=None):
         self.body = None
         self.insert_error = insert_error
+        self.channels_error = channels_error
+        self.channels_result = channels if channels is not None else {
+            "items": [{"id": "UC1", "snippet": {"title": "Mi canal"}}]}
 
     def channels(self):
+        svc = self
 
         class Ch:
             def list(self, **kw):
                 class Req:
                     def execute(self_inner):
-                        return {"items": [{"id": "UC1", "snippet": {"title": "Mi canal"}}]}
+                        if svc.channels_error:
+                            raise svc.channels_error
+                        return svc.channels_result
                 return Req()
         return Ch()
+
 
     def videos(self):
         svc = self
@@ -65,6 +72,13 @@ class FakeService:
         return Vid()
 
 
+def http_error(status: int, reason: str):
+    from googleapiclient.errors import HttpError
+    resp = type("R", (), {"status": status, "reason": "x"})()
+    body = {"error": {"code": status, "message": "m", "errors": [{"reason": reason}]}}
+    return HttpError(resp, json.dumps(body).encode())
+
+
 @pytest.mark.unit
 def test_status_without_token_is_disconnected():
     assert yt.status() == {"connected": False, "channel_title": None}
@@ -76,7 +90,7 @@ def test_token_is_encrypted_at_rest(fernet_key):
     raw = yt.token_path().read_bytes()
     assert b"refresh-SECRET-456" not in raw and b"Canal" not in raw
     assert yt.load_token()["credentials"]["refresh_token"] == "refresh-SECRET-456"
-    assert yt.status() == {"connected": True, "channel_title": "Canal"}
+    assert yt.status() == {"connected": True, "channel_title": "Canal", "warning": None}
 
 
 @pytest.mark.unit
@@ -133,7 +147,7 @@ def test_callback_exchanges_code_stores_token_and_state_is_single_use(fernet_key
     monkeypatch.setattr(yt, "_make_flow", make_flow)
     monkeypatch.setattr(yt, "_build_service", lambda creds: FakeService())
     st = yt.handle_callback(state=state, code="the-code")
-    assert st == {"connected": True, "channel_title": "Mi canal"}
+    assert st == {"connected": True, "channel_title": "Mi canal", "warning": None}
     assert flows[0]["state"] == state and flows[0]["code_verifier"] and flows[1].code == "the-code"
     with pytest.raises(yt.YouTubeAuthError):
         yt.handle_callback(state=state, code="again")
@@ -214,3 +228,37 @@ def test_expired_token_is_refreshed_and_saved_encrypted(fernet_key, monkeypatch)
     saved = yt.load_token()
     assert saved["credentials"]["token"] == "access-NEW" and saved["channel_title"] == "C"
     assert b"access-NEW" not in yt.token_path().read_bytes()
+
+
+def _connect(monkeypatch, svc):
+    state = parse_qs(urlparse(yt.auth_url()).query)["state"][0]
+    monkeypatch.setattr(yt, "_make_flow", lambda **kw: FakeFlow())
+    monkeypatch.setattr(yt, "_build_service", lambda creds: svc)
+    return yt.handle_callback(state=state, code="c")
+
+
+@pytest.mark.integration
+def test_connect_warns_when_api_is_disabled_but_keeps_token(fernet_key, client_secrets, monkeypatch):
+    st = _connect(monkeypatch, FakeService(channels_error=http_error(403, "accessNotConfigured")))
+    assert st["connected"] is True
+    assert "YouTube Data API v3" in st["warning"] and "proyecto de Google Cloud p" in st["warning"]
+    assert yt.status()["warning"] == st["warning"]
+
+
+@pytest.mark.integration
+def test_connect_warns_when_account_has_no_channel(fernet_key, client_secrets, monkeypatch):
+    st = _connect(monkeypatch, FakeService(channels={"items": []}))
+    assert st["connected"] is True and "no tiene canal" in st["warning"]
+
+
+@pytest.mark.integration
+def test_upload_error_explains_reason_without_leaking_tokens(fernet_key, tmp_path, monkeypatch):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x")
+    yt.save_token({"credentials": CREDS})
+    monkeypatch.setattr(yt, "_build_service", lambda creds: FakeService(insert_error=http_error(403, "quotaExceeded")))
+    with pytest.raises(yt.YouTubeError) as ei:
+        yt.upload(video, title="t")
+    msg = str(ei.value)
+    assert "HTTP 403 (quotaExceeded)" in msg and "cuota" in msg
+    assert "refresh-SECRET-456" not in msg

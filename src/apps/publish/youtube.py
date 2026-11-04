@@ -123,7 +123,7 @@ def status() -> dict:
         return {"connected": False, "channel_title": None, "detail": str(e)}
     if not payload or not (payload.get("credentials") or {}).get("refresh_token"):
         return {"connected": False, "channel_title": None}
-    return {"connected": True, "channel_title": payload.get("channel_title")}
+    return {"connected": True, "channel_title": payload.get("channel_title"), "warning": payload.get("warning")}
 
 
 def disconnect() -> None:
@@ -175,15 +175,70 @@ def handle_callback(*, state: str | None, code: str | None, error: str | None = 
         raise YouTubeError(f"No se pudo canjear el code: {type(e).__name__}") from e
     creds = flow.credentials
     payload = {"credentials": json.loads(creds.to_json()), "connected_at": _now_iso()}
-    try:
-        ch = _build_service(creds).channels().list(part="snippet", mine=True).execute()
-        item = (ch.get("items") or [{}])[0]
-        payload["channel_id"] = item.get("id")
-        payload["channel_title"] = (item.get("snippet") or {}).get("title")
-    except Exception as e:  # noqa: BLE001 — el título es cosmético; el token ya sirve
-        log.warning("No se pudo leer el canal: %s", type(e).__name__)
+    payload.update(_channel_check(creds))
     save_token(payload)
     return status()
+
+
+def _channel_check(creds) -> dict:
+    """Lee el canal al conectar: confirma que la API está habilitada y que la cuenta tiene canal.
+
+    El token se guarda igual (la conexión es válida); si algo falla queda un `warning`
+    que el estudio muestra, en vez de enterarse recién al subir.
+    """
+    from googleapiclient.errors import HttpError
+    try:
+        ch = _build_service(creds).channels().list(part="snippet", mine=True).execute()
+    except HttpError as e:
+        return {"warning": explain_http_error(e, "No se pudo leer el canal")}
+    except Exception as e:  # noqa: BLE001 — red/transporte: el token ya sirve
+        log.warning("No se pudo leer el canal: %s", type(e).__name__)
+        return {}
+    items = ch.get("items") or []
+    if not items:
+        return {"warning": "Esta cuenta de Google no tiene canal de YouTube: crea el canal "
+                           "(youtube.com → Crear un canal) y vuelve a conectar."}
+    return {"channel_id": items[0].get("id"),
+            "channel_title": (items[0].get("snippet") or {}).get("title")}
+
+
+_REASON_HINTS = {
+    "accessNotConfigured": "La YouTube Data API v3 no está habilitada en el proyecto de Google Cloud {project}: "
+                           "Cloud Console → APIs y servicios → Biblioteca → YouTube Data API v3 → Habilitar.",
+    "SERVICE_DISABLED": "La YouTube Data API v3 no está habilitada en el proyecto de Google Cloud {project}: "
+                        "Cloud Console → APIs y servicios → Biblioteca → YouTube Data API v3 → Habilitar.",
+    "quotaExceeded": "Se acabó la cuota diaria de la API de YouTube; se renueva a medianoche (hora del Pacífico).",
+    "uploadLimitExceeded": "El canal llegó a su límite de subidas por ahora; intenta en 24 h.",
+    "youtubeSignupRequired": "Esta cuenta de Google no tiene canal de YouTube: crea el canal y vuelve a conectar.",
+    "insufficientPermissions": "El permiso concedido no alcanza: desconecta y vuelve a conectar YouTube.",
+    "forbidden": "YouTube no permite esta acción con esta cuenta (¿canal suspendido o sin verificar?).",
+}
+
+
+def _http_reasons(e) -> list[str]:
+    try:
+        err = json.loads(e.content.decode("utf-8") if isinstance(e.content, bytes) else e.content)["error"]
+    except Exception:  # noqa: BLE001 — cuerpo no JSON
+        return []
+    reasons = [x.get("reason") for x in err.get("errors") or [] if isinstance(x, dict)]
+    reasons += [x.get("reason") for x in err.get("details") or [] if isinstance(x, dict)]
+    return [r for r in reasons if r]
+
+
+def explain_http_error(e, prefix: str) -> str:
+    """'<prefix>: HTTP 403 (accessNotConfigured). <qué hacer>' — sin tokens ni cuerpos crudos."""
+    code = getattr(getattr(e, "resp", None), "status", "?")
+    reasons = _http_reasons(e)
+    msg = f"{prefix}: HTTP {code}" + (f" ({reasons[0]})" if reasons else "")
+    hint = next((_REASON_HINTS[r] for r in reasons if r in _REASON_HINTS), None)
+    if hint:
+        try:
+            cfg = _client_config()
+            project = (cfg.get("installed") or cfg.get("web") or {}).get("project_id") or "?"
+        except YouTubeError:
+            project = "?"
+        msg += ". " + hint.format(project=project)
+    return msg
 
 
 # ── subida ──────────────────────────────────────────────────────────
@@ -270,7 +325,7 @@ def upload(video_path: str | Path, *, title: str, description: str = "", tags: l
             if st and progress:
                 progress("upload", int(10 + 85 * st.progress()), f"{st.progress():.0%}")
     except HttpError as e:
-        raise YouTubeError(f"YouTube rechazó la subida: HTTP {getattr(e.resp, 'status', '?')}") from e
+        raise YouTubeError(explain_http_error(e, "YouTube rechazó la subida")) from e
     video_id = response.get("id")
     if not video_id:
         raise YouTubeError("YouTube no devolvió el id del video")

@@ -340,6 +340,7 @@ function YouTubeCard({ lesson, tracker }) {
       <div className="p-4 space-y-3">
         {status.error && <ErrorBanner error={status.error} onRetry={refetch} title="No se pudo leer el estado de YouTube" />}
         {status.loading && !status.data && <LoadingBlock className="py-4" />}
+        {connected && status.data.warning && <Notice tone="warn">{status.data.warning}</Notice>}
         {status.data && !connected && (
           <div className="space-y-2">
             <Notice tone="warn">YouTube no está conectado en este estudio.</Notice>
