@@ -11,6 +11,8 @@ Runner delgado: parsea args y delega en apps.media.*.
     ylk media index-many --pending       # lote en pipeline (red ∥ GPU/API)
     ylk media runs                       # segundos por etapa (optimización)
     ylk media fetch 1 1800000 1810000 --measure --exact out.mp4
+    ylk media storage                    # cuánto ocupa cada capa
+    ylk media gc                         # tope de segmentos + limpiar análisis ya usado
 """
 from __future__ import annotations
 
@@ -191,4 +193,27 @@ def fetch(asset_id: int, start_ms: int, end_ms: int,
         out["fraction_of_file"] = round(mezz.bytes_transferred / asset["size_bytes"], 5)
     if exact:
         out["exact_clip"] = str(mf.cut_exact(mezz, start_ms, end_ms, exact))
+    _print(out)
+
+
+@app.command()
+def storage():
+    """Uso de almacenamiento por capa (crudo, segmentos, análisis, trabajo, DB)."""
+    from apps.media import storage as st
+    _print(st.usage(_db()))
+
+
+@app.command()
+def gc(max_gb: float = typer.Option(None, help="Tope de la caché de segmentos (default MEDIA_CACHE_MAX_GB)"),
+       analysis: bool = typer.Option(True, "--analysis/--no-analysis",
+                                     help="Borrar proxy+wav de assets ya transcritos y con momentos"),
+       force: bool = typer.Option(False, help="Limpiar análisis aunque falte transcripción/detección")):
+    """Libera espacio: segmentos menos usados por encima del tope + análisis ya aprovechado."""
+    from apps.media import storage as st
+    conn = _db()
+    out = {"segments": st.prune_segments(None if max_gb is None else int(max_gb * 1024 ** 3))}
+    if analysis:
+        ids = [r[0] for r in conn.execute("SELECT id FROM media_assets WHERE audio_path IS NOT NULL "
+                                          "OR proxy_path IS NOT NULL")]
+        out["analysis"] = [st.cleanup_analysis(conn, i, force=force) for i in ids]
     _print(out)

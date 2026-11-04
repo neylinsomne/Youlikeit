@@ -23,3 +23,11 @@ def media_conn() -> sqlite3.Connection:
     ensure_schema(c)
     yield c
     c.close()
+
+
+@pytest.fixture(autouse=True)
+def isolated_data_dir(tmp_path, monkeypatch):
+    """media_cache (segmentos, análisis, .npy) nunca escribe en el data/ real del repo."""
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.delenv("KEEP_ANALYSIS_FILES", raising=False)
+    monkeypatch.delenv("MEDIA_CACHE_MAX_GB", raising=False)

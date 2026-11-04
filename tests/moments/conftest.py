@@ -72,3 +72,11 @@ def seed_asset(conn, *, title: str, year: int, duration_ms: int, segments: list[
     ms.save_transcript(conn, aid, segs)
     ms.save_shots(conn, aid, shots, "scdet")
     return aid
+
+
+@pytest.fixture(autouse=True)
+def isolated_data_dir(tmp_path, monkeypatch):
+    """media_cache (segmentos, análisis, .npy) nunca escribe en el data/ real del repo."""
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.delenv("KEEP_ANALYSIS_FILES", raising=False)
+    monkeypatch.delenv("MEDIA_CACHE_MAX_GB", raising=False)

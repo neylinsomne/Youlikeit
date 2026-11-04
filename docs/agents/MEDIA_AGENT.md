@@ -24,6 +24,19 @@ importa ni se extiende desde este dominio.
 | `indexer.py` | ETL: `prepare_asset` (red/CPU) → `asr_asset` (GPU/API); `index_many` en pipeline; tiempos en `media_index_runs` |
 | `schema.py` | `works`, `media_assets`, `shots`, `transcript_segments`, `transcript_words`, `media_index_runs` |
 
+## Almacenamiento (`storage.py`)
+
+| Capa | Dónde | Vida |
+|---|---|---|
+| Crudo | `MOVIES_DIR` (o Internet Archive) | permanente, **solo lectura**: nunca se borra |
+| DB | `shorts_pipeline.db` | permanente (índice, momentos, recetas, IDs de subida) |
+| Segmentos | `media_cache/segments` | caché LRU con tope `MEDIA_CACHE_MAX_GB` (default 5) |
+| Análisis | `media_cache/analysis/<id>` | proxy + wav se borran tras transcribir y detectar momentos; queda `loudness.npy` (~200 KB vs ~600 MB) |
+| Trabajo | `media_cache/work/<job>` | render efímero: se borra al terminar bien, se conserva si falla |
+
+Los Shorts se renderizan en disco (no en RAM): `+faststart` necesita un archivo con
+seek y la subida debe poder reintentarse. Lo que se guarda es la receta (EDL), no el MP4.
+
 ## Comandos
 
 ```bash
@@ -32,6 +45,8 @@ ylk media ingest "Horror Express" --year 1973  # buscar + registrar + indexar
 ylk media index-many --pending --asr-backend groq
 ylk media runs                                 # segundos por etapa
 ylk media fetch <asset> <start_ms> <end_ms> --measure --exact clip.mp4
+ylk media storage                              # uso por capa
+ylk media gc                                   # tope de segmentos + limpiar análisis ya usado
 ```
 
 ## Medido (2026-11-03, Internet Archive real)

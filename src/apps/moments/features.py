@@ -90,6 +90,17 @@ class AudioProfile:
     def from_wav(cls, wav_path: str | Path) -> AudioProfile:
         return cls.from_env(loudness_envelope(wav_path))
 
+    @classmethod
+    def from_npy(cls, path: str | Path) -> AudioProfile:
+        return cls.from_env(np.load(path))
+
+    def save(self, path: str | Path) -> Path:
+        """Guarda solo la envolvente (~230 KB para 95 min): permite borrar el wav de 180 MB."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(path, self.env.astype(np.float32))
+        return path
+
     def rank(self, db: float) -> float:
         """Fracción de la película más silenciosa que `db` (0-1)."""
         if self.sorted_env.size == 0:

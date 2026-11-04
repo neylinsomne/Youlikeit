@@ -20,6 +20,7 @@ import json
 import logging
 from pathlib import Path
 
+from apps.media import storage
 from apps.media.models import Mezzanine, media_cache_dir
 from apps.media.range_proxy import CountingRangeProxy
 from utils import ffmpeg as ff
@@ -80,6 +81,7 @@ def extract_segment(uri: str, start_ms: int, end_ms: int, *,
 
     if out_path.exists() and meta_path.exists():
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        storage.touch(out_path)                  # LRU: usado recién
         return Mezzanine(**{**meta, "cached": True})
 
     pre_ms = max(0, start_ms - pad_ms)
@@ -112,6 +114,7 @@ def extract_segment(uri: str, start_ms: int, end_ms: int, *,
                      bytes_transferred=bytes_transferred)
     meta = {k: v for k, v in mezz.__dict__.items() if k != "cached"}
     meta_path.write_text(json.dumps(meta), encoding="utf-8")
+    storage.prune_segments(cache_dir=cache_dir)  # tope MEDIA_CACHE_MAX_GB (borra lo menos usado)
     return mezz
 
 

@@ -13,6 +13,7 @@ import sqlite3
 from pathlib import Path
 
 from apps.media import schema as media_schema
+from apps.media import storage
 from apps.moments import anchors, features, labeling, schema, scenes, vocab
 from utils.websocket_hub import notify
 
@@ -75,7 +76,7 @@ def _weak_labels(text: str, sig: dict, position: float) -> tuple[list[tuple], li
 
 
 def detect_moments(conn: sqlite3.Connection, asset_id: int, *, fetch_anchors: bool = True,
-                   refresh_anchors: bool = False) -> dict:
+                   refresh_anchors: bool = False, cleanup: bool | None = None) -> dict:
     asset, segs, word_starts, shots = load_inputs(conn, asset_id)
     if not segs and not shots:
         raise ValueError(f"asset {asset_id} sin transcripción ni planos: corre `ylk media index {asset_id}`")
@@ -84,8 +85,13 @@ def detect_moments(conn: sqlite3.Connection, asset_id: int, *, fetch_anchors: bo
 
     audio = None
     peaks: list[int] = []
+    env_npy = storage.envelope_path(asset_id)
     if asset["audio_path"] and Path(asset["audio_path"]).exists():
         audio = features.AudioProfile.from_wav(asset["audio_path"])
+        audio.save(env_npy)
+    elif env_npy.exists():                   # el wav ya se limpió: basta la envolvente
+        audio = features.AudioProfile.from_npy(env_npy)
+    if audio is not None:
         # Créditos: música fuerte al inicio/final que no es un "momento" de la obra.
         lo, hi = CREDITS_HEAD_MS, duration * (1 - CREDITS_TAIL_FRAC)
         peaks = [p for p in features.energy_peaks(audio) if lo <= p <= hi]
@@ -139,6 +145,9 @@ def detect_moments(conn: sqlite3.Connection, asset_id: int, *, fetch_anchors: bo
                  "text": (c["text"] or "(sin diálogo)")[:80], "quote": bool(c["anchors"].get("quote"))}
                 for c in top],
     }
+    # Proxy + wav ya no hacen falta (transcripción en DB, envolvente en .npy).
+    if cleanup if cleanup is not None else not storage.keep_analysis_files():
+        report["cleanup"] = storage.cleanup_analysis(conn, asset_id)
     notify(SOURCE, "load", report)
     return report
 
