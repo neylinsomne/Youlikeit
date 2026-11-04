@@ -6,6 +6,8 @@ __pycache__/
 .env.plausible
 client_secret.json
 client_secrets.json
+# Descargas de Google Cloud (client_secret_<id>.apps.googleusercontent.com.json) y respaldos
+client_secret*.json
 data/youtube_oauth_token.json
 # OAuth tokens por persona (youtube_<persona>.json, tiktok_<persona>.json)
 tokens/
