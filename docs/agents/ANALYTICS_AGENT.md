@@ -1,5 +1,11 @@
 # Analytics Agent · Handbook
 
+> **Legacy (2026-11-04).** Plausible se diseñó para el sitio estático `youlikeit.vara-alta.lat`
+> (`youlikeit-web/`). El sitio vivo ahora es `web/` en Railway
+> (<https://youlikeit-web-production.up.railway.app>) y **no está instrumentado** con Plausible.
+> Instrumentarlo sería una tarea nueva (agregar el script en `web/app/templates/base.html` y
+> declararlo en la política de privacidad).
+
 > **Scope**: integración de Plausible Analytics + ingestión de su Stats API
 > como fuente interna de `market_signals`. Owner del dashboard de tráfico,
 > métricas de conversión del sitio público, retention proxies cuando aplique.

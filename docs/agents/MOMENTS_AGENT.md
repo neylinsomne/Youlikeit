@@ -64,8 +64,12 @@ ylk moments find trope:the_dead_return --min-works 3
 - [x] Vocabulario controlado + validación de salida del LLM
 - [x] Candidatos ajustados a planos y palabras; anclas Wikiquote/trama
 - [x] Importancia lineal explicable; recuperación MMR entre obras con capa de derechos
-- [ ] Etiquetado real con LLM (requiere `GROQ_API_KEY` u `ollama pull qwen3:8b`)
-- [ ] Transcripción real para que citas y trama se anclen (ASR local o Groq)
+- [x] Etiquetado real con LLM (2026-11-04, Groq `openai/gpt-oss-120b`): 1206 momentos, 199 etiquetados
+  en 3 películas; valores fuera del vocabulario se sanean por ítem
+- [x] Transcripción real con anclas: NOTLD 100/105 citas alineadas, Horror Express 17/19; `find` devuelve
+  las 3 obras para `emotion:fear|dread|shock` y `trope:the_dead_return|monster_reveal`
+- [x] Arreglos de la corrida real: títulos exactos en Wikiquote/Wikipedia, ±2 años entre fuentes, caché
+  de anclas vacías que vence a los 7 días (`tests/moments/test_real_run_regressions.py`)
 - [ ] precisión@5 por tema sobre un set etiquetado a mano (~50 momentos, 5 obras)
 
 ## Verificación

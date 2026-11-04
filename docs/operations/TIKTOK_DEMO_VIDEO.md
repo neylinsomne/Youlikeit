@@ -1,5 +1,7 @@
 # Video demo para la revisión de TikTok
 
+> Parte de [TIKTOK_APP_REVIEW.md](TIKTOK_APP_REVIEW.md) (configuración del portal, estado y textos).
+
 TikTok exige uno o más videos (máximo 5, de hasta 50 MB cada uno) con el flujo
 completo, grabados en **Sandbox** y en el **mismo dominio** del Website URL:
 `https://youlikeit-web-production.up.railway.app`. Ambos permisos
@@ -54,4 +56,5 @@ ffmpeg -i grabacion.mp4 -vf "scale=-2:1080" -c:v libx264 -crf 28 -preset veryfas
 ## Texto para "Explain how each product and scope works"
 
 Ya coincide con lo que se ve en el video (Send to TikTok → borrador en el inbox, sin
-publicación automática). No pidas `video.publish`.
+publicación automática). No pidas `video.publish`. Los textos para pegar están en
+[TIKTOK_APP_REVIEW.md § Textos para la solicitud](TIKTOK_APP_REVIEW.md#textos-para-la-solicitud-en-inglés-como-el-portal).

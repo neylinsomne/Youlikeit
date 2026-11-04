@@ -1,5 +1,8 @@
 # Docs Audit Report · 2026-06-02
 
+> **Histórico.** Audit del 2026-06-02, ya ejecutado (ver `DOCS_AGENT.md` § Tareas, DA01–DA07).
+> Pendiente moverlo a `docs/_archive/` (DA11). No describe el producto actual.
+
 > Auditoría del Docs Agent. Dominio: `docs/`. Entregable de la tarea
 > `docs/agents/prompts/DOCS_AUDIT_PROMPT.md`. Las correcciones de coherencia
 > (Parte A) ya se aplicaron; los borrados/moves (Parte B) y docs nuevos

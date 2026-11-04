@@ -13,10 +13,11 @@ scripts/
 ├── scoring/           Hook scorer + A/B setup
 ├── analytics/         Plausible: setup + fetch stats + dashboard
 ├── testing/           Runners pytest por dominio + audit completo
-├── setup/             Voces, OAuth, descargas iniciales
-├── uploads/           Subida a YouTube / TikTok
-├── ops/               .ps1 de operación (docker-*, run*, schedule*, sync-to-usb)
-└── legacy/            Pre-pytest + exercises ex00–ex40 + main.py — solo referencia
+├── setup/             Voces, OAuth, descargas iniciales (producto anterior)
+├── uploads/           Subida por persona a YouTube / TikTok (producto anterior; ver apps/publish)
+├── web/               Contenido del sitio público: export_catalog.py, make_demo_lesson.py
+├── ops/               .ps1 de operación: studio.ps1 (estudio local), docker-*, run*, schedule*, sync-to-usb
+└── legacy/            Pre-pytest + exercises ex00–ex40 (incluye ex15/ex28/ex29) + main.py — solo referencia
 ```
 
 ## Operación (scripts/ops/)
@@ -26,6 +27,9 @@ Los `.ps1` de operación viven en `scripts/ops/` y computan el repo root con
 pueden invocar desde cualquier cwd:
 
 ```powershell
+.\scripts\ops\studio.ps1               # estudio local: API (ylk studio) + front (Vite) en 127.0.0.1
+.\scripts\ops\studio.ps1 -Check        # solo revisar requisitos (ylk, node, ffmpeg, STUDIO_TOKEN, puertos)
+.\scripts\ops\studio.ps1 -Stop         # apagar API + front
 .\scripts\ops\docker-setup.ps1          # levantar entorno + deps + playwright
 .\scripts\ops\run.ps1 manga             # punto de entrada multi-pipeline
 .\scripts\ops\run-content-flow.ps1      # ciclo de contenido (Docker)
@@ -34,6 +38,17 @@ pueden invocar desde cualquier cwd:
 
 > `setup.ps1` (bootstrap del venv local) y `start-all.ps1`/`stop-all.ps1`
 > (lanzador multi-proyecto del owner) se quedan en el root.
+> `studio.ps1` guarda logs y PIDs en `%TEMP%\youlikeit-studio` (fuera del repo) y nunca imprime el token.
+
+## Sitio público (scripts/web/)
+
+```powershell
+python scripts/web/export_catalog.py                 # DB local → web/app/data/catalog.json (dominio público + licencia abierta)
+python scripts/web/export_catalog.py --include-owned # incluye copias propias
+python scripts/web/make_demo_lesson.py               # lección demo "Fear" → web/app/lessons/ (+ lessons.json)
+```
+
+Después se despliega desde `web/` (ver [web/README.md](../web/README.md)).
 
 ## CLI unificado `ylk`
 
@@ -46,12 +61,18 @@ ylk produce --series "Berserk" --persona deep_mind --dry-run
 ylk rotate --personas deep_mind pop_oracle latam
 ylk score --rescore
 ylk analytics dashboard
-ylk media ingest "Horror Express" --year 1973   # fuente legítima → índice → ASR
+ylk media ingest "Horror Express" --year 1972   # fuente legítima → índice → ASR
+ylk media index-many --pending --asr-backend groq
 ylk media runs                     # tiempos por etapa del ETL
+ylk moments run 1 --provider groq  # detectar + etiquetar un asset
+ylk moments find emotion:fear --min-works 3
+ylk studio                         # API del estudio en 127.0.0.1:8001 (sin el front)
 ylk doctor                         # keys/tokens/stack sin mostrar valores
 ```
 
-Cada subcomando reenvía sus flags al runner subyacente (passthrough). El CLI vive
+Los subcomandos del producto anterior reenvían sus flags al runner subyacente (passthrough);
+`media`, `moments`, `studio` y `doctor` llaman directo a `src/apps/` y `src/integrations/`.
+Runbook completo de una película: [docs/operations/INDEX_A_FILM.md](../docs/operations/INDEX_A_FILM.md). El CLI vive
 en [src/cli/](../src/cli/); agregar un comando es agregar una función en
 `src/cli/commands/<dominio>.py`.
 
@@ -101,10 +122,12 @@ Un **runner** no contiene lógica de negocio: orquesta y delega. Plantilla en
 | `scoring/` | [docs/agents/SCORING_AGENT.md](../docs/agents/SCORING_AGENT.md) |
 | `analytics/` | [docs/agents/ANALYTICS_AGENT.md](../docs/agents/ANALYTICS_AGENT.md) |
 | `testing/` | [docs/agents/QA_AGENT.md](../docs/agents/QA_AGENT.md) |
-| `setup/` | _(pendiente)_ |
-| `uploads/` | _(pendiente — diferido hasta TikTok review)_ |
+| `web/` | [web/README.md](../web/README.md) |
+| `ops/studio.ps1` | [docs/architecture/STUDIO_API.md](../docs/architecture/STUDIO_API.md) |
+| `setup/` | _(sin handbook; producto anterior)_ |
+| `uploads/` | _(producto anterior; la publicación actual está en `src/apps/publish`, ver [UPLOADS.md](../docs/operations/UPLOADS.md))_ |
 | `legacy/` | nadie. Solo lectura. |
 
 ---
 
-*Última actualización: 2026-06-03.*
+*Última actualización: 2026-11-04.*

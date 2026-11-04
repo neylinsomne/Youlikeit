@@ -195,7 +195,7 @@ function Test-Prerequisites([int]$ApiPort) {
     # Node + npm
     $node = Get-Command node -ErrorAction SilentlyContinue
     if ($node -and (Get-Command npm -ErrorAction SilentlyContinue)) { Show-Ok "node: $($node.Source)" }
-    else { Show-Fail 'node/npm not found. Install Node.js 20+ (https://nodejs.org)'; $ok = $false }
+    else { Show-Fail 'node/npm not found. Install Node.js 20.19+ or 22.12+ (https://nodejs.org)'; $ok = $false }
     if (-not (Test-Path -LiteralPath (Join-Path $FrontDir 'node_modules'))) {
         Show-Info 'frontend-react has no node_modules: npm install will run on start'
     }

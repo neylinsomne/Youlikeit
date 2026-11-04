@@ -15,7 +15,7 @@ Todo corre en `127.0.0.1`: la API en `:8001` y este front en `:5180`. Nada escuc
 
 ## Cómo correrlo
 
-Requisitos: Node 24 y la API del estudio (`src/apps/studio`) instalada (`pip install -e .` en la raíz).
+Requisitos: Node 20.19+ o 22.12+ (lo que pide Vite 8; probado con Node 24) y la API del estudio (`src/apps/studio`) instalada (`pip install -e .` en la raíz).
 
 ```powershell
 # 1. API del estudio (127.0.0.1:8001)

@@ -1,9 +1,14 @@
 # Data Model · YouLikeIt
 
 > Schema canónico de la base SQLite (`data/shorts_pipeline.db`). **Fuente de
-> verdad: `src/core/db.py` (`SCHEMA`)**. Este doc lo explica; si divergen, gana
-> `db.py`. ~40 tablas agrupadas por subsistema. Decisión de usar SQLite:
+> verdad: `src/core/db.py` (`SCHEMA`) y los `schema.py` de cada dominio** que
+> `get_db` crea vía `_DOMAIN_SCHEMA_ENSURERS` (`apps/media`, `apps/moments`,
+> `apps/supercut`, `apps/studio`, entre otros). Este doc lo explica; si divergen,
+> gana el código. Decisión de usar SQLite:
 > [DECISIONS/0002](DECISIONS/0002-why-sqlite-not-postgres.md).
+>
+> El sitio público `web/` tiene **otra** base, `web.db` (ver § web.db al final).
+> Última revisión: 2026-11-04.
 
 ## Cómo leer este doc
 
@@ -14,13 +19,84 @@
 - **Ciclo de vida:** cuándo nace una fila y cuándo muere/expira.
 
 Convenciones globales:
-- Todo `*_at` / timestamp en **UTC ISO**.
-- PK siempre `id INTEGER PRIMARY KEY AUTOINCREMENT`.
+- Todo `*_at` / timestamp en **UTC**. Las tablas del estudio (`lessons`, `lesson_issues`,
+  `publications`, `studio_jobs`) guardan texto ISO-8601 con `Z`; las de media/moments usan
+  `CURRENT_TIMESTAMP` de SQLite.
+- PK `id INTEGER PRIMARY KEY AUTOINCREMENT`, salvo tablas hijas con PK compuesta (`shots`,
+  `transcript_*`, `lesson_items`, `moment_labels`, `vocab`, `work_texts`).
 - Cambios de columna se hacen vía `_migrate_columns()` (ALTER idempotente), no editando filas existentes.
+- Conexión: `core.db.get_db(DATA_DIR)` activa `journal_mode=WAL` y `busy_timeout=5000` (API, jobs en
+  hilos y CLI escriben a la vez). Una conexión por request o hilo.
 
 ---
 
-## ER diagram (relaciones FK)
+## Producto actual · ETL de lecciones
+
+Owners: Media Agent (`works` → `media_index_runs`), Moments Agent (`vocab` → `moment_labels`),
+supercut/studio (`lessons` → `studio_jobs`). Arquitectura: [SUPERCUT_ETL.md](SUPERCUT_ETL.md).
+
+```mermaid
+erDiagram
+    works ||--o{ media_assets : "work_id"
+    works ||--o{ work_texts : "work_id"
+    media_assets ||--o{ shots : "asset_id"
+    media_assets ||--o{ transcript_segments : "asset_id"
+    transcript_segments ||--o{ transcript_words : "asset_id + segment_idx"
+    media_assets ||--o{ media_index_runs : "asset_id (no-FK)"
+    media_assets ||--o{ moments : "asset_id"
+    moments ||--o{ moment_labels : "moment_id"
+    vocab ||..o{ moment_labels : "dimension + value (no-FK)"
+    lessons ||--o{ lesson_items : "lesson_id"
+    moments ||..o{ lesson_items : "moment_id (no-FK)"
+    lessons ||--o{ lesson_issues : "lesson_id"
+    lessons ||--o{ publications : "lesson_id"
+    studio_jobs ||..o{ lessons : "params.lesson_id (no-FK)"
+```
+
+### Media (`src/apps/media/schema.py`)
+
+| Tabla | Columnas | Invariantes / notas |
+|---|---|---|
+| `works` | `id`, `kind` (`movie`\|`series`), `title`, `year`, `tmdb_id`, `imdb_id`, `lang`, `created_at` | UNIQUE `(kind, title, year)`; `upsert_work` busca con `COLLATE NOCASE` y `year IS ?` (los NULL no chocan en UNIQUE) |
+| `media_assets` | `id`, `work_id`, `season`, `episode`, `provider` (`archive_org`\|`local`\|`jellyfin`), `external_id`, `master_uri`, `proxy_uri`, `proxy_path`, `audio_path`, `duration_ms`, `width`, `height`, `fps`, `size_bytes`, `rights`, `license_url`, `accept_ranges`, `extra_json`, `transcribed_at`, `shots_at`, `created_at` | UNIQUE `(provider, external_id, master_uri)`; `rights` default `unknown`; solo `public_domain`/`open_license`/`owned` son usables. Indexado = `transcribed_at` y `shots_at` no nulos |
+| `shots` | `asset_id`, `idx`, `start_ms`, `end_ms`, `detector` | PK `(asset_id, idx)`; se reemplazan completos al re-detectar |
+| `transcript_segments` | `asset_id`, `idx`, `start_ms`, `end_ms`, `text`, `lang`, `avg_logprob`, `no_speech_prob` | PK `(asset_id, idx)` |
+| `transcript_words` | `asset_id`, `segment_idx`, `idx`, `start_ms`, `end_ms`, `word`, `prob` | PK `(asset_id, segment_idx, idx)`; índice `(asset_id, start_ms)` |
+| `media_index_runs` | `id`, `asset_id`, `step` (`probe`\|`proxy`\|`audio`\|`shots`\|`asr`…), `status` (`ok`\|`error`\|`skipped`), `seconds`, `detail_json`, `finished_at` | Solo inserta (observabilidad del ETL); lo lee `ylk media runs` |
+
+### Moments (`src/apps/moments/schema.py`)
+
+| Tabla | Columnas | Invariantes / notas |
+|---|---|---|
+| `vocab` | `dimension`, `value`, `label_es`, `label_en`, `desc_es`, `desc_en` | PK `(dimension, value)`; copia de `data/vocab/` para joins |
+| `work_texts` | `work_id`, `kind` (`wikiquote`\|`plot`), `lang`, `source_url`, `items_json`, `fetched_at` | PK `(work_id, kind, lang)`; caché de fuentes externas; un resultado vacío vence a los 7 días |
+| `moments` | `id`, `asset_id`, `start_ms`, `end_ms`, `shot_in`, `shot_out`, `text`, `position` (0–1), `importance`, `signal_score`, `features_json`, `anchors_json`, `summary_es`, `status` (`candidate`\|`labeled`\|`rejected`), `labeled_by`, `created_at` | UNIQUE `(asset_id, start_ms, end_ms)`; re-detectar reemplaza solo los `candidate` (los etiquetados se conservan) |
+| `moment_labels` | `moment_id`, `dimension` (`trope`\|`beat`\|`emotion`\|`role`\|`theme`), `value`, `confidence`, `source` (`llm:<proveedor>`\|`lexical`\|`position`\|`quote`\|`manual`) | PK `(moment_id, dimension, value, source)`; índice `(dimension, value, confidence DESC)` para `find_moments`. Las manuales tienen `confidence = 1.0` |
+
+### Lecciones y estudio (`src/apps/supercut/schema.py`, `src/apps/studio/schema.py`)
+
+| Tabla | Columnas | Invariantes / notas |
+|---|---|---|
+| `lessons` | `id`, `title`, `spec` (`dimension:valor`), `format` (`essay`), `lang`, `status`, `script_json`, `script_source` (`llm:<proveedor>`\|`template`\|`manual`), `output_path`, `duration_s`, `reject_reason`, `created_at`, `updated_at` | `status` ∈ `draft`, `rendering`, `rendered`, `approved`, `rejected`, `published` (máquina de estados en [SUPERCUT_ETL.md](SUPERCUT_ETL.md)) |
+| `lesson_items` | `lesson_id`, `idx`, `moment_id`, `in_ms`, `out_ms`, `caption` | PK `(lesson_id, idx)`; es la **receta** del Short. Cada tramo ≤ 60 s y de un asset con derechos usables |
+| `lesson_issues` | `id`, `lesson_id`, `issue_type` (`voice`\|`caption`\|`timing`\|`image`\|`rights`\|`other`), `start_s`, `end_s`, `note`, `created_at` | `end_s ≥ start_s ≥ 0` |
+| `publications` | `id`, `lesson_id`, `platform` (`tiktok`\|`youtube`), `status` (`pending`\|`sent`\|`published`\|`failed`), `external_id` (publish_id o video_id), `url`, `detail`, `created_at`, `updated_at` | TikTok termina en `sent`, YouTube en `published` |
+| `studio_jobs` | `id`, `type` (`index`\|`detect`\|`label`\|`render`\|`publish_tiktok`\|`publish_youtube`), `status` (`queued`\|`running`\|`done`\|`error`), `params_json`, `progress_json`, `result_json`, `error`, `created_at`, `started_at`, `finished_at` | Índice `(status, id)`; un worker; al arrancar, `running` → `error` |
+
+### `cross_references` (`src/core/db.py`)
+
+Referencias culturales entre obras para las personas (producto anterior; sembrada por
+`scripts/setup/seed_cross_refs.py`). Columnas: `id`, `source_work`, `source_type`, `target_work`,
+`target_type`, `target_creator`, `reference_type`, `description_deep_mind`, `description_cinephile`,
+`description_pop_oracle`, `themes`, `strength` (default 0.7), `created_at`. Índices por `source_work`
+y `target_work`. Las lecciones no la usan.
+
+---
+
+## Producto anterior · ER diagram (relaciones FK)
+
+> Tablas del producto de shorts por persona (señales, producción, scoring, analítica). Siguen en el
+> esquema y con tests, pero las lecciones no las usan.
 
 ```mermaid
 erDiagram
@@ -233,3 +309,20 @@ Owner: **Scoring Agent** (A/B) + sistema.
   a Pandera cuando se escale a DataFrames.
 - `embedding BLOB` en `trend_topics` y `chroma_id` en `clip_library` apuntan a la
   futura capa de embeddings (dedupe capa 3) — ver MLOPS_FLOW § Roadmap.
+- `lesson_items.moment_id` y `moment_labels.value` no tienen FK física: borrar un momento o un valor
+  del vocabulario deja referencias colgando (hoy no se borran).
+- `user_tokens` y `users` eran de la API ex29 (retirada); quedan en el esquema sin uso activo.
+
+---
+
+## web.db (sitio público `web/`, Railway)
+
+SQLite propia del sitio en `DATA_DIR/web.db` (volumen `/data`). Esquema en `web/app/store.py`.
+Owner: dominio web. No comparte nada con `shorts_pipeline.db`.
+
+| Tabla | Columnas | Invariantes / notas |
+|---|---|---|
+| `tiktok_accounts` | `open_id` (PK), `display_name`, `access_token_enc`, `refresh_token_enc`, `scope`, `expires_at`, `refresh_expires_at`, `updated_at` | Tokens cifrados con Fernet (`TOKEN_ENC_KEY`); no se guarda avatar. Desconectar borra la fila |
+| `publishes` | `publish_id` (PK), `open_id`, `lesson_id`, `status`, `created_at` | `lesson_id` es el id de la lección del sitio o el `lesson_ref` del estudio (`lesson-<id>`); `status` es el de TikTok (`PROCESSING_UPLOAD`, `SEND_TO_USER_INBOX`…). Se borran al desconectar la cuenta |
+
+Fechas en epoch (segundos, `INTEGER`).

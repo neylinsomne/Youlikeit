@@ -2,10 +2,51 @@
 
 > Mapa completo del sistema usando como brújula el diagrama de **Sculley et al., NIPS 2015 — "Hidden Technical Debt in Machine Learning Systems"**.
 > La caja naranja "ML Code" es minúscula comparada con la infraestructura que la rodea. Este documento traza qué pieza del repo corresponde a cada caja, qué está implementado, qué es pseudocódigo y qué falta.
+>
+> **Actualización 2026-11-04.** El producto actual es el ETL de lecciones de empatía con cine
+> (sección siguiente). Desde "Posicionamiento del proyecto" en adelante el doc describe el producto
+> anterior (señales → briefs → shorts por persona, mayo–junio 2026), que sigue en el repo como legacy.
+> Detalle por etapa del ETL nuevo: [SUPERCUT_ETL.md](SUPERCUT_ETL.md).
+
+---
+
+## Producto actual (2026-11): ETL de lecciones
+
+```
+ FUENTES CON DERECHOS                      ETL LOCAL (PC del creador, RTX 5060 opcional)                      SERVING
+ ─────────────────────                     ───────────────────────────────────────────────                    ───────
+ Internet Archive ─┐   apps.media                 apps.moments                 apps.supercut
+ (public_domain,   ├─► probe → proxy → audio  ──► candidatos (planos)   ──►  plan (≤ 60 s, 1 escena/obra)
+  open_license)    │   + planos (1 pasada)        señales por película        guion IA | plantilla
+ MOVIES_DIR (owned)┘   → ASR por palabra          anclas Wikiquote/Wiki       voz edge-tts
+                       (local | Groq)             etiquetas LLM validadas     render 1080x1920, −14 LUFS
+                       rango HTTP por clip        find entre obras (MMR)            │
+                                                                                     ▼
+                                       apps.studio (127.0.0.1:8001) + frontend-react (127.0.0.1:5180)
+                                       cola de jobs (1 worker) · revisión humana · aprobar/rechazar
+                                                                                     │
+                                       apps.publish ── YouTube (OAuth app instalada, privado/publishAt)
+                                                    └─ TikTok: web/ en Railway (puente) → PUT directo → inbox
+```
+
+| Caja Sculley | Estado | Implementación |
+|---|---|---|
+| **Configuration** | 🟢 | `.env` (local), variables de Railway (sitio), `data/vocab/*.json` (vocabulario y pesos), `ylk doctor` |
+| **Data Collection** | 🟢 | `apps/media/archive_org.py`, `local_library.py`, `sources.search_all` (solo derechos usables) |
+| **Data Verification** | 🟢 | Capa de derechos en ingesta, plan y render; salida del LLM validada y saneada contra el vocabulario; hechos del guion solo desde la DB |
+| **Feature Extraction** | 🟢 | `apps/moments/features.py` (8 señales 0-1, percentiles por película), `anchors.py`, `scenes.py` |
+| **ML Code** | 🟢 | `labeling.py` (LLM top-K), `retrieval.py` (MMR entre obras), `supercut/planner.py`, `script.py` |
+| **Analysis Tools** | 🟡 | `ylk media runs` (segundos por etapa), "por qué" de cada momento (contribuciones), página Momentos del estudio |
+| **Process Management** | 🟢 | `apps/studio/jobs.py`: cola en `studio_jobs`, un worker, recuperación al arrancar; `index_many` en pipeline red/GPU |
+| **Machine Resource Management** | 🟢 | `utils/gpu_lock.py` (lock entre procesos por PID), `apps/media/storage.py` (crudo de solo lectura, caché con tope) |
+| **Serving Infrastructure** | 🟢 | Estudio local (FastAPI + Vite) y sitio `web/` en Railway (`/healthz`) |
+| **Monitoring** | 🟡 | `media_index_runs`, `studio_jobs`, eventos por `/ws`, healthcheck de Railway. Sin alertas ni métricas de calidad (precision@5 pendiente) |
 
 ---
 
 ## Posicionamiento del proyecto
+
+> Producto anterior (legacy). Ver la sección anterior para el producto actual.
 
 YouLikeIt **no es** un canal de YouTube tradicional. Es un **sistema de producción algorítmica de contenido analítico** donde:
 
@@ -32,7 +73,7 @@ La fase actual (mayo 2026) prioriza **calidad de contenido y analítica de merca
 | **Hook Quality Gate** (post-render) | 🟢 Funcional | `hook_scorer.py` (audio energy + CPS + accent + LLM opcional); gate en `produce_for_series.py` (block_on_fail=False mientras calibramos) | Activar `block_on_fail=True` cuando MIN_HOOK_SCORE esté calibrado contra retention real (>30 videos/persona/vtype) |
 | **Process Management Tools** | 🟡 Parcial | `run_rotation_batch.py`, `topic_clusters.py` scheduler, GitHub Actions cron cada 3d | Airflow/Prefect si crece; hoy GHA + scripts CLI es suficiente |
 | **Machine Resource Management** | 🟢 Funcional | Docker Compose + `start-all.ps1`, GPU NVENC para FFmpeg | Optimizar: hot-cache de subindices, paralelismo de renders |
-| **Serving Infrastructure** | 🔴 No empezado | `cli uploader` directo a YT/TT (deshabilitado por usuario) | API REST para que el dashboard consulte estado de briefs/produced/uploaded |
+| **Serving Infrastructure** | 🔴 No empezado (en este producto) | `cli uploader` directo a YT/TT (deshabilitado por usuario) | Superado: el producto actual sirve por el estudio local y `web/` (ver arriba) |
 | **Monitoring** | 🟡 En construcción | `scraper_health` table, retention_curves table; **Plausible self-host** (`plausible_client.py` + `docker-compose.plausible.yml`) sobre el sitio público + dashboard CLI `analytics_dashboard.py` (4 paneles) | Alertas por scraper caído > 24h; SLO de "briefs nuevos por persona por semana"; conectar uptime de Plausible a alertas |
 | **Internal Signals** (loop de 1ª parte) | 🟢 Funcional | `internal_signals.py` bridge: tráfico propio de Plausible → `Signal(domain='internal')`; tablas `plausible_pageviews` / `plausible_events` | Persistir a `market_signals` (gateado a sub-tarea Signals Agent: `domain += internal`); ponderar afinidad por persona en el distiller |
 
@@ -225,6 +266,8 @@ jobs:
 
 ## Roadmap MLOps (priorizado)
 
+> Roadmap del producto anterior. El estado por fases del producto actual está en [ROADMAP.md](../../ROADMAP.md).
+
 ### Sprint actual (mayo–junio 2026)
 - [x] Ingestión multi-fuente (`market_signals.py`)
 - [x] Distiller con scoring por persona (`signals_distiller.py`)
@@ -317,4 +360,4 @@ Cada TODO debe responder: (a) qué falta, (b) qué desbloquea, (c) condición de
 
 ---
 
-*Documento mantenido por el equipo. Última revisión: 2026-05-29.*
+*Documento mantenido por el equipo. Última revisión: 2026-11-04 (sección "Producto actual"); el resto, 2026-05-29.*

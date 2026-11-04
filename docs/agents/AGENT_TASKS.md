@@ -13,16 +13,32 @@
 
 ## Mapa de dominios
 
+### Producto actual: lecciones de empatía con cine (ETL de supercuts)
+
+| Dominio | Código | Tests | Scope | Handbook / referencia |
+|---|---|---|---|---|
+| **media** | `src/apps/media/` | `tests/media/` | Extract: fuentes con derechos, rango HTTP, audio + planos, ASR, almacenamiento | [MEDIA_AGENT.md](MEDIA_AGENT.md) |
+| **moments** | `src/apps/moments/`, `data/vocab/` | `tests/moments/` | Transform: candidatos, señales, anclas, etiquetas LLM, búsqueda entre obras | [MOMENTS_AGENT.md](MOMENTS_AGENT.md) |
+| **supercut** | `src/apps/supercut/` | `tests/supercut/` | Load: plan, guion, voz, render y preview de lecciones | [SUPERCUT_ETL.md](../architecture/SUPERCUT_ETL.md) _(sin handbook propio)_ |
+| **publish** | `src/apps/publish/` | `tests/publish/` | TikTok vía puente de `web/`, YouTube OAuth de app instalada | [UPLOADS.md](../operations/UPLOADS.md) _(sin handbook propio)_ |
+| **studio** | `src/apps/studio/`, `frontend-react/`, `scripts/ops/studio.ps1` | `tests/studio/`, `npm run lint` + `npm run build` | API local 127.0.0.1 + cola de jobs + UI en español | [STUDIO_API.md](../architecture/STUDIO_API.md) (contrato) + [frontend-react/README.md](../../frontend-react/README.md) |
+| **web** | `web/`, `scripts/web/` | `web/tests/` (job `web` de CI) | Sitio público en Railway, Login Kit, borrador a TikTok, puente | [web/README.md](../../web/README.md), [TIKTOK_APP_REVIEW.md](../operations/TIKTOK_APP_REVIEW.md), [TIKTOK_DEMO_VIDEO.md](../operations/TIKTOK_DEMO_VIDEO.md) |
+| **qa** | `tests/`, `.github/workflows/tests.yml` | — | pytest + invariantes + CI | [QA_AGENT.md](QA_AGENT.md) |
+| **docs** | `docs/` | — | Dueño de `docs/` + gaps arquitectónicos | [DOCS_AGENT.md](DOCS_AGENT.md) |
+
+### Producto anterior (legacy, sin desarrollo activo)
+
 | Dominio       | Owner agent            | Scope                                 | Handbook |
 |---------------|------------------------|---------------------------------------|----------|
 | **signals**   | Signals Agent          | Ingesta de fuentes → briefs por persona | [SIGNALS_AGENT.md](SIGNALS_AGENT.md) |
 | **production**| Production Agent       | Rotator + render + EDL                | [PRODUCTION_AGENT.md](PRODUCTION_AGENT.md) |
 | **scoring**   | Scoring Agent          | Hook scorer + A/B variants            | [SCORING_AGENT.md](SCORING_AGENT.md) |
-| **qa**        | QA / Testing Agent     | pytest + invariantes + smoke E2E      | [QA_AGENT.md](QA_AGENT.md) |
-| **docs**      | Docs Agent             | Dueño de `docs/` + gaps arquitectónicos | [DOCS_AGENT.md](DOCS_AGENT.md) |
 | **analytics** | Analytics Agent        | Plausible self-host + bridge a signals  | [ANALYTICS_AGENT.md](ANALYTICS_AGENT.md) |
-| **uploads**   | Uploads Agent          | YouTube + TikTok API integration      | _(pendiente — handler diferido)_ |
-| **setup**     | Setup Agent            | OAuth, voces, descargas de assets     | _(pendiente)_ |
+| **uploads**   | —                      | Subida por persona (reemplazado por **publish**) | [UPLOADS.md](../operations/UPLOADS.md) § Legacy |
+| **setup**     | —                      | OAuth por persona, voces, descargas   | _(sin handbook)_ |
+
+Congelado: `src/apps/content/movie_source.py` (Torrentio + qBittorrent). No se extiende ni lo importan
+los dominios nuevos ([ADR 0004](../architecture/DECISIONS/0004-legit-sources-only.md)).
 
 ## Prompts paste-ready
 
@@ -52,7 +68,7 @@ Prompts auto-contenidos para delegar a una sesión fresca de agente
 ```markdown
 ## Tarea: <título corto>
 
-**Dominio:** signals | production | scoring | qa | uploads | setup
+**Dominio:** media | moments | supercut | publish | studio | web | qa | docs (legacy: signals | production | scoring | analytics)
 **Handbook:** docs/agents/<DOMAIN>_AGENT.md
 
 **Contexto (qué pasaba antes):**
@@ -97,6 +113,10 @@ Cada una con dominio, archivos afectados y DoD.
 | T06 | Borrar 1 doc obsoleto al root del repo | docs | `git grep` 0 referencias; PR con justificación; CHANGELOG entry |
 | T07 | Mover 1 doc al root hacia `docs/<categoría>/` | docs | enlaces rotos fijados; entry en `docs/README.md` |
 
+| T08 | Añadir un tropo a `data/vocab/tropes.json` | moments | descripción propia es/en + frases clave; `tests/moments` pasa |
+| T09 | Indexar y etiquetar una obra nueva de dominio público | media + moments | `ylk media ingest` + `ylk moments run`; aparece en `ylk moments find` |
+| T10 | Ajustar textos de la plantilla de guion | supercut | `tests/supercut/test_script.py` pasa; sin años ni títulos inventados |
+
 ### 🟡 Tier 2 · Tareas medianas (1-4h, riesgo medio)
 
 | # | Tarea | Dominio | DoD |
@@ -109,7 +129,10 @@ Cada una con dominio, archivos afectados y DoD.
 | T25 | Self-host Plausible (Fase 1) | analytics | docker-compose + Tunnel route; `/api/health` 200 |
 | T26 | Bridge Plausible → market_signals (Fase 4) | analytics | tabla + `internal_signals.py`; coordinación enum con signals |
 | T27 | ✅ `docs/architecture/DATA_MODEL.md` | docs | HECHO (2026-06-02): ER mermaid + ~40 tablas |
-| T28 | ✅ `docs/operations/RUNBOOK.md` | docs | HECHO (2026-06-02): top 5 incidents |
+| T28 | ✅ `docs/operations/RUNBOOK.md` | docs | HECHO (2026-06-02): top 5 incidents; ampliado 2026-11-04 con incidentes del ETL |
+| T29 | Set de evaluación precision@5 (~50 momentos, 5 obras) | moments | etiquetas humanas versionadas + métrica en un test `slow` |
+| T30 | F1 de cortes de plano sobre 10 min etiquetados a mano | media | F1 ≥ 0.9 documentado en MEDIA_AGENT |
+| T31 | Handbooks SUPERCUT/PUBLISH/STUDIO/WEB | docs | estructura de DOCS_AGENT § Crear nuevo handbook; listados aquí |
 
 ### 🔴 Tier 3 · Tareas estructurales (≥ 4h, alto riesgo)
 
@@ -142,17 +165,19 @@ Cada una con dominio, archivos afectados y DoD.
 Cuando un agente entra fresco:
 
 ```powershell
-# 1. Sanity check de la estructura
-ls docs/architecture docs/testing docs/agents
+# 1. Instalar y diagnosticar
+python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m pip install -e .
+ylk doctor
 
-# 2. Verificar que el flujo info corre
-.\scripts\testing\run_tests.ps1 -Mode quick
+# 2. Suite offline (excluye network y gpu)
+python -m pytest -q
+cd web; python -m pytest -q; cd ..
 
-# 3. Leer el handbook del dominio que te asignaron
-code docs/agents/<DOMAIN>_AGENT.md
+# 3. Leer el handbook / referencia del dominio que te asignaron (tabla de arriba)
 
-# 4. Smoke E2E contra DB real (si tu dominio toca data)
-python scripts/signals/verify_signals_flow.py --cleanup
+# 4. Smoke del estudio (si tu dominio toca el estudio o el front)
+.\scripts\ops\studio.ps1 -Check
 ```
 
 Si los 4 pasos pasan → el repo está en estado coherente y puedes empezar.
@@ -171,10 +196,12 @@ Toda feature nueva es una **tupla de 4** alineada por dominio: lógica en
 
 ## Referencias cruzadas
 
+- [docs/architecture/SUPERCUT_ETL.md](../architecture/SUPERCUT_ETL.md) — ETL de lecciones (producto actual)
+- [docs/architecture/STUDIO_API.md](../architecture/STUDIO_API.md) — contrato estudio ↔ front ↔ puente
 - [docs/architecture/MLOPS_FLOW.md](../architecture/MLOPS_FLOW.md) — mapa Sculley completo del sistema
 - [docs/testing/INTEGRATION_CHECKLIST.md](../testing/INTEGRATION_CHECKLIST.md) — checklist marcable por sección
 - [docs/testing/PENDING_TESTS.md](../testing/PENDING_TESTS.md) — items diferidos con DoD individual
 
 ---
 
-*Mantenedor: Owner del repo. Última actualización: 2026-06-02.*
+*Mantenedor: Owner del repo. Última actualización: 2026-11-04.*

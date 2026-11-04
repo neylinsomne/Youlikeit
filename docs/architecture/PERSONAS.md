@@ -1,5 +1,10 @@
 # YouLikeIt — Arquitectura Multi-Persona
 
+> **Legacy (2026-11-04).** Diseño del producto anterior (shorts por persona). El producto actual es
+> el ETL de lecciones de empatía con cine ([SUPERCUT_ETL.md](SUPERCUT_ETL.md)). Fish Speech y el
+> personaje "cinephile" son legacy: la voz actual es edge-tts y el TTS local previsto es Qwen3-TTS
+> (Fish Speech tiene licencia no comercial). La RTX 5060 del proyecto tiene **8 GB** de VRAM.
+
 > **Nota (2026-06-02):** movido desde el root del repo. El flujo end-to-end
 > canónico vive en [MLOPS_FLOW.md](MLOPS_FLOW.md); la fuente de verdad de los
 > datos de persona es `src/apps/content/personas.py` + `tokens/personas.json`. Aquí
@@ -374,7 +379,7 @@ fish-speech-2:
 ```
 
 ### Recomendación: Opción A por ahora
-- Tu RTX 5060 tiene 16GB VRAM, Fish Speech usa ~1.5GB
+- Tu RTX 5060 tiene 8 GB de VRAM (corregido; decía 16 GB), Fish Speech usa ~1.5GB
 - Un container alcanza para producción secuencial
 - La cola por persona evita que se mezclen voces
 - Cuando escales a 3 personas produciendo diario, cambia a Opción B

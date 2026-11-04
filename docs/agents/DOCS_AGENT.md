@@ -14,10 +14,13 @@ Todo bajo `docs/`:
 | Path | Rol |
 |---|---|
 | [docs/README.md](../README.md) | Índice raíz |
-| [docs/architecture/](../architecture/) | Diseño del sistema (MLOPS_FLOW, ESTRATEGIA_CPS_HOOKS) |
+| [docs/architecture/](../architecture/) | Diseño del sistema (SUPERCUT_ETL, STUDIO_API, DATA_MODEL, MLOPS_FLOW, ADRs) |
 | [docs/testing/](../testing/) | Verificación (INTEGRATION_CHECKLIST, PENDING_TESTS) |
-| [docs/operations/](../operations/) | Runbook + on-call (vacío hoy) |
+| [docs/operations/](../operations/) | INDEX_A_FILM, UPLOADS, TIKTOK_APP_REVIEW, RUNBOOK, SECURITY |
 | [docs/agents/](../) | Handbooks por dominio + prompts paste-ready |
+
+Además, por acuerdo con el owner, los Markdown fuera de `docs/`: `README.md`, `ROADMAP.md`,
+`SETUP_CUENTAS.md`, `web/README.md`, `tests/README.md`, `scripts/README.md` y `youlikeit-web/*.md`.
 
 Tu autoridad incluye:
 - Crear nuevos handbooks de agente
@@ -66,49 +69,40 @@ el dominio dueño con la justificación de los docs.
 
 ## Gaps arquitectónicos conocidos
 
-Pendientes de documentar (priorizar por impacto):
+Resueltos: DATA_MODEL, RUNBOOK, ADRs, SECURITY, CHANGELOG (2026-06-02) y, para el producto actual,
+SUPERCUT_ETL, STUDIO_API revisado, INDEX_A_FILM, TIKTOK_APP_REVIEW, web/README y ADRs 0004–0008
+(2026-11-04). Pendientes (priorizar por impacto):
 
 | Gap | Por qué importa | DoD |
 |---|---|---|
-| `docs/architecture/DATA_MODEL.md` | Schema canónico SQLite; hoy disperso entre db.py y handbooks | ER diagram (mermaid) + cada tabla con invariantes + owner |
-| `docs/operations/RUNBOOK.md` | Qué hacer cuando algo se rompe en cron / scraper / render | 5 incidents top + step-by-step + rollback |
-| `docs/architecture/DECISIONS/` (ADRs) | Por qué algorítmico vs LLM; por qué SQLite; por qué CATALOG fijo | 1 ADR por decisión non-obvious; formato ADR-MADR |
-| `docs/operations/SECURITY.md` | Manejo de secrets, OAuth tokens, threat model | Lista de secrets + dónde viven + rotación + amenaza→mitigación |
+| Handbooks `SUPERCUT_AGENT`, `PUBLISH_AGENT`, `STUDIO_AGENT`, `WEB_AGENT` | Hoy esos dominios se apoyan en SUPERCUT_ETL / UPLOADS / STUDIO_API / web/README, sin DoD ni comando único | Estructura de § Crear nuevo handbook; listados en AGENT_TASKS |
+| `docs/testing/INTEGRATION_CHECKLIST.md` del producto actual | El checklist describe el producto anterior | Checklist marcable: indexar → detectar → etiquetar → lección → render → revisión → publicar |
+| Chequeo de deriva STUDIO_API ↔ OpenAPI | El contrato se escribe a mano; `/api/openapi.json` es la verdad del servidor | Script o test que compare rutas del contrato con el OpenAPI |
 | `docs/architecture/CONTRIBUTING.md` | Cómo añadir un módulo, qué tests escribir, workflow git | Workflow paso a paso + ejemplos + check final |
-| `docs/CHANGELOG.md` | Trazabilidad de cambios entre sprints | Keep-a-changelog format desde el sprint actual |
-| `docs/operations/COSTS.md` | Costo $ por persona/mes (LLM, scraping, deploy) | Tabla por proveedor + budget alerts |
+| `docs/operations/COSTS.md` | Límites de los planes gratis (Groq, Gemini, YouTube, TikTok) y costo de Railway | Tabla por proveedor + qué hacer al llegar al límite |
+| Métricas de calidad de momentos | precision@5 y F1 de planos no tienen doc de método | Sección en MOMENTS/MEDIA_AGENT con set, método y resultados |
 
-### Gaps detectados por el Analytics Agent (2026-06-02)
+### Gaps de QA detectados por el Analytics Agent (2026-06-02)
 
-| Gap | Por qué importa | DoD sugerido |
-|---|---|---|
-| Suite no corre en clone fresco | `pyproject` declara `asyncio_mode="auto"` + `--strict-config` pero `pytest-asyncio`/`responses` no se instalan solos → `INTERNALERROR` en TODO `pytest`. Falta paso `pip install -r requirements-dev.txt` documentado como **obligatorio** | QA Agent: doc + `run_tests.ps1 -Install` por default, o quitar `asyncio_mode` si no se usa async |
-| `scene_moments` table ausente | Tests de `content_rotator` y `signals_distiller` fallan con `no such table: scene_moments` (no está en `db.py` SCHEMA). 10 tests rojos pre-existentes | Production/Signals Agent: añadir la tabla al SCHEMA o ajustar los tests |
-| `run_signals.ps1` declara `-Verbose` sobre `[CmdletBinding()]` | Conflicto de parámetro (`ParameterNameAlreadyExistsForCommand`). `run_analytics.ps1` lo evitó usando `-Detailed` | QA Agent: renombrar el switch en `run_signals.ps1` |
+| Gap | Estado (2026-11-04) |
+|---|---|
+| Suite no corre en clone fresco sin `requirements-dev.txt` | Mitigado: README, tests/README y CI instalan `requirements-dev.txt` explícitamente |
+| `scene_moments` ausente del esquema | ✅ Resuelto: `get_db` crea las tablas de dominio vía `_DOMAIN_SCHEMA_ENSURERS` (incluye `thematic_classifier.init_db`) |
+| `run_signals.ps1 -Verbose` choca con `[CmdletBinding()]` | ✅ Resuelto: el switch ahora es `-Detailed` |
 
 ## Docs candidatos a borrar / mover
 
 Auditar uno por uno con criterio "es la fuente de verdad para alguien hoy?".
 
-| Path | Estado sospechoso | Decisión recomendada |
+La limpieza de DA01 (2026-06-02) ya se ejecutó. Quedan:
+
+| Path | Estado | Decisión recomendada |
 |---|---|---|
-| `ARCHITECTURE.md` (root) | Probable duplicado de `docs/architecture/MLOPS_FLOW.md` | Comparar; si duplica → borrar y redirect en README |
-| `ARCHITECTURE_PERSONAS.md` (root) | ¿Se solapa con `src/apps/content/personas.py` docstring? | Si describe data viva → mover a `docs/architecture/PERSONAS.md`; si es historia → borrar |
-| `COMANDOS_CLAUDE.md` (root) | Probable scratchpad del owner | Mover a `docs/_internal/` o borrar |
-| `DIAGRAMA_FLUJO_EDICION.md` (root) | Probablemente reemplazado por MLOPS_FLOW | Comparar; merge en MLOPS_FLOW si vale |
-| `FLUJO_PUBLICACION_CADA_3_DIAS.md` (root) | Reemplazado por rotator + content_rotation.yml | Decidir si la prosa aporta vs YAML del workflow |
-| `GUIA_APIS_YOUTUBE_TIKTOK.md` (root) | Pendiente integración (uploads paused) | Mover a `docs/operations/UPLOADS.md` o `docs/_drafts/` |
-| `GUIA_EDICION_VIDEO.md` (root) | Solapa con `METODOLOGIA_EDICION_DAVINCI.md` | Mergear y mover a `docs/architecture/EDITING.md` |
-| `MANIFIESTO.md` (root) | Propiedad del owner | Dejar en root pero linkear desde docs/README |
-| `METODOLOGIA_EDICION_DAVINCI.md` (root) | Posible legacy DaVinci (no usamos) | Si pipeline ya no usa DaVinci → mover a `docs/_archive/` |
-| `PLAN_FASE_2.md` (root) | Probable plan ya ejecutado o reemplazado por roadmap | Comparar con ROADMAP y borrar el viejo |
-| `ROADMAP.md` (root) | ¿Sincronizado con MLOPS_FLOW.md § Roadmap? | Si duplica → consolidar uno solo |
-| `SETUP_CUENTAS.md` (root) | Setup de cuentas (OAuth, canales) | Mover a `docs/operations/SETUP_ACCOUNTS.md` |
-| `README.md` (root) | Punto de entrada del repo | Auditar y mantener; linkear a `docs/README.md` |
-| `docs/privacy.html` | Legacy del sitio TikTok review — la fuente viva está en `youlikeit-web/public/` | Borrar (duplica) |
-| `docs/terms.html` | Idem | Borrar (duplica) |
-| `docs/tiktok6SqmAImuROUyUPH61nJk6s8TjcqpaJXF.txt` | Verification file de TikTok | Verificar si TikTok aún lo requiere; si sí, mover a `youlikeit-web/public/`; si no, borrar |
-| `docs/callback/index.html` | OAuth callback — duplica `youlikeit-web/public/callback/` | Borrar |
+| `SETUP_CUENTAS.md` (root) | Citado por código (`doctor.py`, `ex34_oauth_manager.py`) | Mantener en root (ver DA08) |
+| `docs/_audit_report.md` | Audit histórico del 2026-06-02 | Mover a `docs/_archive/` con `git mv` y actualizar `docs/README.md` y CHANGELOG (DA11) |
+| `youlikeit-web/` (README, PASOS_DEPLOY, `public/`) | Reemplazado por `web/` en Railway; ya tiene banner | Decidir con el owner si se archiva o se borra la carpeta |
+| `tiktok6SqmAImuROUyUPH61nJk6s8TjcqpaJXF.txt` (root) | Copia del token que ya sirve `web/app/verification/` | Verificar que nada lo use y borrar (owner) |
+| `docs/architecture/PERSONAS.md`, `ESTRATEGIA_CPS_HOOKS.md`, `ANALYTICS_COVERAGE.md` | Producto anterior | Mantener con banner legacy; mover a `_archive/` si el producto anterior se retira |
 
 ---
 
@@ -192,6 +186,10 @@ Exit 0 si no hay legacy paths; cualquier output = trabajo pendiente.
 - ❌ Cambiar un handbook ajeno sin coordinarse con el owner
 - ❌ Mover/renombrar un doc citado por código (`git grep` en `*.py`) sin abrir
   sub-tarea al dominio dueño — rompe la referencia silenciosamente (ej. `SETUP_CUENTAS.md` ↔ `ex34_oauth_manager.py`)
+- ❌ Documentar el contrato de una API desde el plan y no desde el código: STUDIO_API se escribió antes
+  de implementar y derivó (estados de publicación, códigos `409`/`422`/`503`). Revisar contra el código
+  (o `/api/openapi.json`) después de cada merge.
+- ❌ Copiar cifras de una corrida real sin fecha ni fuente: cada número medido lleva fecha y dónde se midió.
 
 ---
 
@@ -213,9 +211,20 @@ Tracking explícito acá (no duplicado en PENDING_TESTS porque eso es de QA):
 - [x] **DA07**: Auditar coherencia post-reorganización — comando de verificación
   retorna **0 issues** tras fix (6 paths legacy + 1 workflow name en `MLOPS_FLOW.md`,
   1 link placeholder en este handbook). 34 links OK / 0 rotos.
-- [ ] **DA08** (nuevo): mover `SETUP_CUENTAS.md` requiere sub-tarea a setup/uploads
-  para actualizar la referencia en `scripts/legacy/exercises/ex34_oauth_manager.py` (acoplamiento doc↔código).
+- [ ] **DA08**: mover `SETUP_CUENTAS.md` requiere actualizar las referencias en
+  `src/cli/commands/doctor.py` y `scripts/legacy/exercises/ex34_oauth_manager.py` (acoplamiento
+  doc↔código). Decisión actual: se queda en el root.
+- [x] **DA09** (2026-11-04): docs al día con la rama `feat/supercut-media`: README, ROADMAP,
+  SETUP_CUENTAS, SECURITY, UPLOADS, RUNBOOK (incidentes 6–15), CHANGELOG, MLOPS_FLOW, DATA_MODEL
+  (tablas nuevas + `web.db`), STUDIO_API (comportamiento implementado), docs nuevos SUPERCUT_ETL,
+  INDEX_A_FILM, TIKTOK_APP_REVIEW, `web/README.md`, ADRs 0004–0008, `tests/README.md`,
+  `scripts/README.md`, banners en `youlikeit-web/*.md` y en los docs legacy.
+- [ ] **DA10**: handbooks de supercut, publish, studio y web (ver § Gaps).
+- [ ] **DA11**: `git mv docs/_audit_report.md docs/_archive/` (no se movió en DA09 por instrucción).
+- [ ] **DA12**: reescribir `docs/testing/INTEGRATION_CHECKLIST.md` y `PENDING_TESTS.md` para el producto actual.
+- [x] **DA13**: propuesta de actualización del MANIFIESTO escrita en
+  `docs/_internal/MANIFIESTO_PROPUESTA.md`. Pendiente: decisión del owner.
 
 ---
 
-*Owner: este agente. Última actualización: 2026-06-02.*
+*Owner: este agente. Última actualización: 2026-11-04.*

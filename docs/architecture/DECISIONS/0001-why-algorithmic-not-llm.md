@@ -5,6 +5,12 @@
 - **Deciders:** owner del repo
 - **Fuente original:** [MLOPS_FLOW.md § Decisiones de diseño 1](../MLOPS_FLOW.md)
 
+> **Alcance (2026-11-04).** Esta decisión aplica al generador de guiones del producto anterior
+> (shorts por persona con A/B de tono). El ETL de lecciones **sí** usa LLM, pero acotado: etiquetar el
+> top-K de momentos contra un vocabulario cerrado y redactar el guion, siempre con salida validada,
+> hechos solo desde la DB y una plantilla de respaldo que permite renderizar sin LLM. Ver
+> [0007](0007-swappable-local-api-ai.md).
+
 ## Context and Problem Statement
 
 El generador de scripts (`algorithmic_script_generator.py` / `script_generator.py`)

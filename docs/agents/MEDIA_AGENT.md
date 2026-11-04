@@ -63,7 +63,10 @@ ylk media gc                                   # tope de segmentos + limpiar an�
 - [x] Clip de 10 s < 5 % del archivo (`tests/media/test_live_archive.py`, marker `network`)
 - [x] Corte exacto ±1 frame (mismo test)
 - [ ] Cortes de plano F1 ≥ 0.9 sobre 10 min **etiquetados a mano** (pendiente: requiere etiquetas humanas)
-- [ ] ASR real de una película completa (pendiente: `GROQ_API_KEY` o modelo local descargado)
+- [x] ASR real de películas completas (2026-11-04, Groq): 3 películas, 96 min de audio en 75 s;
+  indexado completo de las 3 en 6,4 min
+- [x] Masters MPEG-PS de DVD → derivado h.264 indexado; reintentos + proxy cuando IA responde 500
+  (ver [RUNBOOK.md](../operations/RUNBOOK.md) incidentes 7 y 8)
 
 ## Verificación
 
