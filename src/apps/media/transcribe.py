@@ -25,7 +25,50 @@ log = logging.getLogger(__name__)
 DEFAULT_MODEL = "large-v3-turbo"
 
 
+_DLL_DIRS_DONE = False
+
+
+def register_nvidia_dlls() -> list[str]:
+    """Windows: hace visibles cuBLAS/cuDNN instalados por pip (nvidia-*-cu12).
+
+    CTranslate2 carga `cublas64_12.dll` / `cudnn*64_9.dll` con LoadLibrary; los
+    wheels de NVIDIA los dejan en site-packages/nvidia/<lib>/bin, fuera del PATH.
+    En Linux (Docker) no hace falta: ver LD_LIBRARY_PATH en el Dockerfile.
+    """
+    global _DLL_DIRS_DONE
+    if os.name != "nt" or _DLL_DIRS_DONE:
+        return []
+    added: list[str] = []
+    try:
+        import nvidia  # type: ignore  # paquete namespace de los wheels nvidia-*-cu12
+        roots = list(nvidia.__path__)
+    except ImportError:
+        roots = []
+    for root in roots:
+        for bin_dir in Path(root).glob("*/bin"):
+            os.add_dll_directory(str(bin_dir))
+            os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+            added.append(str(bin_dir))
+    _DLL_DIRS_DONE = True
+    return added
+
+
+def load_wav_16k(path: str | Path):
+    """wav PCM16 mono 16 kHz → float32 [-1, 1]. Evita PyAV (faster-whisper ≤1.2
+    pasa `metadata_errors` a av.open, que las versiones nuevas de PyAV rechazan)."""
+    import wave
+
+    import numpy as np
+    with wave.open(str(path), "rb") as w:
+        if w.getframerate() != 16000 or w.getnchannels() != 1 or w.getsampwidth() != 2:
+            raise ValueError(f"{path}: se espera wav PCM16 mono 16 kHz "
+                             f"({w.getframerate()} Hz, {w.getnchannels()} ch, {w.getsampwidth() * 8} bit)")
+        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+    return pcm.astype(np.float32) / 32768.0
+
+
 def _load_model(model_size: str, device: str, compute_type: str | None):
+    register_nvidia_dlls()
     try:
         from faster_whisper import WhisperModel  # type: ignore
     except ImportError as e:
@@ -98,11 +141,14 @@ def transcribe(audio_path: str | Path, *, backend: str | None = None,
         result, lang = transcribe_groq(audio_path, duration_ms=duration_ms, language=language)
         log.info("ASR (groq): %d segmentos, idioma=%s", len(result), lang)
         return result, lang
+    # ASR_DEVICE=cuda hace fallar rápido en vez de caer en silencio a CPU (horas).
+    device = device if device != "auto" else os.getenv("ASR_DEVICE", "auto")
+    audio = load_wav_16k(audio_path)
     with gpu_slot("asr"):
         model = _load_model(model_size, device, compute_type)
         try:
             segments, info = model.transcribe(
-                str(audio_path), language=language, word_timestamps=True,
+                audio, language=language, word_timestamps=True,
                 vad_filter=vad, beam_size=5,
                 # Películas: el contexto previo arrastra alucinaciones en silencios/música.
                 condition_on_previous_text=False,

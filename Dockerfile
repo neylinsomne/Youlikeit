@@ -19,5 +19,8 @@ COPY pyproject.toml ./
 COPY src/ ./src/
 RUN pip install --no-cache-dir -e . --no-deps
 
+# cuBLAS/cuDNN de los wheels nvidia-*-cu12 (faster-whisper/CTranslate2 en GPU)
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib
+
 # EasyOCR models download on first use (cached in volume)
 ENV EASYOCR_MODULE_PATH=/workspace/data/.easyocr

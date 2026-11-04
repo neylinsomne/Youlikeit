@@ -20,3 +20,7 @@ playwright==1.54.0
 scenedetect>=0.6.4
 # Transcripción local con tiempos por palabra (CTranslate2, sin torch)
 faster-whisper>=1.1.0
+# CTranslate2 en GPU necesita cuBLAS + cuDNN 9 (no vienen con el driver).
+# Linux/Docker: ver LD_LIBRARY_PATH en el Dockerfile. Windows: transcribe.register_nvidia_dlls().
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*

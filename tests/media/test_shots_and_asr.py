@@ -44,3 +44,29 @@ def test_segments_to_dicts_milliseconds_and_words():
     assert out[0]["start_ms"] == 1234 and out[0]["end_ms"] == 3500
     assert out[0]["text"] == "They're coming to get you, Barbara."
     assert out[0]["words"][1] == {"start_ms": 1500, "end_ms": 1810, "word": " coming", "prob": 0.97}
+
+
+@pytest.mark.unit
+def test_load_wav_16k_reads_pcm16_mono(tmp_path):
+    import wave
+
+    import numpy as np
+
+    from apps.media.transcribe import load_wav_16k
+    path = tmp_path / "a.wav"
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(np.array([0, 16384, -32768], dtype=np.int16).tobytes())
+    audio = load_wav_16k(path)
+    assert audio.dtype == np.float32 and list(audio) == [0.0, 0.5, -1.0]
+
+    bad = tmp_path / "b.wav"
+    with wave.open(str(bad), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(44100)
+        w.writeframes(bytes(8))
+    with pytest.raises(ValueError):
+        load_wav_16k(bad)
