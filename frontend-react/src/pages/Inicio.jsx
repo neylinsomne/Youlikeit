@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { api } from '../api/client';
+import { YOUTUBE_CONNECT_URL, api } from '../api/client';
 import JobRow from '../components/JobRow';
-import { Card, CardHeader, EmptyState, ErrorBanner, Icon, LoadingBlock, PageHeader, Pill, ProgressBar, Stat } from '../components/ui';
+import { Button, Card, CardHeader, EmptyState, ErrorBanner, Icon, LoadingBlock, PageHeader, Pill, ProgressBar, Spinner, Stat } from '../components/ui';
 import { useApi } from '../hooks/useApi';
 import { useDebouncedCallback } from '../hooks/useDebounced';
 import { useLiveJobs } from '../hooks/useJobsSocket';
@@ -9,6 +9,92 @@ import { fmtGB, fmtNumber } from '../lib/format';
 import { CREDENTIAL_TONE, LESSON_STATUS, STORAGE_LABELS, humanize } from '../lib/labels';
 
 const NO_JOBS = [];
+const NO_ACCOUNTS = [];
+const LINK_CLS = 'text-[10px] font-bold uppercase tracking-widest text-primary hover:underline flex items-center gap-1';
+
+function AccountRow({ platform, icon, children }) {
+  return (
+    <li className="flex items-center justify-between gap-3 bg-surface-low rounded-lg px-3 py-2.5">
+      <span className="flex items-center gap-2 text-xs font-bold">
+        <Icon name={icon} className="text-sm text-primary" />
+        {platform}
+      </span>
+      <span className="flex items-center gap-2 min-w-0 justify-end flex-wrap">{children}</span>
+    </li>
+  );
+}
+
+/**
+ * Solo nombres visibles: el open_id y los tokens de TikTok se quedan en el sitio (Railway);
+ * el de YouTube, cifrado en tokens/. Se consulta aparte del resumen para no frenarlo si el puente tarda.
+ */
+function AccountsCard({ webBaseUrl }) {
+  const tiktok = useApi((signal) => api.tiktokAccounts({ signal }), []);
+  const youtube = useApi((signal) => api.youtubeStatus({ signal }), []);
+  const accounts = tiktok.data?.accounts ?? NO_ACCOUNTS;
+  const connectTikTok = webBaseUrl ? `${webBaseUrl.replace(/\/+$/, '')}/studio` : null;
+  const refetchAll = () => {
+    tiktok.refetch();
+    youtube.refetch();
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        title="Cuentas conectadas"
+        icon="link"
+        subtitle="Solo se muestra el nombre; los tokens no salen del sitio público (TikTok) ni del archivo cifrado (YouTube)."
+        actions={
+          <Button variant="ghost" icon="refresh" loading={tiktok.loading || youtube.loading} onClick={refetchAll}>
+            Actualizar
+          </Button>
+        }
+      />
+      <ul className="p-4 space-y-2">
+        <AccountRow platform="TikTok" icon="music_video">
+          {tiktok.loading && !tiktok.data && <Spinner />}
+          {tiktok.error && (
+            <Pill tone="error" icon="cloud_off" title={tiktok.error.detail}>
+              Sitio sin respuesta
+            </Pill>
+          )}
+          {accounts.map((a) => (
+            <Pill key={a.open_id} tone="ok" icon="check_circle">
+              {a.display_name || 'Cuenta sin nombre'}
+            </Pill>
+          ))}
+          {tiktok.data && accounts.length === 0 && (
+            <>
+              <Pill tone="warn">Sin conectar</Pill>
+              {connectTikTok && (
+                <a href={connectTikTok} target="_blank" rel="noreferrer" className={LINK_CLS}>
+                  Conectar <Icon name="open_in_new" className="text-xs" />
+                </a>
+              )}
+            </>
+          )}
+        </AccountRow>
+        <AccountRow platform="YouTube" icon="smart_display">
+          {youtube.loading && !youtube.data && <Spinner />}
+          {youtube.error && <Pill tone="error">Error al leer</Pill>}
+          {youtube.data?.connected && (
+            <Pill tone="ok" icon="check_circle">
+              {youtube.data.channel_title || 'Canal conectado'}
+            </Pill>
+          )}
+          {youtube.data && !youtube.data.connected && (
+            <>
+              <Pill tone="warn">Sin conectar</Pill>
+              <a href={YOUTUBE_CONNECT_URL} target="_blank" rel="noreferrer" className={LINK_CLS}>
+                Conectar <Icon name="open_in_new" className="text-xs" />
+              </a>
+            </>
+          )}
+        </AccountRow>
+      </ul>
+    </Card>
+  );
+}
 
 function StorageRow({ name, layer }) {
   const cap = layer.cap_gb;
@@ -150,6 +236,8 @@ export default function Inicio() {
             </div>
 
             <div className="col-span-12 xl:col-span-5 space-y-6">
+              <AccountsCard webBaseUrl={settings.web_base_url} />
+
               <Card>
                 <CardHeader
                   title="Almacenamiento"
