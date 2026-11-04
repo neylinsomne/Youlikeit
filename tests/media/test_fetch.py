@@ -67,3 +67,28 @@ def test_extract_segment_retries_when_keyframe_inside_range_and_caches(tmp_path,
 def test_extract_segment_rejects_empty_range(tmp_path):
     with pytest.raises(ValueError):
         fetch.extract_segment(REMOTE, 5000, 5000, cache_dir=tmp_path)
+
+
+@pytest.mark.unit
+def test_resilient_extract_retries_then_falls_back_to_proxy(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_extract(uri, s, e, **kw):
+        calls.append(uri)
+        if "master" in uri:
+            raise fetch.ff.FFmpegError("Server returned 5XX")
+        return Mezzanine(path="p.mkv", start_ms=s - 500, end_ms=e + 500, requested_start_ms=s, requested_end_ms=e)
+
+    monkeypatch.setattr(fetch, "extract_segment", fake_extract)
+    slept = []
+    mezz, used = fetch.extract_segment_resilient(["https://ia/master.mp4", "https://ia/proxy.mp4"], 1000, 5000,
+                                                 sleep=slept.append)
+    assert used == "https://ia/proxy.mp4" and mezz.requested_start_ms == 1000
+    assert calls == ["https://ia/master.mp4"] * 3 + ["https://ia/proxy.mp4"] and slept == [5.0, 10.0]
+
+
+@pytest.mark.unit
+def test_resilient_extract_reports_all_failures(monkeypatch):
+    monkeypatch.setattr(fetch, "extract_segment", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+    with pytest.raises(fetch.ff.FFmpegError, match="ninguna fuente"):
+        fetch.extract_segment_resilient(["https://a", None, "https://a"], 0, 1000, sleep=lambda s: None)

@@ -29,7 +29,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from apps.media import storage
-from apps.media.fetch import extract_segment
+from apps.media.fetch import extract_segment_resilient
 from apps.media.models import USABLE_RIGHTS, Mezzanine
 from apps.supercut import lessons, tts
 from utils import ffmpeg as ff
@@ -318,7 +318,10 @@ def _render(lesson: dict, items: list[dict], *, narrate: bool, report: Callable[
                 raise ValueError(f"El momento {it['moment_id']} ya no existe o no tiene asset")
             if it["rights"] not in USABLE_RIGHTS:
                 raise ValueError(f"'{title}' tiene derechos '{it['rights']}': no se puede usar")
-            mezz = extract_segment(it["master_uri"], it["in_ms"], it["out_ms"])
+            mezz, used = extract_segment_resilient([it["master_uri"], it.get("proxy_uri")],
+                                                   it["in_ms"], it["out_ms"])
+            if used != it["master_uri"]:
+                report("extract", int(5 + 75 * k / n), f"tramo {k + 1}/{n}: master no disponible, uso el proxy")
             has_audio = ff.summarize_probe(ff.probe(mezz.path))["has_audio"]
             seg = seg_script.get(it["idx"], {})
             hook = script.get("hook") if k == 0 else None

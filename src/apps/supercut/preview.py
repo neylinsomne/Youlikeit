@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 
 from apps.media import storage
-from apps.media.fetch import cut_exact, extract_segment
+from apps.media.fetch import cut_exact, extract_segment_resilient
 from apps.media.models import media_cache_dir
 
 PREVIEW_HEIGHT = 480
@@ -31,17 +31,18 @@ def preview_path(moment_id: int, start_ms: int, end_ms: int) -> Path:
 
 
 def moment_preview(conn: sqlite3.Connection, moment_id: int) -> Path:
-    row = conn.execute("SELECT m.start_ms, m.end_ms, a.master_uri FROM moments m "
+    row = conn.execute("SELECT m.start_ms, m.end_ms, a.master_uri, a.proxy_uri FROM moments m "
                        "JOIN media_assets a ON a.id = m.asset_id WHERE m.id = ?", (moment_id,)).fetchone()
     if row is None:
         raise MomentNotFound(f"momento {moment_id} no existe")
-    start_ms, end_ms, master = int(row[0]), int(row[1]), row[2]
+    start_ms, end_ms, master, proxy = int(row[0]), int(row[1]), row[2], row[3]
     path = preview_path(moment_id, start_ms, end_ms)
     if path.exists():
         storage.touch(path)
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
-    mezz = extract_segment(master, start_ms, end_ms)
+    # Para un preview de 480 px el proxy alcanza: se prueba primero (más liviano) y luego el master.
+    mezz, _ = extract_segment_resilient([proxy, master], start_ms, end_ms)
     tmp = path.with_name(f"{path.stem}.{uuid.uuid4().hex[:8]}.part.mp4")
     try:
         cut_exact(mezz, start_ms, end_ms, tmp, vf=f"scale=-2:{PREVIEW_HEIGHT}")

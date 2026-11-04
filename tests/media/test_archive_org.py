@@ -88,3 +88,18 @@ def test_partial_dvd_item_is_flagged(ia_notld_meta):
     full = ia.candidate_from_metadata({**ia_notld_meta,
                                        "metadata": {**ia_notld_meta["metadata"], "runtime": "01:35:06"}})
     assert full.extra["partial"] is False
+
+
+@pytest.mark.unit
+def test_unindexed_mpeg_original_uses_same_timeline_h264_derivative():
+    """Grave of the Vampire (IA): el original es un MPEG-PS de DVD donde ffmpeg no puede saltar."""
+    files = [
+        {"name": "G.avi", "source": "original", "format": "Cinepack", "size": "803519542", "length": "5380.6", "height": "384"},
+        {"name": "G.mpeg", "source": "original", "format": "MPEG2", "size": "1371951104", "length": "5380.16", "height": "480"},
+        {"name": "G.mp4", "source": "derivative", "format": "h.264", "size": "558133988", "length": "5380.21",
+         "height": "480", "original": "G.mpeg"},
+        {"name": "G_512kb.mp4", "source": "derivative", "format": "512Kb MPEG4", "size": "390849989",
+         "length": "5380.04", "height": "240", "original": "G.mpeg"},
+    ]
+    master, proxy = ia.pick_master_and_proxy(files)
+    assert master["name"] == "G.mp4" and proxy["name"] == "G_512kb.mp4"

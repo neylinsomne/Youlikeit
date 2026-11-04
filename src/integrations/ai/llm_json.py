@@ -126,12 +126,19 @@ def _groq(system: str, prompt: str, schema: dict | None, *, model: str, temperat
             "response_format": {"type": "json_object"},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         }, timeout=timeout)
+        if resp.status_code == 400 and "json_validate_failed" in resp.text and attempt < 2:
+            # Modo JSON de Groq: si el modelo emite JSON inválido la API responde 400.
+            # Es intermitente (visto en producción): se reintenta tal cual.
+            log.warning("Groq json_validate_failed; reintento %d", attempt + 1)
+            continue
         if resp.status_code == 429 and attempt < RETRY_429:
             wait = retry_after_seconds(resp, attempt)
             log.warning("Groq 429 (límite por minuto); esperando %.1fs", wait)
             time.sleep(wait)
             continue
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            # El cuerpo explica el 400 (modelo, response_format, tokens): sin él no se puede depurar.
+            raise requests.HTTPError(f"Groq {resp.status_code}: {resp.text[:300]}", response=resp)
         return resp.json()["choices"][0]["message"]["content"]
     raise requests.HTTPError("Groq: reintentos 429 agotados")
 

@@ -118,6 +118,31 @@ def extract_segment(uri: str, start_ms: int, end_ms: int, *,
     return mezz
 
 
+def extract_segment_resilient(uris: list[str | None], start_ms: int, end_ms: int, *,
+                               attempts: int = 3, backoff_s: float = 5.0, sleep=None,
+                               **kw) -> tuple[Mezzanine, str]:
+    """extract_segment con reintentos y fuentes de respaldo, en orden.
+
+    Visto en producción: un nodo de Internet Archive respondía 500 a ratos para el
+    master de una película mientras su proxy (misma línea de tiempo) funcionaba.
+    Devuelve (mezzanine, uri_usada) para que el llamador sepa si cayó al respaldo.
+    """
+    import time
+    sleep = sleep or time.sleep
+    errors: list[str] = []
+    for uri in [u for u in dict.fromkeys(uris) if u]:
+        tries = attempts if ff.is_remote(uri) else 1     # un archivo local que falta no se arregla esperando
+        for attempt in range(tries):
+            try:
+                return extract_segment(uri, start_ms, end_ms, **kw), uri
+            except (ff.FFmpegError, OSError) as e:
+                errors.append(f"{uri.rsplit('/', 1)[-1]} #{attempt + 1}: {str(e)[:120]}")
+                log.warning("extract_segment falló (%s); reintento", errors[-1])
+                if attempt < tries - 1:
+                    sleep(backoff_s * (attempt + 1))
+    raise ff.FFmpegError("No se pudo extraer el segmento de ninguna fuente: " + " | ".join(errors[-4:]))
+
+
 def build_cut_cmd(mezz: Mezzanine, start_ms: int, end_ms: int, out_path: str | Path,
                   *, vf: str | None = None, audio: bool = True) -> list[str]:
     """Corte exacto al frame desde el mezzanine (una sola recodificación)."""

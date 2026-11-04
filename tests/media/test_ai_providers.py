@@ -127,3 +127,14 @@ def test_groq_429_waits_and_retries(mocked_http, monkeypatch):
                                                      "properties": {"trope": {"type": "string"}}})
     assert used == "groq" and data["trope"] == "siege"
     assert waits == [2.0]
+
+
+@pytest.mark.integration
+def test_groq_json_validate_failed_is_retried(mocked_http, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "g")
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    mocked_http.post(url, status=400, json={"error": {"code": "json_validate_failed", "message": "bad json"}})
+    mocked_http.post(url, json={"choices": [{"message": {"content": '{"ok": true}'}}]})
+    monkeypatch.setattr(llm_json, "available", lambda name: name == "groq")
+    data, used = llm_json.complete_json("x", schema={"type": "object"})
+    assert data == {"ok": True} and used == "groq"

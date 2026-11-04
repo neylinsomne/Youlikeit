@@ -123,7 +123,9 @@ def test_render_with_narration_calls_tts_per_segment_and_outro(sconn, masters, m
 @pytest.mark.integration
 def test_render_failure_returns_lesson_to_draft(sconn, masters, tmp_path):
     lesson = _lesson(sconn, masters)
-    sconn.execute("UPDATE media_assets SET master_uri = ?", (str(tmp_path / "missing.mkv"),))
+    # Master Y proxy rotos: con solo el master roto el render cae al proxy (respaldo) y sale bien.
+    sconn.execute("UPDATE media_assets SET master_uri = ?, proxy_uri = ?",
+                  (str(tmp_path / "missing.mkv"), str(tmp_path / "missing_proxy.mp4")))
     sconn.commit()
     with pytest.raises(FFmpegError):
         render.render_lesson(sconn, lesson["id"], narrate=False)

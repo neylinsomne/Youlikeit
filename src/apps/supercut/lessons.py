@@ -91,7 +91,7 @@ def get_items(conn: sqlite3.Connection, lesson_id: int) -> list[dict]:
             """SELECT li.idx, li.moment_id, li.in_ms, li.out_ms, li.caption,
                       m.text, m.asset_id, m.start_ms, m.end_ms, m.summary_es,
                       w.id AS work_id, w.title AS work_title, w.year AS work_year,
-                      a.rights, a.master_uri
+                      a.rights, a.master_uri, a.proxy_uri
                FROM lesson_items li
                LEFT JOIN moments m ON m.id = li.moment_id
                LEFT JOIN media_assets a ON a.id = m.asset_id

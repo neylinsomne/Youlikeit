@@ -37,6 +37,9 @@ VIDEO_EXTS = {".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".mpg", ".mpeg", 
 # Contenedores con índice (moov / Cues): ffmpeg salta directo al rango pedido.
 _CONTAINER_PREF = {".mp4": 3, ".m4v": 3, ".mov": 3, ".mkv": 3, ".webm": 2, ".avi": 1, ".ogv": 1}
 _MAX_USEFUL_HEIGHT = 1080
+# Contenedores SIN índice: ffmpeg no puede saltar por rangos (visto con un MPEG-PS de DVD
+# de IA que declaraba 5 s de duración para 90 min). Se prefiere un derivado indexado.
+_UNINDEXED = {".mpeg", ".mpg", ".ts", ".m2ts", ".vob"}
 
 
 def classify_rights(license_url: str | None, rights_text: str | None = None) -> str:
@@ -96,11 +99,18 @@ def pick_master_and_proxy(files: list[dict]) -> tuple[dict | None, dict | None]:
         return (min(h, _MAX_USEFUL_HEIGHT), _CONTAINER_PREF.get(_ext(f["name"]), 0),
                 min(bitrate, 25e6))
 
-    master = max(originals, key=master_key)
+    original = max(originals, key=master_key)
     derived = [f for f in files
-               if f.get("source") == "derivative" and f.get("original") == master["name"]
+               if f.get("source") == "derivative" and f.get("original") == original["name"]
                and _is_video(f) and _ext(f["name"]) in {".mp4", ".m4v", ".mkv", ".webm"}]
     proxy = min(derived, key=lambda f: _f(f.get("size"))) if derived else None
+    master = original
+    if _ext(original["name"]) in _UNINDEXED:
+        # Derivado h.264 del MISMO original (misma línea de tiempo) con resolución equivalente.
+        same_res = [f for f in derived if _f(f.get("height")) >= 0.9 * _f(original.get("height"))
+                    and "512kb" not in (f.get("format") or "").lower()]
+        if same_res:
+            master = max(same_res, key=lambda f: _f(f.get("size")))
     return master, proxy
 
 
