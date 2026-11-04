@@ -26,7 +26,7 @@ import asyncio
 import json
 import time
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ---------------------------------------------------------------------------
@@ -39,11 +39,21 @@ _event_buffer: deque = deque(maxlen=100)
 # Connected WebSocket clients
 _ws_clients: set = set()
 
+# Event loop del servidor (se captura cuando conecta el primer cliente). notify()
+# se llama desde hilos de trabajo (jobs del estudio, indexer): sin este loop,
+# asyncio.ensure_future fallaba y se desconectaba a TODOS los clientes.
+_loop: asyncio.AbstractEventLoop | None = None
+
+
+def bind_loop(loop: asyncio.AbstractEventLoop) -> None:
+    global _loop
+    _loop = loop
+
 
 def _build_event(source: str, stage: str, data: dict | None = None) -> dict:
     """Build a structured event."""
     return {
-        "ts": datetime.utcnow().isoformat() + "Z",
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": source,
         "stage": stage,  # extract, transform, load, complete, error
         "data": data or {},
@@ -58,18 +68,27 @@ def notify(source: str, stage: str, data: dict | None = None):
     event = _build_event(source, stage, data)
     _event_buffer.append(event)
 
-    # Try to push to connected WebSocket clients
+    # Try to push to connected WebSocket clients (seguro desde cualquier hilo)
     global _ws_clients
-    if _ws_clients:
-        msg = json.dumps(event, ensure_ascii=False)
-        disconnected = set()
-        for ws in _ws_clients:
-            try:
-                # Queue the message for async send
-                asyncio.ensure_future(ws.send_text(msg))
-            except Exception:
-                disconnected.add(ws)
-        _ws_clients -= disconnected
+    if not _ws_clients:
+        return
+    msg = json.dumps(event, ensure_ascii=False, default=str)
+    try:
+        running = asyncio.get_running_loop()           # estamos en el hilo del servidor
+    except RuntimeError:
+        running = None
+    loop = _loop
+    disconnected = set()
+    for ws in list(_ws_clients):
+        try:
+            if running is not None:
+                running.create_task(ws.send_text(msg))
+            elif loop is not None and loop.is_running():
+                asyncio.run_coroutine_threadsafe(ws.send_text(msg), loop)
+            # sin loop disponible: el evento queda en el buffer; NO se desconecta al cliente
+        except Exception:
+            disconnected.add(ws)
+    _ws_clients -= disconnected
 
 
 def get_recent_events(n: int = 50) -> list[dict]:
@@ -181,6 +200,7 @@ def create_ws_endpoint(app):
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
         await websocket.accept()
+        bind_loop(asyncio.get_running_loop())
         _ws_clients.add(websocket)
 
         # Send recent events as catch-up

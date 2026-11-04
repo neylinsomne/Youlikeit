@@ -22,3 +22,35 @@ def test_cross_references_matches_ab_testing_queries(conn):
                  ("Dark Souls",))
     (strength,) = conn.execute("SELECT strength FROM cross_references").fetchone()
     assert strength == pytest.approx(0.8)
+
+
+@pytest.mark.integration
+def test_get_db_uses_wal_and_busy_timeout(tmp_path):
+    from core.db import get_db
+    c = get_db(tmp_path)
+    assert c.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+    assert c.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+    c.close()
+
+
+@pytest.mark.unit
+def test_websocket_notify_from_thread_keeps_clients():
+    """notify() desde un hilo sin loop no debe desconectar clientes (antes los borraba a todos)."""
+    import threading
+
+    from utils import websocket_hub as hub
+
+    class FakeWS:
+        async def send_text(self, msg):
+            pass
+
+    ws = FakeWS()
+    hub._ws_clients.add(ws)
+    try:
+        t = threading.Thread(target=hub.notify, args=("test", "load", {"x": 1}))
+        t.start()
+        t.join()
+        assert ws in hub._ws_clients
+        assert hub.get_recent_events(1)[-1]["data"] == {"x": 1}
+    finally:
+        hub._ws_clients.discard(ws)

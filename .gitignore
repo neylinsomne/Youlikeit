@@ -37,6 +37,8 @@ data/.easyocr/
 *.mkv
 *.avi
 data/shorts_pipeline.db
+data/*.db-wal
+data/*.db-shm
 
 # Node
 node_modules/

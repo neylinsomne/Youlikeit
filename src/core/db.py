@@ -763,8 +763,12 @@ INSERT OR IGNORE INTO topic_clusters (cluster_name, display_name, priority, seed
 def get_db(data_dir: Path) -> sqlite3.Connection:
     """Get or create the SQLite database connection."""
     db_path = data_dir / "shorts_pipeline.db"
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), timeout=5)
     conn.row_factory = sqlite3.Row
+    # Estudio local: API + jobs en hilos + CLI escriben a la vez. WAL permite
+    # lectores concurrentes con un escritor; busy_timeout evita "database is locked".
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
     _migrate_columns(conn)
     _ensure_domain_schemas(conn)
