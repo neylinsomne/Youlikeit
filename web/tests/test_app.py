@@ -119,3 +119,17 @@ def test_store_refuses_to_save_without_encryption_key(monkeypatch, tmp_path):
     from app import store
     with pytest.raises(RuntimeError, match="TOKEN_ENC_KEY"):
         store.save_account("oid", "x", {"access_token": "t"})
+
+
+def test_tiktok_url_verification_only_for_allowlisted_tokens(client, monkeypatch):
+    shipped = "tiktok6SqmAImuROUyUPH61nJk6s8TjcqpaJXF.txt"
+    r = client.get(f"/{shipped}")
+    assert r.status_code == 200 and r.text == "tiktok-developers-site-verification=6SqmAImuROUyUPH61nJk6s8TjcqpaJXF"
+    assert r.headers["content-type"].startswith("text/plain")
+
+    assert client.get("/tiktokNotAllowed12345.txt").status_code == 404     # no se firma cualquier token
+    monkeypatch.setenv("TIKTOK_SITE_TOKENS", "AbCdEf123456, Zz99Yy88Xx77")
+    r = client.get("/tiktokZz99Yy88Xx77.txt")
+    assert r.status_code == 200 and r.text == "tiktok-developers-site-verification=Zz99Yy88Xx77"
+    for bad in ("/tiktok..%2Fmain.py", "/robots.txt", "/tiktokAbC.txt"):
+        assert client.get(bad).status_code == 404

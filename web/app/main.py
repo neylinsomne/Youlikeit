@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -157,3 +158,32 @@ def tiktok_disconnect(request: Request):
                 pass
         store.delete_account(open_id)
     return RedirectResponse("/studio?notice=disconnected", status_code=303)
+
+
+# ── Verificación de propiedad de URL (TikTok "Verify URL properties") ─────────
+# TikTok pide servir /tiktok<TOKEN>.txt con "tiktok-developers-site-verification=<TOKEN>".
+# Solo se sirven tokens EN LISTA PERMITIDA (archivos en app/verification/ o la variable
+# TIKTOK_SITE_TOKENS): responder a cualquier token dejaría a terceros verificar este
+# dominio en sus propias apps.
+_VERIFY_RE = re.compile(r"^tiktok([A-Za-z0-9]{8,64})\.txt$")
+VERIFY_DIR = BASE / "verification"
+
+
+def allowed_site_tokens() -> set[str]:
+    tokens = {t.strip() for t in os.getenv("TIKTOK_SITE_TOKENS", "").split(",") if t.strip()}
+    if VERIFY_DIR.is_dir():
+        tokens |= {m.group(1) for f in VERIFY_DIR.iterdir() if (m := _VERIFY_RE.match(f.name))}
+    return tokens
+
+
+@app.get("/{filename}")
+def site_verification(filename: str):
+    m = _VERIFY_RE.match(filename)
+    if not m or m.group(1) not in allowed_site_tokens():
+        raise HTTPException(404)
+    path = VERIFY_DIR / filename
+    if path.is_file():
+        body = path.read_text(encoding="utf-8")
+    else:
+        body = f"tiktok-developers-site-verification={m.group(1)}"
+    return PlainTextResponse(body)
