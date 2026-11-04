@@ -180,7 +180,8 @@ def provider_order(spec: str | None = None) -> list[str]:
 
 def complete_json(prompt: str, *, schema: dict | None = None, system: str = "",
                   provider: str | None = None, temperature: float = 0.2,
-                  max_tokens: int = 800, timeout: float = 120) -> tuple[object, str]:
+                  max_tokens: int = 800, timeout: float = 120,
+                  sanitize=None) -> tuple[object, str]:
     """Devuelve (json_validado, proveedor_usado). Levanta LLMUnavailable si todos fallan."""
     sys_prompt = system or "Responde SOLO con JSON válido."
     if schema:
@@ -194,6 +195,8 @@ def complete_json(prompt: str, *, schema: dict | None = None, system: str = "",
             raw = _PROVIDERS[name](sys_prompt, prompt, schema, model=model_for(name),
                                    temperature=temperature, max_tokens=max_tokens, timeout=timeout)
             data = parse_json(raw)
+            if sanitize is not None:
+                data = sanitize(data)            # p.ej. descartar valores fuera de vocabulario
             errs = validate(data, schema)
             if errs:
                 tried.append(f"{name}: esquema inválido {errs[:3]}")

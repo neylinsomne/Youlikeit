@@ -134,6 +134,15 @@ def detect_moments(conn: sqlite3.Connection, asset_id: int, *, fetch_anchors: bo
                      "plot": p["sentence"] if p else None, "plot_score": p["score"] if p else None,
                  }.items() if v is not None})
 
+    # Dos candidatos pueden caer en el MISMO rango (p.ej. una cita y su bloque de
+    # diálogo ajustados al mismo plano): se queda el de mayor puntaje.
+    by_range: dict[tuple[int, int], dict] = {}
+    for c in cands:
+        key = (c["start_ms"], c["end_ms"])
+        if key not in by_range or c["signal_score"] > by_range[key]["signal_score"]:
+            by_range[key] = c
+    cands = sorted(by_range.values(), key=lambda c: c["start_ms"])
+
     vocab.sync_vocab_table(conn)
     n = schema.save_candidates(conn, asset_id, cands)
     top = sorted(cands, key=lambda c: -c["signal_score"])[:5]

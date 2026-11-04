@@ -51,6 +51,29 @@ def build_schema() -> dict:
             "properties": {"items": {"type": "array", "items": item}}}
 
 
+def sanitize_items(data):
+    """Descarta valores fuera del vocabulario POR ÍTEM en vez de rechazar el lote.
+
+    Visto en producción: el modelo puso un tropo ('standoff') en `beat`, y el
+    lote entero (6 momentos) se perdía y el etiquetado se detenía.
+    """
+    if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+        return data
+    allowed = {d: set(vocab.ids(d)) for d in ("trope", "beat", "emotion", "role", "theme")}
+    for it in data["items"]:
+        if not isinstance(it, dict):
+            continue
+        for key, dim in (("tropes", "trope"), ("roles", "role"), ("themes", "theme")):
+            if isinstance(it.get(key), list):
+                it[key] = [v for v in it[key] if v in allowed[dim]]
+        if it.get("beat") not in allowed["beat"]:
+            it["beat"] = "none"
+        if it.get("emotion") not in allowed["emotion"]:
+            it.pop("emotion", None)
+    data["items"] = [it for it in data["items"] if isinstance(it, dict) and "emotion" in it]
+    return data
+
+
 def _catalog() -> str:
     v = vocab.load_vocab()
     tropes = "\n".join(f"- {t['id']}: {t['desc_es']}" for t in v["trope"])
@@ -138,11 +161,15 @@ def label_moments(conn: sqlite3.Connection, asset_id: int, *, work_title: str, y
         try:
             data, used = llm_json.complete_json(build_prompt(work_title, year, batch), schema=sch,
                                                 system=SYSTEM, provider=provider,
-                                                max_tokens=350 * len(batch), temperature=0.2)
+                                                max_tokens=350 * len(batch), temperature=0.2,
+                                                sanitize=sanitize_items)
         except llm_json.LLMUnavailable as e:
             report["errors"].append(str(e)[:300])
-            log.warning("Sin LLM disponible: quedan solo etiquetas léxicas/posición (%s)", e)
-            break
+            if "no disponible" in str(e) and "esquema" not in str(e):
+                log.warning("Sin LLM disponible: quedan solo etiquetas léxicas/posición (%s)", e)
+                break                          # ningún proveedor: no tiene sentido seguir
+            log.warning("Lote %d descartado (%s); sigo con el siguiente", k // batch_size, e)
+            continue
         n = apply_labels(conn, data["items"], used, {m["id"]: m["signal_score"] for m in batch})
         report["labeled"] += n
         report["providers"][used] = report["providers"].get(used, 0) + n

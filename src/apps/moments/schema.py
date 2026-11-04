@@ -116,7 +116,19 @@ def save_work_texts(conn: sqlite3.Connection, work_id: int, kind: str, items: li
     conn.commit()
 
 
-def get_work_texts(conn: sqlite3.Connection, work_id: int, kind: str, lang: str = "en") -> list | None:
-    row = conn.execute("SELECT items_json FROM work_texts WHERE work_id = ? AND kind = ? AND lang = ?",
-                       (work_id, kind, lang)).fetchone()
-    return json.loads(row[0]) if row else None
+def get_work_texts(conn: sqlite3.Connection, work_id: int, kind: str, lang: str = "en",
+                   *, empty_ttl_days: float = 7.0) -> list | None:
+    """Ítems cacheados, o None si hay que (re)bajarlos.
+
+    Un resultado VACÍO caduca a los `empty_ttl_days`: suele ser un fallo de
+    búsqueda o de red, no la ausencia real de la página.
+    """
+    row = conn.execute(
+        "SELECT items_json, julianday('now') - julianday(fetched_at) FROM work_texts "
+        "WHERE work_id = ? AND kind = ? AND lang = ?", (work_id, kind, lang)).fetchone()
+    if not row:
+        return None
+    items = json.loads(row[0])
+    if not items and (row[1] is None or row[1] > empty_ttl_days):
+        return None
+    return items

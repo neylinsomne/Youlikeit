@@ -108,21 +108,69 @@ def _pick_title(candidates: list[str], title: str, year: int | None) -> str | No
     return best if best and score(best) >= 0.8 else None
 
 
+def exact_title_candidates(title: str, year: int | None) -> list[str]:
+    """Títulos exactos en orden de preferencia (convención de Wikipedia/Wikiquote)."""
+    out = [f"{title} ({year} film)"] if year else []
+    return out + [f"{title} (film)", title]
+
+
+def _resolve_exact(site: str, title: str, year: int | None) -> str | None:
+    """Primera página existente y no-desambiguación entre los títulos exactos.
+
+    La búsqueda de texto completo de Wikiquote ordena mal ("Horror Express 1972
+    film" devolvía páginas de personas); consultar títulos exactos es más fiable.
+    """
+    cands = exact_title_candidates(title, year)
+    data = api_get(f"https://{site}/w/api.php", params={
+        "action": "query", "titles": "|".join(cands), "redirects": 1, "prop": "pageprops",
+        "ppprop": "disambiguation", "format": "json"}, service="wikimedia", headers=UA)
+    q = (data or {}).get("query") or {}
+    alias = {n["from"]: n["to"] for n in q.get("normalized", []) + q.get("redirects", [])}
+    ok = {p["title"] for p in (q.get("pages") or {}).values()
+          if "missing" not in p and "invalid" not in p and "disambiguation" not in (p.get("pageprops") or {})}
+    for c in cands:
+        target = alias.get(alias.get(c, c), alias.get(c, c))
+        if target in ok:
+            return target
+    return None
+
+
+def _page_wikitext(site: str, page: str, section: int | str | None = None) -> str:
+    params = {"action": "parse", "page": page, "prop": "wikitext", "format": "json", "redirects": 1}
+    if section is not None:
+        params["section"] = section
+    data = api_get(f"https://{site}/w/api.php", params=params, service="wikimedia", headers=UA)
+    return (((data or {}).get("parse") or {}).get("wikitext") or {}).get("*", "")
+
+
+YEAR_TOLERANCE = 2
+
+
+def year_matches(text: str, year: int, tolerance: int = YEAR_TOLERANCE) -> bool:
+    """El año de una película varía según la fuente (estreno local vs internacional):
+    Horror Express es 1972 en IA y 1973 en Wikiquote; Grave of the Vampire, 1974 vs 1972."""
+    return any(str(y) in text for y in range(year - tolerance, year + tolerance + 1))
+
+
+def _resolve_page(site: str, title: str, year: int | None) -> str | None:
+    """Título exacto verificado (el año aparece en la página) o, si no, búsqueda."""
+    page = _resolve_exact(site, title, year)
+    if page and (not year or page.endswith(f"({year} film)") or year_matches(_page_wikitext(site, page, 0), year)):
+        return page
+    return _pick_title(_search_page(site, f"{title} {year or ''} film"), title, year)
+
+
 def fetch_wikiquote(title: str, year: int | None = None, *, lang: str = "en") -> tuple[list[dict], str | None]:
     site = f"{lang}.wikiquote.org"
-    page = _pick_title(_search_page(site, f"{title} {year or ''} film"), title, year)
+    page = _resolve_page(site, title, year)
     if not page:
         return [], None
-    data = api_get(f"https://{site}/w/api.php", params={
-        "action": "parse", "page": page, "prop": "wikitext", "format": "json", "redirects": 1},
-        service="wikimedia", headers=UA)
-    wikitext = (((data or {}).get("parse") or {}).get("wikitext") or {}).get("*", "")
-    return parse_wikiquote(wikitext), f"https://{site}/wiki/{page.replace(' ', '_')}"
+    return parse_wikiquote(_page_wikitext(site, page)), f"https://{site}/wiki/{page.replace(' ', '_')}"
 
 
 def fetch_plot(title: str, year: int | None = None, *, lang: str = "en") -> tuple[list[str], str | None]:
     site = f"{lang}.wikipedia.org"
-    page = _pick_title(_search_page(site, f"{title} {year or ''} film"), title, year)
+    page = _resolve_page(site, title, year)
     if not page:
         return [], None
     secs = api_get(f"https://{site}/w/api.php", params={
