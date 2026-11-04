@@ -87,6 +87,21 @@ def get_account(open_id: str) -> dict | None:
             "access_token": access, "refresh_token": refresh, "expires_at": row["expires_at"]}
 
 
+def list_accounts() -> list[dict]:
+    """Cuentas conectadas, sin tokens (para el puente del estudio local)."""
+    with connect() as conn:
+        rows = conn.execute("SELECT open_id, display_name FROM tiktok_accounts "
+                            "ORDER BY updated_at DESC, open_id").fetchall()
+    return [{"open_id": r["open_id"], "display_name": r["display_name"]} for r in rows]
+
+
+def has_account(open_id: str) -> bool:
+    """¿Existe la fila? (no descifra: distingue 'desconocida' de 'hay que reconectar')."""
+    with connect() as conn:
+        row = conn.execute("SELECT 1 FROM tiktok_accounts WHERE open_id = ?", (open_id,)).fetchone()
+    return row is not None
+
+
 def delete_account(open_id: str) -> None:
     with connect() as conn:
         conn.execute("DELETE FROM tiktok_accounts WHERE open_id = ?", (open_id,))

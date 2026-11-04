@@ -99,28 +99,47 @@ def _api_error(resp: httpx.Response) -> str | None:
     return None if code in (None, "ok") and resp.status_code < 400 else (code or f"http_{resp.status_code}")
 
 
-def upload_draft(access_token: str, video_path, *, timeout: float = 300) -> str:
-    """Sube un MP4 al inbox del creador como borrador. Devuelve publish_id."""
-    from pathlib import Path
-    data = Path(video_path).read_bytes()
-    size = len(data)
-    if size > MAX_SINGLE_CHUNK:
+def init_inbox_upload(access_token: str, video_size: int) -> dict:
+    """Init de borrador al inbox (FILE_UPLOAD, un solo trozo). Devuelve {publish_id, upload_url}.
+
+    Lo usan el botón del sitio (upload_draft) y el puente del estudio local, que luego
+    hace el PUT de los bytes directo a `upload_url` (el video no pasa por este servidor).
+    """
+    if video_size <= 0:
+        raise TikTokError("empty video")
+    if video_size > MAX_SINGLE_CHUNK:
         raise TikTokError("video too large for single-chunk upload")
     init = httpx.post(INBOX_INIT_URL, timeout=30,
                       headers={"Authorization": f"Bearer {access_token}",
                                "Content-Type": "application/json; charset=UTF-8"},
-                      json={"source_info": {"source": "FILE_UPLOAD", "video_size": size,
-                                            "chunk_size": size, "total_chunk_count": 1}})
+                      json={"source_info": {"source": "FILE_UPLOAD", "video_size": video_size,
+                                            "chunk_size": video_size, "total_chunk_count": 1}})
     code = _api_error(init)
     if code:
         raise TikTokError(code)
-    payload = init.json()["data"]
-    put = httpx.put(payload["upload_url"], content=data, timeout=timeout,
+    payload = init.json().get("data") or {}
+    if not payload.get("publish_id") or not payload.get("upload_url"):
+        raise TikTokError("invalid_init_response")
+    return {"publish_id": payload["publish_id"], "upload_url": payload["upload_url"]}
+
+
+def put_bytes(upload_url: str, data: bytes, *, timeout: float = 300) -> None:
+    """PUT de un solo trozo con Content-Range exacto."""
+    size = len(data)
+    put = httpx.put(upload_url, content=data, timeout=timeout,
                     headers={"Content-Type": "video/mp4", "Content-Length": str(size),
                              "Content-Range": f"bytes 0-{size - 1}/{size}"})
     if put.status_code not in (200, 201):
         raise TikTokError(f"upload_failed_http_{put.status_code}")
-    return payload["publish_id"]
+
+
+def upload_draft(access_token: str, video_path, *, timeout: float = 300) -> str:
+    """Sube un MP4 al inbox del creador como borrador. Devuelve publish_id."""
+    from pathlib import Path
+    data = Path(video_path).read_bytes()
+    init = init_inbox_upload(access_token, len(data))
+    put_bytes(init["upload_url"], data, timeout=timeout)
+    return init["publish_id"]
 
 
 def fetch_status(access_token: str, publish_id: str) -> dict:

@@ -34,3 +34,30 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
         run: python -m pytest -q
+
+  # Sitio publico web/ (Railway): su propia app y sus propias deps. TikTok va simulado.
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: web/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt "pytest>=8.0.0"
+
+      - name: Run web tests
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m pytest -q

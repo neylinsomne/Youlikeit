@@ -6,6 +6,8 @@ Rutas
   /explore/{emotion}     una emoción: qué es, cómo la muestra el cine, pausa, tropos, películas
   /studio                conectar TikTok (Login Kit) y ver la cuenta conectada
   /auth/tiktok/*         OAuth (login, callback, disconnect)
+  /studio/send/*         "Send to TikTok as draft" (borrador al inbox)
+  /api/studio/*          puente del estudio local (Bearer STUDIO_API_KEY)
   /terms /privacy /contact /healthz
 """
 from __future__ import annotations
@@ -17,10 +19,12 @@ import secrets
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+import httpx
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import store, tiktok
@@ -28,7 +32,7 @@ from app.content import EMOTION_BY_ID, EMOTIONS
 
 BASE = Path(__file__).resolve().parent
 CONTACT = os.getenv("CONTACT_EMAIL", "contact@vara-alta.lat")
-LAST_UPDATED = "November 3, 2026"
+LAST_UPDATED = "November 4, 2026"
 
 app = FastAPI(title="YouLikeIt", docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(
@@ -173,6 +177,93 @@ def tiktok_disconnect(request: Request):
                 pass
         store.delete_account(open_id)
     return RedirectResponse("/studio?notice=disconnected", status_code=303)
+
+
+# ── Puente del estudio local (Authorization: Bearer STUDIO_API_KEY) ──────────
+# El estudio (127.0.0.1, en el PC del creador) pide aquí un upload_url y sube los bytes
+# DIRECTO a TikTok: el video no pasa por este servidor y el token de TikTok nunca sale de aquí.
+# Contrato: docs/architecture/STUDIO_API.md ("Puente de publicación en web/").
+MIN_STUDIO_KEY_LEN = 32                       # una key corta equivale a no tener key
+
+
+def require_studio_key(authorization: str | None = Header(default=None)) -> None:
+    expected = os.getenv("STUDIO_API_KEY", "")
+    if len(expected) < MIN_STUDIO_KEY_LEN:
+        raise HTTPException(503, "studio bridge not configured")
+    scheme, _, given = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not secrets.compare_digest(given.strip().encode(), expected.encode()):
+        raise HTTPException(401, "invalid studio key", headers={"WWW-Authenticate": "Bearer"})
+
+
+class StudioInit(BaseModel):
+    open_id: str = Field(min_length=1, max_length=128)
+    video_size: int = Field(gt=0, le=tiktok.MAX_SINGLE_CHUNK)     # > 64 MB → 422 (un solo trozo)
+    lesson_ref: str = Field(min_length=1, max_length=200)
+
+    @field_validator("lesson_ref", mode="before")
+    @classmethod
+    def _ref_as_text(cls, v):
+        return str(v) if isinstance(v, int) and not isinstance(v, bool) else v
+
+
+def _studio_token(open_id: str) -> str:
+    """Token vigente (renovado si venció). 404 cuenta desconocida · 409 hay que reconectar."""
+    if not store.has_account(open_id):
+        raise HTTPException(404, "unknown open_id")
+    try:
+        token = store.valid_access_token(open_id, tiktok.refresh)
+    except tiktok.TikTokError:
+        token = None                                   # TikTok rechazó el refresh_token
+    except httpx.HTTPError:
+        raise HTTPException(502, "tiktok_unreachable") from None
+    if token is None:
+        raise HTTPException(409, "reconnect_required")
+    return token
+
+
+studio_api = APIRouter(prefix="/api/studio", dependencies=[Depends(require_studio_key)])
+
+
+@studio_api.get("/accounts")
+def studio_accounts():
+    return {"accounts": store.list_accounts()}
+
+
+@studio_api.post("/tiktok/init")
+def studio_tiktok_init(body: StudioInit):
+    token = _studio_token(body.open_id)
+    try:
+        init = tiktok.init_inbox_upload(token, body.video_size)
+    except tiktok.TikTokError as e:
+        raise HTTPException(502, str(e)) from None
+    except httpx.HTTPError:
+        raise HTTPException(502, "tiktok_unreachable") from None
+    store.record_publish(init["publish_id"], body.open_id, body.lesson_ref)
+    return {"publish_id": init["publish_id"], "upload_url": init["upload_url"]}
+
+
+@studio_api.get("/tiktok/status/{publish_id}")
+def studio_tiktok_status(publish_id: str):
+    pub = store.get_publish(publish_id)
+    if pub is None:
+        raise HTTPException(404, "unknown publish_id")
+    token = _studio_token(pub["open_id"])
+    try:
+        data = tiktok.fetch_status(token, publish_id)
+    except tiktok.TikTokError as e:
+        raise HTTPException(502, str(e)) from None
+    except httpx.HTTPError:
+        raise HTTPException(502, "tiktok_unreachable") from None
+    status = data.get("status") or pub["status"]
+    if status != pub["status"]:
+        store.update_publish_status(publish_id, status)
+    out = {"status": status}
+    if data.get("fail_reason"):
+        out["fail_reason"] = data["fail_reason"]
+    return out
+
+
+app.include_router(studio_api)
 
 
 # ── Verificación de propiedad de URL (TikTok "Verify URL properties") ─────────
