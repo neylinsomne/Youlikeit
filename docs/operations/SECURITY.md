@@ -44,6 +44,7 @@
 | `PUBLIC_BASE_URL` | Redirect URI de TikTok y cookie `https_only` | Cargada |
 | `CONTACT_EMAIL` | Página de contacto | Cargada |
 | `TIKTOK_SITE_TOKENS` | Tokens extra de verificación de URL (coma) | Opcional |
+| `ALLOWED_TIKTOK_OPEN_IDS` | Cuentas de TikTok que pueden conectarse (acceso por invitación; vacía = abierto) | Cargada con la cuenta del dueño (2026-11-04). La identidad es el login de TikTok: no hay contraseñas propias que guardar |
 
 `DATA_DIR=/data` lo fija el `Dockerfile`; `/data` es el volumen de Railway.
 

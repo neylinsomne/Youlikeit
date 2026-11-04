@@ -39,6 +39,7 @@ No hay `/docs` ni `openapi.json` (deshabilitados a propósito).
 | `STUDIO_API_KEY` | Auth del puente; mínimo 32 caracteres o el puente responde `503` |
 | `CONTACT_EMAIL` | Página de contacto |
 | `TIKTOK_SITE_TOKENS` | Tokens de verificación de URL extra, separados por coma (opcional) |
+| `ALLOWED_TIKTOK_OPEN_IDS` | Acceso por invitación: `open_id`s (coma) que pueden conectar TikTok. Otra cuenta → se revoca su autorización, no se guarda nada y ve "invite-only". Vacía = abierto. El puente solo expone cuentas permitidas |
 | `DATA_DIR` | Carpeta de `web.db`; el `Dockerfile` fija `/data` (el volumen) |
 
 Secrets y modelo de amenazas: [docs/operations/SECURITY.md](../docs/operations/SECURITY.md).

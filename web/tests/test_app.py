@@ -470,3 +470,62 @@ def test_init_inbox_upload_and_put_bytes(monkeypatch):
     monkeypatch.setattr(tiktok.httpx, "put", lambda url, **kw: Resp(403))
     with pytest.raises(tiktok.TikTokError, match="upload_failed_http_403"):
         tiktok.put_bytes("https://upload/u", b"x" * 10)
+
+
+# ── Acceso por invitación (ALLOWED_TIKTOK_OPEN_IDS) ─────────────────────────
+
+def _connect_as(c, monkeypatch, open_id, revoked):
+    from app import tiktok
+    monkeypatch.setattr(tiktok, "exchange_code", lambda code: {
+        "access_token": f"act.{open_id}", "refresh_token": f"rft.{open_id}", "open_id": open_id,
+        "scope": "user.info.basic,video.upload", "expires_in": 86400, "refresh_expires_in": 31536000})
+    monkeypatch.setattr(tiktok, "user_info", lambda token: {"open_id": open_id, "display_name": f"name-{open_id}"})
+    monkeypatch.setattr(tiktok, "revoke", lambda token: revoked.append(token))
+    login = c.get("/auth/tiktok/login", follow_redirects=False)
+    state = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
+    return c.get(f"/auth/tiktok/callback?code=c&state={state}", follow_redirects=False)
+
+
+def test_invite_only_rejects_other_accounts_revokes_and_stores_nothing(tiktok_client, monkeypatch, tmp_path):
+    monkeypatch.setenv("ALLOWED_TIKTOK_OPEN_IDS", "oid-owner")
+    revoked = []
+    r = _connect_as(tiktok_client, monkeypatch, "oid-stranger", revoked)
+    assert r.headers["location"] == "/studio?notice=invite_only"
+    assert revoked == ["act.oid-stranger"]                                   # su autorización se revoca
+    db = tmp_path / "web.db"
+    if db.exists():                                                          # nada guardado (ni la tabla)
+        rows = sqlite3.connect(db).execute("SELECT name FROM sqlite_master WHERE name='tiktok_accounts'").fetchall()
+        assert not rows or sqlite3.connect(db).execute("SELECT COUNT(*) FROM tiktok_accounts").fetchone()[0] == 0
+    page = tiktok_client.get("/studio?notice=invite_only").text
+    assert "invite-only" in page and "name-oid-stranger" not in page
+    assert "personal" not in page.lower()                                    # motivo de rechazo anterior
+
+
+def test_invite_only_lets_listed_accounts_in(tiktok_client, monkeypatch):
+    monkeypatch.setenv("ALLOWED_TIKTOK_OPEN_IDS", " oid-owner , oid-2 ")
+    revoked = []
+    r = _connect_as(tiktok_client, monkeypatch, "oid-owner", revoked)
+    assert r.headers["location"] == "/studio?notice=connected" and revoked == []
+    assert "name-oid-owner" in tiktok_client.get("/studio").text
+
+
+def test_empty_allowlist_keeps_the_studio_open(tiktok_client, monkeypatch):
+    monkeypatch.setenv("ALLOWED_TIKTOK_OPEN_IDS", " , ")
+    r = _connect_as(tiktok_client, monkeypatch, "oid-anyone", [])
+    assert r.headers["location"] == "/studio?notice=connected"
+
+
+def test_allowlist_set_after_connecting_closes_web_send(connected, monkeypatch):
+    monkeypatch.setenv("ALLOWED_TIKTOK_OPEN_IDS", "oid-owner")             # oid-1 ya estaba conectada
+    r = connected.post("/studio/send/demo", follow_redirects=False)
+    assert r.headers["location"] == "/studio?notice=invite_only"
+    assert "Disconnect and revoke access" not in connected.get("/studio").text
+
+
+def test_bridge_only_exposes_allowed_accounts(bridge, monkeypatch):
+    monkeypatch.setenv("ALLOWED_TIKTOK_OPEN_IDS", "oid-owner")
+    assert bridge.get("/api/studio/accounts").json() == {"accounts": []}
+    r = bridge.post("/api/studio/tiktok/init", json={"open_id": "oid-1", "video_size": 10, "lesson_ref": "7"})
+    assert r.status_code == 404
+    monkeypatch.setenv("ALLOWED_TIKTOK_OPEN_IDS", "oid-1")
+    assert bridge.get("/api/studio/accounts").json()["accounts"][0]["open_id"] == "oid-1"

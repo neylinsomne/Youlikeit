@@ -117,12 +117,27 @@ def contact(request: Request):
 
 
 # ── Studio + TikTok Login Kit ───────────────────────────────────────
+# Acceso por invitación: la identidad es el login de TikTok (con su contraseña y 2FA), no una
+# contraseña propia. ALLOWED_TIKTOK_OPEN_IDS (coma) limita qué cuentas pueden conectarse; vacía =
+# abierto a toda cuenta que TikTok autorice (en Sandbox, TikTok ya limita a los target users).
+
+
+def allowed_open_ids() -> set[str]:
+    return {v.strip() for v in os.getenv("ALLOWED_TIKTOK_OPEN_IDS", "").split(",") if v.strip()}
+
+
+def account_allowed(open_id: str | None) -> bool:
+    allowed = allowed_open_ids()
+    return bool(open_id) and (not allowed or open_id in allowed)
 
 
 @app.get("/studio")
 def studio(request: Request):
     account, avatar, notice = None, None, request.query_params.get("notice")
     open_id = request.session.get("open_id")
+    if open_id and not account_allowed(open_id):        # la lista cambió después de conectar
+        request.session.pop("open_id", None)
+        open_id = None
     if open_id:
         account = store.get_account(open_id)
         if account is None:
@@ -160,6 +175,14 @@ def tiktok_callback(request: Request, code: str | None = None, state: str | None
     except tiktok.TikTokError:
         return RedirectResponse("/studio?notice=tiktok_error", status_code=303)
     open_id = user.get("open_id") or token.get("open_id")
+    if not open_id:
+        return RedirectResponse("/studio?notice=tiktok_error", status_code=303)
+    if not account_allowed(open_id):
+        try:
+            tiktok.revoke(token["access_token"])        # no queda acceso ni dato de esa cuenta
+        except Exception:  # noqa: BLE001 — igual no se guarda nada
+            pass
+        return RedirectResponse("/studio?notice=invite_only", status_code=303)
     store.save_account(open_id, user.get("display_name"), token)
     request.session["open_id"] = open_id
     return RedirectResponse("/studio?notice=connected", status_code=303)
@@ -207,8 +230,8 @@ class StudioInit(BaseModel):
 
 
 def _studio_token(open_id: str) -> str:
-    """Token vigente (renovado si venció). 404 cuenta desconocida · 409 hay que reconectar."""
-    if not store.has_account(open_id):
+    """Token vigente (renovado si venció). 404 cuenta desconocida o no permitida · 409 reconectar."""
+    if not account_allowed(open_id) or not store.has_account(open_id):
         raise HTTPException(404, "unknown open_id")
     try:
         token = store.valid_access_token(open_id, tiktok.refresh)
@@ -226,7 +249,7 @@ studio_api = APIRouter(prefix="/api/studio", dependencies=[Depends(require_studi
 
 @studio_api.get("/accounts")
 def studio_accounts():
-    return {"accounts": store.list_accounts()}
+    return {"accounts": [a for a in store.list_accounts() if account_allowed(a["open_id"])]}
 
 
 @studio_api.post("/tiktok/init")
@@ -313,6 +336,9 @@ def send_lesson(request: Request, lesson_id: str):
     open_id = request.session.get("open_id")
     if not open_id:
         return RedirectResponse("/studio?notice=connect_first", status_code=303)
+    if not account_allowed(open_id):
+        request.session.pop("open_id", None)
+        return RedirectResponse("/studio?notice=invite_only", status_code=303)
     try:
         token = store.valid_access_token(open_id, tiktok.refresh)
         if token is None:

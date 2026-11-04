@@ -13,7 +13,8 @@
     "tiktok_error": ("TikTok could not complete the authorization. Please try again.", "text-red-300"),
     "not_configured": ("TikTok connection is temporarily unavailable.", "text-amber-300"),
     "connect_first": ("Connect your TikTok account first.", "text-amber-300"),
-    "reconnect": ("Your TikTok session expired. Please connect again.", "text-amber-300")} %}
+    "reconnect": ("Your TikTok session expired. Please connect again.", "text-amber-300"),
+    "invite_only": ("The creator studio is invite-only during the beta. Your TikTok authorization was revoked and nothing was stored.", "text-amber-300")} %}
   {% if notice and notice in messages %}
   <p class="mt-6 rounded-xl border border-white/10 p-4 {{ messages[notice][1] }}">{{ messages[notice][0] }}</p>
   {% endif %}
