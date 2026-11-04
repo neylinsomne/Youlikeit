@@ -134,9 +134,8 @@ switch ($Pipeline) {
         Write-Host "Starting services..." -ForegroundColor Yellow
         docker compose up -d 2>&1 | Out-Null
         Start-Sleep 3
-        Write-Host "Dashboard:  http://localhost:8080" -ForegroundColor Green
-        Write-Host "API:        http://localhost:8001" -ForegroundColor Green
-        Write-Host "Frontend:   http://localhost:8002/app" -ForegroundColor Green
+        Write-Host "El estudio local (API + front) ya no corre en Docker." -ForegroundColor Yellow
+        Write-Host "Arrancalo con: .\scripts\ops\studio.ps1  ->  http://127.0.0.1:5180" -ForegroundColor Green
     }
 
     "upload" {

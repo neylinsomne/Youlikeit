@@ -51,7 +51,7 @@ while (-not (docker info 2>`$null)) {
 
 # Start containers if not running
 Set-Location "$ProjectDir"
-docker compose up -d ytlab api fish-speech 2>&1 | Out-File `$logFile -Append
+docker compose up -d ytlab fish-speech 2>&1 | Out-File `$logFile -Append
 Start-Sleep -Seconds 30
 
 # Run manga pipeline
