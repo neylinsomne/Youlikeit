@@ -27,7 +27,8 @@ npm install
 npm run dev
 ```
 
-O todo junto con `scripts/ops/studio.ps1`.
+O todo junto con `scripts/ops/studio.ps1`, o como aplicativo con el ícono "YouLikeIt Studio"
+(`scripts/ops/install-studio-shortcut.ps1` lo crea; corre `studio.ps1 -App`).
 
 Abre **http://127.0.0.1:5180**.
 

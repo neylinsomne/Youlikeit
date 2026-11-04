@@ -45,10 +45,16 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }   # y llena las keys 
 ylk doctor                                       # estado de keys, tokens y stack, sin mostrar valores
 
 .\scripts\ops\studio.ps1                         # API + front en 127.0.0.1 y abre http://127.0.0.1:5180
+.\scripts\ops\install-studio-shortcut.ps1        # una vez: ícono "YouLikeIt Studio" en Escritorio e Inicio
 ```
 
 `studio.ps1` revisa los requisitos (ylk, Node.js, ffmpeg, `STUDIO_TOKEN` en `.env`, puertos libres),
 corre `npm install` la primera vez y arranca todo. `-Check` solo revisa y `-Stop` lo apaga.
+
+**Como aplicativo:** el ícono "YouLikeIt Studio" corre `studio.ps1 -App`. Arranca la API y el front
+ocultos y abre el estudio en una ventana propia de Edge (sin barra de direcciones, perfil aparte y sin
+sincronizar). Al **cerrar la ventana se apaga todo**. Un segundo doble clic no duplica los servidores.
+Si algo falla aparece un mensaje; el detalle queda en `%TEMP%\youlikeit-studio\app.log`.
 
 Indexar una película de punta a punta (CLI o UI): [docs/operations/INDEX_A_FILM.md](docs/operations/INDEX_A_FILM.md).
 

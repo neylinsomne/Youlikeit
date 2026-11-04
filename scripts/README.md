@@ -30,6 +30,8 @@ pueden invocar desde cualquier cwd:
 .\scripts\ops\studio.ps1               # estudio local: API (ylk studio) + front (Vite) en 127.0.0.1
 .\scripts\ops\studio.ps1 -Check        # solo revisar requisitos (ylk, node, ffmpeg, STUDIO_TOKEN, puertos)
 .\scripts\ops\studio.ps1 -Stop         # apagar API + front
+.\scripts\ops\studio.ps1 -App          # modo aplicativo: ventana propia de Edge; al cerrarla se apaga todo
+.\scripts\ops\install-studio-shortcut.ps1   # ícono "YouLikeIt Studio" en Escritorio e Inicio (-Remove lo quita)
 .\scripts\ops\docker-setup.ps1          # levantar entorno + deps + playwright
 .\scripts\ops\run.ps1 manga             # punto de entrada multi-pipeline
 .\scripts\ops\run-content-flow.ps1      # ciclo de contenido (Docker)

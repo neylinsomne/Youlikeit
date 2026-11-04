@@ -17,12 +17,17 @@
   .\scripts\ops\studio.ps1 -Check       # only check prerequisites
   .\scripts\ops\studio.ps1 -NoBrowser   # start without opening the browser
   .\scripts\ops\studio.ps1 -Stop        # stop API + front
+  .\scripts\ops\studio.ps1 -App         # desktop-app mode (what the shortcut runs):
+                                        # hidden servers + Edge app window; closing the
+                                        # window stops everything. Errors show a message box.
+  .\scripts\ops\install-studio-shortcut.ps1   # creates the Desktop + Start menu shortcut
 #>
 
 param(
     [switch]$Stop,
     [switch]$Check,
     [switch]$NoBrowser,
+    [switch]$App,
     [int]$TimeoutSec = 60
 )
 
@@ -37,6 +42,9 @@ $EnvFile    = Join-Path $RepoRoot '.env'
 $StateDir   = Join-Path $env:TEMP 'youlikeit-studio'
 $StateFile  = Join-Path $StateDir 'state.json'
 $Ylk        = $null
+# Own Edge profile for the app window: isolated from the user's browser, and lets us find
+# exactly the processes of OUR window (their command line contains this path).
+$AppProfile = Join-Path $env:LOCALAPPDATA 'YouLikeIt\studio-window'
 
 function Show-Step([string]$Text) { Write-Host "[studio] $Text" -ForegroundColor Cyan }
 function Show-Ok([string]$Text)   { Write-Host "  OK    $Text" -ForegroundColor Green }
@@ -317,6 +325,7 @@ function Start-Studio([int]$ApiPort) {
         Show-Fail ('{0} did not start on port {1}. Stopping both.' -f $failed[0], $failed[1])
         Stop-Studio
         Show-LogTail $failed[2]
+        Show-AppMessage ("El estudio no pudo arrancar ({0} en el puerto {1}).`n`nDetalle en:`n{2}" -f $failed[0], $failed[1], $StateDir)
         exit 1
     }
     Test-LoopbackOnly 'API' $ApiPort
@@ -330,7 +339,113 @@ function Start-Studio([int]$ApiPort) {
     if (-not $NoBrowser) { Start-Process $frontUrl }
 }
 
+# -- desktop-app mode (-App) ---------------------------------------------------
+function Show-AppMessage([string]$Text, [string]$Icon = 'Error') {
+    if (-not $App) { return }
+    try {
+        Add-Type -AssemblyName PresentationFramework
+        [void][System.Windows.MessageBox]::Show($Text, 'YouLikeIt Studio', 'OK', $Icon)
+    } catch { }
+}
+
+function Find-Edge {
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
+        (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'))
+    foreach ($p in $candidates) { if ($p -and (Test-Path -LiteralPath $p)) { return $p } }
+    return $null
+}
+
+# Edge processes that belong to OUR app window (same --user-data-dir), and nothing else.
+function Get-AppWindowProcess {
+    $needle = $AppProfile.ToLowerInvariant()
+    $ids = @(Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($needle) } |
+        ForEach-Object { [int]$_.ProcessId })
+    if ($ids.Count -eq 0) { return @() }
+    return @(Get-Process -Id $ids -ErrorAction SilentlyContinue)
+}
+
+function Test-AppWindowOpen {
+    return [bool](@(Get-AppWindowProcess | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero }).Count)
+}
+
+function Open-AppWindow([string]$Url) {
+    $edge = Find-Edge
+    if (-not $edge) { Start-Process $Url; return $false }
+    New-Item -ItemType Directory -Force -Path $AppProfile | Out-Null
+    # --disable-sync: a new Edge profile signs in with the Windows account and turns sync on by
+    # itself (verified); the studio window must not upload anything.
+    $edgeArgs = @("--app=$Url", ('--user-data-dir="{0}"' -f $AppProfile), '--no-first-run',
+                  '--no-default-browser-check', '--disable-sync', '--window-size=1440,900')
+    Start-Process -FilePath $edge -ArgumentList $edgeArgs | Out-Null
+    return $true
+}
+
+# Waits for the window to appear (max 30 s) and then for the user to close it.
+function Wait-AppWindowClosed {
+    $deadline = (Get-Date).AddSeconds(30)
+    while (-not (Test-AppWindowOpen)) {
+        if ((Get-Date) -gt $deadline) { return $false }
+        Start-Sleep -Milliseconds 500
+    }
+    while (Test-AppWindowOpen) { Start-Sleep -Seconds 2 }
+    return $true
+}
+
+function Start-App {
+    New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
+    try { Start-Transcript -Path (Join-Path $StateDir 'app.log') -Force | Out-Null } catch { }
+    $frontUrl = 'http://{0}:{1}' -f $StudioHost, $FrontPort
+    $mutex = New-Object System.Threading.Mutex($false, 'Local\YouLikeItStudioApp')
+    if (-not $mutex.WaitOne(0)) {
+        # Another launcher owns the studio: just open one more window (if it is already up).
+        if (Test-Port $FrontPort) { [void](Open-AppWindow $frontUrl) }
+        return 0
+    }
+    $startedHere = $false
+    try {
+        $running = Read-State
+        if ($running -and ((Get-TrackedProcess $running.api) -or (Get-TrackedProcess $running.front))) {
+            # Started from a terminal: open a window but never stop what we did not start.
+            [void](Open-AppWindow $frontUrl)
+            return 0
+        }
+        if ($running) { Remove-Item -LiteralPath $StateFile -Force -ErrorAction SilentlyContinue }
+        $apiPort = Get-ApiPort
+        if (-not (Test-Prerequisites $apiPort)) {
+            Show-AppMessage ("Faltan requisitos para abrir el estudio.`n`nDetalle en:`n{0}`n`nO en PowerShell: .\scripts\ops\studio.ps1 -Check" -f (Join-Path $StateDir 'app.log'))
+            return 1
+        }
+        $script:NoBrowser = $true
+        Start-Studio $apiPort                   # exits 1 (with a message) if it cannot start
+        $startedHere = $true
+        if (-not (Open-AppWindow $frontUrl)) {
+            Show-AppMessage "No encontre Microsoft Edge: abri el estudio en tu navegador.`nPara apagarlo: .\scripts\ops\studio.ps1 -Stop" 'Information'
+            $startedHere = $false               # without our own window we cannot tell when to stop
+            return 0
+        }
+        if (-not (Wait-AppWindowClosed)) {
+            Show-AppMessage 'La ventana del estudio no se abrio. Se apagan la API y el front.'
+        }
+        return 0
+    } finally {
+        if ($startedHere) {
+            Stop-Studio
+            # Leftover processes of our own window profile only (never the user's Edge).
+            Get-AppWindowProcess | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+        }
+        $mutex.ReleaseMutex()
+        try { Stop-Transcript | Out-Null } catch { }
+    }
+}
+
 # -- main ------------------------------------------------------------------
+if ($App) {
+    $code = @(Start-App)[-1]                # a function returns ALL its output: keep the last
+    exit ([int]$code)
+}
+
 if ($Stop) {
     Stop-Studio
     exit 0
