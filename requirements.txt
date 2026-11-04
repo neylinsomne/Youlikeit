@@ -34,7 +34,7 @@ google-auth-httplib2>=0.2.0
 cryptography>=42.0.0   # Fernet: tokens de YouTube cifrados en tokens/ (TOKEN_ENC_KEY)
 
 # TTS (free, no API key) — fallback de apps.supercut.tts
-edge-tts>=6.1.0
+edge-tts>=7.3.1                # Microsoft cambia el protocolo: 7.2.x ya da 403
 
 # Trends
 pytrends>=4.9.0

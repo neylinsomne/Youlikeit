@@ -148,12 +148,31 @@ def test_patch_moment_reject_and_manual_labels(client, world, db):
     m = r.json()
     assert m["status"] == "rejected"
     assert m["labels"] == [{"dimension": "trope", "value": "mentor_betrayal", "confidence": 1.0, "source": "manual"}]
-    assert client.patch(f"/api/moments/{mid}", json={"status": "candidate"}).json()["status"] == "candidate"
+    # restaurar un momento con etiqueta manual lo deja 'labeled': como 'candidate' la próxima
+    # detección lo borraría junto con sus etiquetas
+    assert client.patch(f"/api/moments/{mid}", json={"status": "candidate"}).json()["status"] == "labeled"
     assert client.patch(f"/api/moments/{mid}", json={"status": "labeled"}).status_code == 422
     bad = client.patch(f"/api/moments/{mid}", json={"add_labels": [{"dimension": "trope", "value": "made_up"}]})
     assert bad.status_code == 422
     assert client.patch("/api/moments/99999", json={"status": "rejected"}).status_code == 404
-    assert moments_by_ids(db, [mid])[0]["status"] == "candidate"
+    assert moments_by_ids(db, [mid])[0]["status"] == "labeled"
+
+
+@pytest.mark.integration
+def test_restore_and_manual_labels_protect_moments_from_redetection(client, world, db):
+    mid = world["moments"]["Horror Express"]
+    db.execute("UPDATE moments SET status = 'candidate', labeled_by = NULL WHERE id = ?", (mid,))
+    db.execute("DELETE FROM moment_labels WHERE moment_id = ? AND source = 'manual'", (mid,))
+    db.commit()
+    client.patch(f"/api/moments/{mid}", json={"status": "rejected"})
+    assert client.patch(f"/api/moments/{mid}", json={"status": "candidate"}).json()["status"] == "candidate"
+    r = client.patch(f"/api/moments/{mid}", json={"add_labels": [{"dimension": "emotion", "value": "dread"}]})
+    assert r.json()["status"] == "labeled"                       # etiquetar a mano lo protege
+    db.execute("UPDATE moments SET status = 'rejected' WHERE id = ?", (mid,))
+    db.execute("UPDATE moments SET labeled_by = 'llm:groq' WHERE id = ?", (mid,))
+    db.execute("DELETE FROM moment_labels WHERE moment_id = ? AND source = 'manual'", (mid,))
+    db.commit()
+    assert client.patch(f"/api/moments/{mid}", json={"status": "candidate"}).json()["status"] == "labeled"
 
 
 @pytest.mark.integration

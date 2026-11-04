@@ -138,3 +138,13 @@ def test_groq_json_validate_failed_is_retried(mocked_http, monkeypatch):
     monkeypatch.setattr(llm_json, "available", lambda name: name == "groq")
     data, used = llm_json.complete_json("x", schema={"type": "object"})
     assert data == {"ok": True} and used == "groq"
+
+
+@pytest.mark.unit
+def test_groq_reasoning_models_get_low_effort_and_token_margin():
+    p = llm_json.groq_payload("s", "p", model="openai/gpt-oss-120b", temperature=0.5, max_tokens=780)
+    assert p["reasoning_effort"] == "low" and p["max_tokens"] == 780 + llm_json.REASONING_BUDGET
+    retry = llm_json.groq_payload("s", "p", model="openai/gpt-oss-120b", temperature=0.5, max_tokens=780, attempt=1)
+    assert retry["max_tokens"] > p["max_tokens"]                     # más margen en cada reintento
+    plain = llm_json.groq_payload("s", "p", model="qwen/qwen3.8-27b", temperature=0.5, max_tokens=780)
+    assert "reasoning_effort" not in plain and plain["max_tokens"] == 780

@@ -9,6 +9,23 @@ import { Button, Icon, ProgressBar, StatusPill } from './ui';
 const SOURCE_ICON = (source = '') =>
   source === 'manual' ? 'person' : source.startsWith('llm') ? 'auto_awesome' : 'bolt';
 
+const SOURCE_RANK = (source = '') => (source === 'manual' ? 2 : source.startsWith('llm') ? 1 : 0);
+
+/** Una etiqueta puede venir de varias fuentes (IA + léxico): se muestra una vez, la más fiable. */
+function uniqueLabels(labels = []) {
+  const best = new Map();
+  for (const l of labels ?? []) {
+    const key = `${l.dimension}:${l.value}`;
+    const prev = best.get(key);
+    const better =
+      !prev ||
+      SOURCE_RANK(l.source) > SOURCE_RANK(prev.source) ||
+      (SOURCE_RANK(l.source) === SOURCE_RANK(prev.source) && (l.confidence ?? 0) > (prev.confidence ?? 0));
+    if (better) best.set(key, l);
+  }
+  return [...best.values()];
+}
+
 function LazyPreview({ src, startMs, endMs }) {
   const [state, setState] = useState('idle'); // idle | playing | error
   return (
@@ -93,7 +110,7 @@ export default function MomentCard({ moment, vocab, onUpdated, onAddToLesson }) 
   const [draft, setDraft] = useState({ dimension: 'emotion', value: '' });
 
   const rejected = moment.status === 'rejected';
-  const labels = moment.labels || [];
+  const labels = uniqueLabels(moment.labels);
   const alreadyHas = labels.some((l) => l.dimension === draft.dimension && l.value === draft.value);
   const draftValid = Boolean(draft.value) && vocab.has(draft.dimension, draft.value) && !alreadyHas;
 

@@ -89,8 +89,19 @@ def patch_moment(moment_id: int, body: MomentPatch) -> dict:
                          (moment_id, lab.dimension, lab.value))
         for lab in body.add_labels or []:
             add_label(conn, moment_id, lab.dimension, lab.value, 1.0, "manual", commit=False)
+        # Volver a detectar momentos BORRA los 'candidate' (y sus etiquetas). Por eso un momento
+        # con etiquetas de la IA o manuales nunca queda como 'candidate': restaurarlo lo devuelve
+        # a 'labeled', y etiquetar a mano un candidato lo protege.
+        has_labels = conn.execute(
+            "SELECT (SELECT labeled_by FROM moments WHERE id = ?) IS NOT NULL OR EXISTS("
+            "SELECT 1 FROM moment_labels WHERE moment_id = ? AND source = 'manual')",
+            (moment_id, moment_id)).fetchone()[0]
         if body.status is not None:
-            conn.execute("UPDATE moments SET status = ? WHERE id = ?", (body.status, moment_id))
+            status = "labeled" if body.status == "candidate" and has_labels else body.status
+            conn.execute("UPDATE moments SET status = ? WHERE id = ?", (status, moment_id))
+        elif body.add_labels:
+            conn.execute("UPDATE moments SET status = 'labeled', labeled_by = COALESCE(labeled_by, 'manual') "
+                         "WHERE id = ? AND status = 'candidate'", (moment_id,))
         conn.commit()
         return serializers.moment(conn, moment_id)
 

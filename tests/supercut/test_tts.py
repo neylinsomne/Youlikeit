@@ -79,3 +79,14 @@ def test_empty_text_is_rejected(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "edge_tts", _fake_edge([], {}))
     with pytest.raises(ValueError):
         tts.synthesize("   ", lang="es", out_path=tmp_path / "n.mp3")
+
+
+def test_edge_403_explains_how_to_fix():
+    from apps.supercut import tts
+
+    async def boom():
+        raise RuntimeError("WSServerHandshakeError: 403, message='Invalid response status', url='wss://x?TrustedClientToken=abc'")
+
+    with pytest.raises(tts.TTSError, match="pip install -U edge-tts") as e:
+        tts._run_coro(boom, timeout=5)
+    assert "TrustedClientToken" not in str(e.value)               # no se vuelca la URL larga

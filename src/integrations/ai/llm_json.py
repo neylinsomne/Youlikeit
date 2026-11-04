@@ -99,6 +99,26 @@ def _ollama(system: str, prompt: str, schema: dict | None, *, model: str, temper
 
 RETRY_429 = 5
 MAX_WAIT_S = 90.0
+# gpt-oss (Groq) razona antes de responder y ese razonamiento gasta del MISMO max_tokens.
+# Con presupuestos chicos (p. ej. 780 para un guion de 3 tramos) a veces se agota antes del
+# JSON → 400 json_validate_failed con failed_generation vacío. Se pide razonamiento bajo y se
+# suma margen (más en cada reintento).
+REASONING_BUDGET = 1024
+
+
+def is_reasoning_model(model: str) -> bool:
+    return model.startswith("openai/gpt-oss")
+
+
+def groq_payload(system: str, prompt: str, *, model: str, temperature: float, max_tokens: int,
+                 attempt: int = 0) -> dict:
+    payload = {"model": model, "temperature": temperature, "max_tokens": max_tokens,
+               "response_format": {"type": "json_object"},
+               "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}]}
+    if is_reasoning_model(model):
+        payload["reasoning_effort"] = "low"
+        payload["max_tokens"] = max_tokens + REASONING_BUDGET * (1 + min(attempt, 2))
+    return payload
 
 
 def retry_after_seconds(resp: requests.Response, attempt: int) -> float:
@@ -121,14 +141,12 @@ def _groq(system: str, prompt: str, schema: dict | None, *, model: str, temperat
     # se espera lo que indica Groq y se reintenta (antes se pasaba al siguiente y fallaba).
     for attempt in range(RETRY_429 + 1):
         resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={
-            "Authorization": f"Bearer {os.getenv('GROQ_API_KEY', '')}"}, json={
-            "model": model, "temperature": temperature, "max_tokens": max_tokens,
-            "response_format": {"type": "json_object"},
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-        }, timeout=timeout)
+            "Authorization": f"Bearer {os.getenv('GROQ_API_KEY', '')}"},
+            json=groq_payload(system, prompt, model=model, temperature=temperature,
+                              max_tokens=max_tokens, attempt=attempt), timeout=timeout)
         if resp.status_code == 400 and "json_validate_failed" in resp.text and attempt < 2:
-            # Modo JSON de Groq: si el modelo emite JSON inválido la API responde 400.
-            # Es intermitente (visto en producción): se reintenta tal cual.
+            # Modo JSON de Groq: si el modelo emite JSON inválido (o se queda sin tokens por
+            # el razonamiento) la API responde 400. Se reintenta con más margen.
             log.warning("Groq json_validate_failed; reintento %d", attempt + 1)
             continue
         if resp.status_code == 429 and attempt < RETRY_429:

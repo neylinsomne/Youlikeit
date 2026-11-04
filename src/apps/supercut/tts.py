@@ -68,7 +68,13 @@ def _run_coro(factory, timeout: float):
     if t.is_alive():
         raise TTSError(f"TTS sin respuesta en {timeout:.0f} s")
     if "error" in box:
-        raise TTSError(f"{type(box['error']).__name__}: {box['error']}") from box["error"]
+        err = box["error"]
+        if "403" in str(err):
+            # Microsoft cambia cada tanto el protocolo de la voz de Edge; la librería se pone al día.
+            raise TTSError("La voz de Edge rechazó la conexión (403). Actualiza edge-tts con "
+                           "`python -m pip install -U edge-tts` y vuelve a renderizar, o renderiza "
+                           "sin narración.") from err
+        raise TTSError(f"{type(err).__name__}: {str(err)[:200]}") from err
     return box["value"]
 
 
