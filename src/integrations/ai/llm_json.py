@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import time
 
 import requests
 
@@ -96,16 +97,43 @@ def _ollama(system: str, prompt: str, schema: dict | None, *, model: str, temper
     return resp.json()["message"]["content"]
 
 
+RETRY_429 = 5
+MAX_WAIT_S = 90.0
+
+
+def retry_after_seconds(resp: requests.Response, attempt: int) -> float:
+    """Espera para un 429: header Retry-After, o el "try again in 12.3s" del cuerpo de Groq."""
+    header = resp.headers.get("retry-after")
+    if header:
+        try:
+            return min(MAX_WAIT_S, float(header))
+        except ValueError:
+            pass
+    m = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", resp.text or "")
+    if m:
+        return min(MAX_WAIT_S, float(m.group(1) or 0) * 60 + float(m.group(2)) + 0.5)
+    return min(MAX_WAIT_S, 5.0 * (2 ** attempt))
+
+
 def _groq(system: str, prompt: str, schema: dict | None, *, model: str, temperature: float,
           max_tokens: int, timeout: float) -> str:
-    resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={
-        "Authorization": f"Bearer {os.getenv('GROQ_API_KEY', '')}"}, json={
-        "model": model, "temperature": temperature, "max_tokens": max_tokens,
-        "response_format": {"type": "json_object"},
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-    }, timeout=timeout)
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    # Plan gratis de Groq: límites de tokens/minuto. Un 429 NO es "proveedor caído":
+    # se espera lo que indica Groq y se reintenta (antes se pasaba al siguiente y fallaba).
+    for attempt in range(RETRY_429 + 1):
+        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers={
+            "Authorization": f"Bearer {os.getenv('GROQ_API_KEY', '')}"}, json={
+            "model": model, "temperature": temperature, "max_tokens": max_tokens,
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        }, timeout=timeout)
+        if resp.status_code == 429 and attempt < RETRY_429:
+            wait = retry_after_seconds(resp, attempt)
+            log.warning("Groq 429 (límite por minuto); esperando %.1fs", wait)
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+    raise requests.HTTPError("Groq: reintentos 429 agotados")
 
 
 def _gemini(system: str, prompt: str, schema: dict | None, *, model: str, temperature: float,

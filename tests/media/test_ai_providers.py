@@ -112,3 +112,18 @@ def test_complete_json_without_providers_raises(monkeypatch):
     monkeypatch.setattr(llm_json, "available", lambda name: False)
     with pytest.raises(llm_json.LLMUnavailable):
         llm_json.complete_json("x", schema=SCHEMA)
+
+
+@pytest.mark.integration
+def test_groq_429_waits_and_retries(mocked_http, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "g")
+    waits = []
+    monkeypatch.setattr(llm_json.time, "sleep", lambda s: waits.append(s))
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    mocked_http.post(url, status=429, body="Rate limit reached. Please try again in 1.5s.")
+    mocked_http.post(url, json={"choices": [{"message": {"content": '{"trope": "siege", "confidence": 0.6}'}}]})
+    monkeypatch.setattr(llm_json, "available", lambda name: name == "groq")
+    data, used = llm_json.complete_json("x", schema={"type": "object", "required": ["trope"],
+                                                     "properties": {"trope": {"type": "string"}}})
+    assert used == "groq" and data["trope"] == "siege"
+    assert waits == [2.0]
