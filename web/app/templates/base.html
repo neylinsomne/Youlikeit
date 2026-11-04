@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="YouLikeIt helps people understand emotions and practice empathy through film: explore movies by emotion and turn key scenes into short lessons." />
+  <meta name="theme-color" content="#070710" />
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg" />
+  <title>{% block title %}YouLikeIt — Learn empathy through film{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { ink: { 950: '#070710', 900: '#0d0d18', 800: '#161628', 700: '#1f1f35' },
+                brand: { 400: '#7ad7ff', 500: '#5bc0de' }, accent: { 500: '#ff6f91' } },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], display: ['"Space Grotesk"', 'system-ui', 'sans-serif'] } } } };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    h1, h2, h3, .display { font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.08); }
+    .glow { background: radial-gradient(60% 60% at 50% 0%, rgba(91,192,222,0.16), transparent 70%), radial-gradient(40% 40% at 80% 30%, rgba(255,111,145,0.10), transparent 70%); }
+    .prose-legal h2 { font-size: 1.25rem; font-weight: 700; margin-top: 2rem; margin-bottom: .5rem; }
+    .prose-legal p, .prose-legal li { color: rgba(255,255,255,.75); line-height: 1.7; }
+    .prose-legal ul { list-style: disc; padding-left: 1.25rem; margin: .5rem 0; }
+    .prose-legal table { width: 100%; font-size: .9rem; margin: .75rem 0; }
+    .prose-legal th, .prose-legal td { border: 1px solid rgba(255,255,255,.1); padding: .5rem .6rem; text-align: left; vertical-align: top; }
+    .prose-legal th { color: #fff; background: rgba(255,255,255,.04); }
+  </style>
+</head>
+<body class="bg-ink-950 text-white min-h-screen flex flex-col">
+  <header class="sticky top-0 z-40 border-b border-white/5 bg-ink-950/85 backdrop-blur-md">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+      <a href="/" class="flex items-center gap-2 font-semibold"><img src="/static/logo.svg" alt="" class="h-7 w-7"> YouLikeIt</a>
+      <nav class="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-white/75">
+        <a href="/explore" class="hover:text-white">Explore</a>
+        <a href="/studio" class="hover:text-white">Creator studio</a>
+        <a href="/terms" class="hover:text-white">Terms of Service</a>
+        <a href="/privacy" class="hover:text-white">Privacy Policy</a>
+        <a href="/contact" class="hover:text-white">Contact</a>
+      </nav>
+    </div>
+  </header>
+  <main class="flex-1">{% block content %}{% endblock %}</main>
+  <footer class="border-t border-white/5 py-8 text-sm text-white/55">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5">
+      <p>© {{ year }} YouLikeIt · Learn empathy through film</p>
+      <div class="flex flex-wrap gap-5">
+        <a href="/terms" class="hover:text-white">Terms of Service</a>
+        <a href="/privacy" class="hover:text-white">Privacy Policy</a>
+        <a href="/contact" class="hover:text-white">Contact</a>
+        <a href="mailto:{{ contact }}" class="hover:text-white">{{ contact }}</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

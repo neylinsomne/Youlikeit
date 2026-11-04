@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy — YouLikeIt{% endblock %}
+{% block content %}
+<article class="prose-legal mx-auto max-w-3xl px-5 py-14">
+  <h1 class="text-3xl font-bold md:text-4xl">Privacy Policy</h1>
+  <p class="mt-2 text-sm">Last updated: {{ last_updated }}</p>
+
+  <h2>1. Who we are</h2>
+  <p>YouLikeIt ("we", "us") is a website that helps people understand emotions and practice empathy through film, and a creator studio that lets creators send short educational videos to their own TikTok account as drafts. Contact: <a class="underline" href="mailto:{{ contact }}">{{ contact }}</a>.</p>
+
+  <h2>2. Visitors who browse the site</h2>
+  <p>You can explore the site without an account. We do not use advertising or tracking cookies and we do not sell personal data. Our hosting provider keeps standard technical logs (such as IP address, browser type and requested page) for security and reliability, for a limited time.</p>
+
+  <h2>3. Creators who connect TikTok</h2>
+  <p>If you choose to connect your TikTok account in the Creator Studio, we use TikTok Login Kit and request only these permissions:</p>
+  <table>
+    <tr><th>Permission</th><th>Data we receive</th><th>Why</th><th>What we store</th></tr>
+    <tr><td><code>user.info.basic</code></td><td>Open ID, display name, avatar URL</td><td>To show you which TikTok account is connected</td><td>Open ID and display name. The avatar is displayed but not stored.</td></tr>
+    <tr><td><code>video.upload</code></td><td>Permission to upload videos to your TikTok inbox as drafts</td><td>To send a lesson to your inbox when you click "Send to TikTok"</td><td>OAuth access and refresh tokens, encrypted (see section 5)</td></tr>
+  </table>
+  <p>We never publish on your behalf: uploads arrive in your TikTok inbox as drafts, and you decide in the TikTok app whether to post them. We do not access your existing videos, followers, likes, comments, messages or analytics.</p>
+
+  <h2>4. How we use data</h2>
+  <ul>
+    <li>To identify the connected account and display its name and avatar in the Creator Studio.</li>
+    <li>To upload a draft video to your TikTok inbox when you explicitly request it.</li>
+    <li>To keep the service secure and working.</li>
+  </ul>
+  <p>We do not use TikTok data for advertising, profiling or any purpose other than those listed above, and we do not share it with third parties except our infrastructure providers acting on our behalf.</p>
+
+  <h2>5. Storage and security</h2>
+  <p>OAuth tokens are encrypted at rest (AES with HMAC authentication) using a key that is kept only in our server environment, never in our code. Data is stored on our cloud hosting provider (Railway). Access to production systems is restricted to the operator of the service.</p>
+
+  <h2>6. Retention and deletion</h2>
+  <ul>
+    <li>Your connection data is kept while your TikTok account remains connected.</li>
+    <li>Clicking "Disconnect and revoke access" in the Creator Studio revokes the token with TikTok and deletes your Open ID, display name and tokens from our database immediately.</li>
+    <li>You can also revoke access from TikTok (Settings and privacy → Security and permissions → Apps and services).</li>
+    <li>To request deletion of any other data, email <a class="underline" href="mailto:{{ contact }}">{{ contact }}</a>; we respond within 30 days.</li>
+  </ul>
+
+  <h2>7. Your rights</h2>
+  <p>You can request access to, correction of, or deletion of your personal data, and withdraw consent at any time by disconnecting. If you are in Colombia, these rights are protected by Law 1581 of 2012 (habeas data); similar rights apply under other laws such as the GDPR.</p>
+
+  <h2>8. Children</h2>
+  <p>The Creator Studio is not intended for people under 18. We do not knowingly collect data from children.</p>
+
+  <h2>9. Changes</h2>
+  <p>We will update this page and its date if this policy changes. Significant changes will be announced on the site.</p>
+</article>
+{% endblock %}
