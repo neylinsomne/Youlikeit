@@ -19,6 +19,7 @@ import typer
 from cli.commands import analytics as analytics_cmd
 from cli.commands import doctor as doctor_cmd
 from cli.commands import media as media_cmd
+from cli.commands import moments as moments_cmd
 from cli.commands import production as production_cmd
 from cli.commands import scoring as scoring_cmd
 from cli.commands import signals as signals_cmd
@@ -40,6 +41,7 @@ app = typer.Typer(
 app.add_typer(signals_cmd.app, name="signals")
 app.add_typer(analytics_cmd.app, name="analytics")
 app.add_typer(media_cmd.app, name="media")
+app.add_typer(moments_cmd.app, name="moments")
 
 # Verbos top-level
 production_cmd.register(app)

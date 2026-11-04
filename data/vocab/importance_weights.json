@@ -1,0 +1,14 @@
+{
+  "_doc": "Pesos lineales de la importancia de un momento (cada señal normalizada a 0-1). Interpretables y ajustables por el ciclo de analytics. La contribución de cada señal se guarda en moments.features_json.",
+  "weights": {
+    "quote_anchor": 0.30,
+    "loudness": 0.12,
+    "sudden_onset": 0.10,
+    "shot_tempo": 0.08,
+    "speech_intensity": 0.08,
+    "plot_anchor": 0.12,
+    "climax_position": 0.10,
+    "trope_cues": 0.10
+  },
+  "llm_blend": 0.4
+}
