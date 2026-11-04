@@ -38,6 +38,7 @@ app.add_middleware(
     same_site="lax", max_age=60 * 60 * 24 * 14,
 )
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
+app.mount("/lessons-media", StaticFiles(directory=BASE / "lessons", check_dir=False), name="lessons")
 templates = Jinja2Templates(directory=BASE / "templates")
 
 
@@ -47,6 +48,18 @@ def load_catalog() -> dict:
 
 
 CATALOG = load_catalog()
+LESSONS_DIR = BASE / "lessons"
+
+
+def load_lessons() -> list[dict]:
+    reg = LESSONS_DIR / "lessons.json"
+    if not reg.exists():
+        return []
+    return [x for x in json.loads(reg.read_text(encoding="utf-8")) if (LESSONS_DIR / x["file"]).is_file()]
+
+
+LESSONS = load_lessons()
+LESSON_BY_ID = {x["id"]: x for x in LESSONS}
 EMOTION_COUNTS = {e["id"]: sum(e["id"] in f.get("emotions", []) for f in CATALOG["films"]) for e in EMOTIONS}
 
 
@@ -54,7 +67,7 @@ def render(request: Request, name: str, **ctx):
     return templates.TemplateResponse(request, name, {
         "year": datetime.now().year, "contact": CONTACT, "last_updated": LAST_UPDATED,
         "emotions": EMOTIONS, "films": CATALOG["films"], "tropes": CATALOG["tropes"],
-        "emotion_counts": EMOTION_COUNTS, **ctx})
+        "emotion_counts": EMOTION_COUNTS, "lessons": LESSONS, **ctx})
 
 
 @app.get("/healthz")
@@ -78,7 +91,8 @@ def emotion(request: Request, emotion_id: str):
     if emo is None:
         raise HTTPException(404)
     films = [f for f in CATALOG["films"] if emotion_id in f.get("emotions", [])]
-    return render(request, "emotion.html", emo=emo, emo_films=films)
+    emo_lessons = [x for x in LESSONS if x["emotion"] == emotion_id]
+    return render(request, "emotion.html", emo=emo, emo_films=films, emo_lessons=emo_lessons)
 
 
 @app.get("/terms")
@@ -114,7 +128,8 @@ def studio(request: Request):
                 avatar = tiktok.user_info(account["access_token"]).get("avatar_url")
             except Exception:  # noqa: BLE001 — el avatar es opcional (no se almacena)
                 avatar = None
-    return render(request, "studio.html", account=account, avatar=avatar, notice=notice,
+    flash = request.session.pop("flash", None)
+    return render(request, "studio.html", account=account, avatar=avatar, notice=notice, flash=flash,
                   tiktok_ready=tiktok.configured(), scopes=tiktok.SCOPES)
 
 
@@ -187,3 +202,54 @@ def site_verification(filename: str):
     else:
         body = f"tiktok-developers-site-verification={m.group(1)}"
     return PlainTextResponse(body)
+
+
+# ── Send to TikTok (Content Posting API: borrador al inbox) ─────────────────
+STATUS_TEXT = {
+    "PROCESSING_UPLOAD": ("Uploading to TikTok…", True),
+    "PROCESSING_DOWNLOAD": ("TikTok is processing the video…", True),
+    "SEND_TO_USER_INBOX": ("Delivered to your TikTok inbox as a draft.", False),
+    "PUBLISH_COMPLETE": ("You published it from TikTok.", False),
+    "FAILED": ("TikTok could not process this video.", False),
+}
+
+
+@app.post("/studio/send/{lesson_id}")
+def send_lesson(request: Request, lesson_id: str):
+    lesson = LESSON_BY_ID.get(lesson_id)
+    if lesson is None:
+        raise HTTPException(404)
+    open_id = request.session.get("open_id")
+    if not open_id:
+        return RedirectResponse("/studio?notice=connect_first", status_code=303)
+    try:
+        token = store.valid_access_token(open_id, tiktok.refresh)
+        if token is None:
+            request.session.pop("open_id", None)
+            return RedirectResponse("/studio?notice=reconnect", status_code=303)
+        publish_id = tiktok.upload_draft(token, LESSONS_DIR / lesson["file"])
+    except tiktok.TikTokError as e:
+        code = str(e)
+        request.session["flash"] = tiktok.FRIENDLY_ERRORS.get(
+            code, f"TikTok could not receive the video ({code}). Please try again.")
+        return RedirectResponse("/studio", status_code=303)
+    store.record_publish(publish_id, open_id, lesson_id)
+    return RedirectResponse(f"/studio/sent/{publish_id}", status_code=303)
+
+
+@app.get("/studio/sent/{publish_id}")
+def sent(request: Request, publish_id: str):
+    pub = store.get_publish(publish_id)
+    if pub is None or pub["open_id"] != request.session.get("open_id"):
+        raise HTTPException(404)
+    status = pub["status"]
+    try:
+        token = store.valid_access_token(pub["open_id"], tiktok.refresh)
+        if token:
+            status = tiktok.fetch_status(token, publish_id).get("status") or status
+            store.update_publish_status(publish_id, status)
+    except tiktok.TikTokError:
+        pass                                   # se muestra el último estado conocido
+    text, pending = STATUS_TEXT.get(status, (status or "Unknown", False))
+    return render(request, "sent.html", lesson=LESSON_BY_ID.get(pub["lesson_id"]), status=status,
+                  status_text=text, pending=pending, publish_id=publish_id)

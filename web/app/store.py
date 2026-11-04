@@ -25,6 +25,14 @@ CREATE TABLE IF NOT EXISTS tiktok_accounts (
     refresh_expires_at INTEGER,
     updated_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS publishes (
+    publish_id TEXT PRIMARY KEY,
+    open_id TEXT NOT NULL,
+    lesson_id TEXT NOT NULL,
+    status TEXT,
+    created_at INTEGER NOT NULL
+);
 """
 
 
@@ -82,3 +90,35 @@ def get_account(open_id: str) -> dict | None:
 def delete_account(open_id: str) -> None:
     with connect() as conn:
         conn.execute("DELETE FROM tiktok_accounts WHERE open_id = ?", (open_id,))
+        conn.execute("DELETE FROM publishes WHERE open_id = ?", (open_id,))
+
+
+def valid_access_token(open_id: str, refresher) -> str | None:
+    """Token de acceso vigente; si venció (o vence en < 5 min) lo renueva con `refresher`."""
+    acc = get_account(open_id)
+    if acc is None:
+        return None
+    if acc["expires_at"] and acc["expires_at"] - 300 > int(time.time()):
+        return acc["access_token"]
+    if not acc["refresh_token"]:
+        return None
+    token = refresher(acc["refresh_token"])
+    save_account(open_id, acc["display_name"], token)
+    return token["access_token"]
+
+
+def record_publish(publish_id: str, open_id: str, lesson_id: str, status: str = "PROCESSING_UPLOAD") -> None:
+    with connect() as conn:
+        conn.execute("INSERT OR REPLACE INTO publishes VALUES (?, ?, ?, ?, ?)",
+                     (publish_id, open_id, lesson_id, status, int(time.time())))
+
+
+def get_publish(publish_id: str) -> dict | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM publishes WHERE publish_id = ?", (publish_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_publish_status(publish_id: str, status: str) -> None:
+    with connect() as conn:
+        conn.execute("UPDATE publishes SET status = ? WHERE publish_id = ?", (status, publish_id))
