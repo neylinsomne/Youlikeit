@@ -177,8 +177,29 @@ def check_local_stack() -> list[Check]:
     return out
 
 
+def check_stremio_addon() -> Check:
+    """Addon de Stremio (opcional): manifest alcanzable y si sirve para buscar. Solo muestra el host."""
+    from apps.media.stremio_addon import StremioAddonError, StremioAddonProvider
+    name, needed = "Addon Stremio", "buscar fuentes en tu addon (opcional)"
+    if not _env("STREMIO_ADDON_URL"):
+        return _missing(name, "STREMIO_ADDON_URL", needed)
+    try:
+        prov = StremioAddonProvider()
+        m = prov.manifest()
+        searchable, imdb = bool(prov.search_catalogs()), prov.accepts_imdb()
+    except StremioAddonError as e:
+        return Check(name, "ERROR", str(e)[:160], needed)
+    detail = f"{m.get('name') or m['id']} {m.get('version') or ''} en {prov.host}".replace("  ", " ")
+    if not (searchable or imdb):
+        return Check(name, "WARN", f"{detail}: sin catálogo con búsqueda ni IDs tt (no hay cómo buscar)", needed)
+    if not prov.own:
+        return Check(name, "WARN", f"{detail}: STREMIO_OWN_HOSTS vacío, solo se usarán enlaces de archive.org",
+                     needed)
+    return Check(name, "OK", detail, needed)
+
+
 def run_all(*, network: bool = True) -> list[Check]:
     checks = check_local_stack()
     if network:
-        checks += check_api_keys() + check_youtube_oauth()
+        checks += check_api_keys() + check_youtube_oauth() + [check_stremio_addon()]
     return checks

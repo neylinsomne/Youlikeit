@@ -109,6 +109,7 @@ export function rightsInfo(rights) {
 export const PROVIDERS = {
   archive_org: 'Internet Archive',
   local: 'Biblioteca local',
+  stremio: 'Addon Stremio',
 };
 
 export const INDEX_STEPS = [

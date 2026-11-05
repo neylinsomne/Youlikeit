@@ -12,6 +12,11 @@ import { INDEX_STEPS, JOB_STATUS, JOB_TYPE, PROVIDERS, rightsInfo } from '../lib
 import { checkboxCls, inputCls } from '../lib/styles';
 
 const NO_ITEMS = [];
+// Mientras carga /media/providers (o si falla) se busca en las dos fuentes de siempre.
+const FALLBACK_PROVIDERS = [
+  { name: 'archive_org', available: true },
+  { name: 'local', available: true },
+];
 const LIBRARY_JOBS = new Set(['index', 'detect', 'label']);
 const candidateKey = (c) => `${c.provider}:${c.external_id}`;
 
@@ -30,6 +35,12 @@ function CandidateCard({ candidate, registered, registering, onRegister }) {
           <p className="text-[10px] text-on-surface-variant font-mono truncate mt-0.5" title={candidate.external_id}>
             {PROVIDERS[candidate.provider] ?? candidate.provider} · {candidate.external_id}
           </p>
+          {candidate.via && (
+            <p className="text-[10px] text-on-surface-variant mt-0.5 flex items-center gap-1">
+              <Icon name="extension" className="text-[11px]" />
+              Encontrado con tu addon de Stremio
+            </p>
+          )}
         </div>
         <Pill tone={rights.tone} icon={usable ? 'verified' : 'gpp_maybe'}>
           {rights.label}
@@ -81,11 +92,14 @@ function CandidateCard({ candidate, registered, registering, onRegister }) {
 
 function MediaSearch({ registeredKeys, onRegistered }) {
   const toast = useToast();
-  const [form, setForm] = useState({ title: '', year: '', local: true, archive_org: true, allRights: false });
-  const [results, setResults] = useState({ items: null, loading: false, error: null });
+  const providerInfo = useApi((signal) => api.mediaProviders({ signal }), []);
+  const [form, setForm] = useState({ title: '', year: '', allRights: false });
+  const [picked, setPicked] = useState({});
+  const [results, setResults] = useState({ items: null, warnings: NO_ITEMS, loading: false, error: null });
   const [registering, setRegistering] = useState(null);
 
-  const providers = ['local', 'archive_org'].filter((p) => form[p]);
+  const sources = providerInfo.data?.items ?? FALLBACK_PROVIDERS;
+  const providers = sources.filter((p) => p.available && (picked[p.name] ?? true)).map((p) => p.name);
   const canSearch = form.title.trim().length > 1 && providers.length > 0 && !results.loading;
 
   const search = async (e) => {
@@ -97,9 +111,9 @@ function MediaSearch({ registeredKeys, onRegistered }) {
     setResults((r) => ({ ...r, loading: true, error: null }));
     try {
       const res = await api.searchMedia(body);
-      setResults({ items: res.items ?? [], loading: false, error: null });
+      setResults({ items: res.items ?? [], warnings: res.warnings ?? NO_ITEMS, loading: false, error: null });
     } catch (err) {
-      setResults({ items: null, loading: false, error: err });
+      setResults({ items: null, warnings: NO_ITEMS, loading: false, error: err });
     }
   };
 
@@ -123,7 +137,7 @@ function MediaSearch({ registeredKeys, onRegistered }) {
       <CardHeader
         title="Buscar películas"
         icon="travel_explore"
-        subtitle="Internet Archive y tu biblioteca local. Solo se registran obras de dominio público, licencia abierta o propias."
+        subtitle="Internet Archive, tu biblioteca local y tu addon de Stremio. Solo se registran obras de dominio público, licencia abierta o propias."
       />
       <form onSubmit={search} className="p-4 grid grid-cols-12 gap-3 items-end">
         <Field label="Título" className="col-span-12 md:col-span-5">
@@ -138,14 +152,22 @@ function MediaSearch({ registeredKeys, onRegistered }) {
         </Field>
         <fieldset className="col-span-8 md:col-span-3 flex flex-wrap gap-x-4 gap-y-1 text-xs pb-2">
           <legend className="sr-only">Fuentes</legend>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" className={checkboxCls} checked={form.archive_org} onChange={(e) => set({ archive_org: e.target.checked })} />
-            Internet Archive
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" className={checkboxCls} checked={form.local} onChange={(e) => set({ local: e.target.checked })} />
-            Local
-          </label>
+          {sources.map((p) => (
+            <label
+              key={p.name}
+              className={`flex items-center gap-1.5 ${p.available ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+              title={p.detail}
+            >
+              <input
+                type="checkbox"
+                className={checkboxCls}
+                disabled={!p.available}
+                checked={p.available && (picked[p.name] ?? true)}
+                onChange={(e) => setPicked((s) => ({ ...s, [p.name]: e.target.checked }))}
+              />
+              {PROVIDERS[p.name] ?? p.name}
+            </label>
+          ))}
           <label className="flex items-center gap-1.5 cursor-pointer" title="Muestra también resultados sin derechos usables (no se pueden registrar)">
             <input type="checkbox" className={checkboxCls} checked={form.allRights} onChange={(e) => set({ allRights: e.target.checked })} />
             Ver todos los derechos
@@ -160,6 +182,11 @@ function MediaSearch({ registeredKeys, onRegistered }) {
 
       <div className="px-4 pb-4">
         {results.error && <ErrorBanner error={results.error} title="La búsqueda falló" />}
+        {!results.loading && results.warnings.length > 0 && (
+          <Notice tone="warn" icon="cloud_off" className="mb-3">
+            Algunas fuentes no respondieron y se saltaron: {results.warnings.join(' · ')}
+          </Notice>
+        )}
         {results.loading && <LoadingBlock label="Buscando en las fuentes…" />}
         {!results.loading && results.items && results.items.length === 0 && (
           <EmptyState icon="search_off" title="Sin resultados">

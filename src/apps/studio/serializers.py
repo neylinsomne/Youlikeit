@@ -77,7 +77,7 @@ def candidate(c: MediaCandidate) -> dict:
             "rights": c.rights, "license_url": c.license_url or None, "height": c.height or None,
             "duration_ms": c.duration_ms or None, "partial": bool(c.extra.get("partial")),
             "master_file": c.extra.get("master_file"), "proxy_file": c.extra.get("proxy_file"),
-            "usable": c.usable}
+            "usable": c.usable, "via": c.extra.get("via")}
 
 
 # ── moments ─────────────────────────────────────────────────────────

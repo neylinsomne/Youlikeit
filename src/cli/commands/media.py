@@ -38,7 +38,7 @@ def _print(obj) -> None:
 
 @app.command()
 def search(title: str, year: int = typer.Option(None, help="Año aproximado (±1)"),
-           provider: list[str] = typer.Option(["local", "archive_org"], help="archive_org | local"),
+           provider: list[str] = typer.Option(None, help="local | archive_org | stremio (default: los disponibles)"),
            all_rights: bool = typer.Option(False, "--all-rights", help="Incluir derechos unknown/restricted"),
            limit: int = 5):
     """Busca candidatos para una obra en los proveedores."""
@@ -55,11 +55,11 @@ def add(provider: str, external_id: str,
         title: str = typer.Option(None, help="Título canónico de la obra (default: el del proveedor)"),
         year: int = typer.Option(None),
         allow_unknown_rights: bool = typer.Option(False, help="Registrar aunque los derechos no sean usables")):
-    """Registra un ítem concreto (IA identifier o ruta relativa en MOVIES_DIR)."""
+    """Registra un ítem concreto (IA identifier, ruta relativa en MOVIES_DIR o movie/<id> del addon)."""
     from apps.media.indexer import register_candidate
     from apps.media.sources import get_provider
     prov = get_provider(provider)
-    if provider in ("archive_org", "ia"):
+    if provider in ("archive_org", "ia", "stremio", "addon"):
         cand = prov.get_item(external_id)
     else:
         cand = next((c for c in prov.scan() if c.external_id == external_id), None)
@@ -142,7 +142,7 @@ def index_many(asset_ids: list[int] = typer.Argument(None),
 
 @app.command()
 def ingest(title: str, year: int = typer.Option(None),
-           provider: list[str] = typer.Option(["local", "archive_org"]),
+           provider: list[str] = typer.Option(None, help="local | archive_org | stremio (default: los disponibles)"),
            index_now: bool = typer.Option(True, "--index/--no-index", help="Indexar al registrar"),
            asr_backend: str = typer.Option(None, help=_ASR_HELP)):
     """Busca la mejor copia con derechos usables, la registra y la indexa (un comando)."""

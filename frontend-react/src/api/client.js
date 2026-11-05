@@ -101,6 +101,7 @@ export const api = {
   // Biblioteca
   works: (opts) => get('/works', opts),
   assets: (params, opts) => get(`/assets${qs(params)}`, opts),
+  mediaProviders: (opts) => get('/media/providers', opts),
   searchMedia: (body) => post('/media/search', body),
   ingest: (body) => post('/media/ingest', body),
 

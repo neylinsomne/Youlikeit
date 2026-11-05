@@ -16,6 +16,10 @@ RIGHTS_UNKNOWN = "unknown"
 USABLE_RIGHTS = frozenset({RIGHTS_PUBLIC_DOMAIN, RIGHTS_OPEN, RIGHTS_OWNED})
 
 
+class SourceUnavailable(RuntimeError):
+    """Un proveedor no está configurado o no responde (la búsqueda sigue con los demás)."""
+
+
 def media_cache_dir(*parts: str) -> Path:
     """data/media_cache/<parts> respetando DATA_DIR (como core.config.load_settings)."""
     return Path(os.getenv("DATA_DIR", "data"), "media_cache", *parts)

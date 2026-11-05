@@ -48,8 +48,9 @@ def test_media_search_maps_candidates_and_errors(client, monkeypatch):
     import apps.media.sources as sources
     seen = {}
 
-    def fake_search(title, year=None, *, providers=None, only_usable=True, limit=10):
+    def fake_search(title, year=None, *, providers=None, only_usable=True, limit=10, errors=None):
         seen.update(title=title, year=year, providers=providers, only_usable=only_usable)
+        errors.append("local: MOVIES_DIR no disponible")
         return [MediaCandidate(provider="archive_org", external_id="HorrorExpress1972", title="Horror Express",
                                year=1972, rights="public_domain", height=720, duration_ms=5_265_024,
                                extra={"master_file": "HE.mkv", "proxy_file": "HE_512kb.mp4"})]
@@ -60,7 +61,8 @@ def test_media_search_maps_candidates_and_errors(client, monkeypatch):
     assert r.json()["items"][0] == {
         "provider": "archive_org", "external_id": "HorrorExpress1972", "title": "Horror Express", "year": 1972,
         "rights": "public_domain", "license_url": None, "height": 720, "duration_ms": 5_265_024, "partial": False,
-        "master_file": "HE.mkv", "proxy_file": "HE_512kb.mp4", "usable": True}
+        "master_file": "HE.mkv", "proxy_file": "HE_512kb.mp4", "usable": True, "via": None}
+    assert r.json()["warnings"] == ["local: MOVIES_DIR no disponible"]
     assert seen == {"title": "Horror Express", "year": 1972, "providers": ["archive_org"], "only_usable": True}
     assert client.post("/api/media/search", json={"title": "x", "providers": ["torrent"]}).status_code == 422
     assert client.post("/api/media/search", json={}).status_code == 422
@@ -189,3 +191,45 @@ def test_moment_preview_endpoint(client, world, monkeypatch, tmp_path):
 
     monkeypatch.setattr(preview, "moment_preview", missing)
     assert client.get("/api/moments/5/preview").status_code == 404
+
+
+@pytest.mark.integration
+def test_media_providers_reports_config_without_secrets(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("MOVIES_DIR", str(tmp_path))
+    monkeypatch.delenv("STREMIO_ADDON_URL", raising=False)
+    items = {p["name"]: p for p in client.get("/api/media/providers").json()["items"]}
+    assert [*items] == ["local", "archive_org", "stremio"]
+    assert items["local"]["available"] and items["archive_org"]["available"]
+    assert not items["stremio"]["available"] and "STREMIO_ADDON_URL" in items["stremio"]["detail"]
+
+    monkeypatch.setenv("STREMIO_ADDON_URL", "https://addon.example/cfg-SECRET123/manifest.json")
+    monkeypatch.setenv("MOVIES_DIR", str(tmp_path / "unplugged"))
+    r = client.get("/api/media/providers")
+    items = {p["name"]: p for p in r.json()["items"]}
+    assert items["stremio"] == {"name": "stremio", "available": True, "detail": "addon.example"}
+    assert not items["local"]["available"] and "SECRET123" not in r.text
+
+
+@pytest.mark.integration
+def test_media_ingest_from_stremio_addon(client, monkeypatch):
+    import apps.media.sources as sources
+    own = MediaCandidate(provider="stremio", external_id="movie/ylk:mine", title="ylk:mine",
+                         master_uri="http://127.0.0.1:7010/media/mine.mkv", rights="owned")
+
+    class Prov:
+        def get_item(self, external_id):
+            return own if external_id == "movie/ylk:mine" else None
+
+    monkeypatch.setattr(sources, "get_provider", lambda name, **kw: Prov())
+    r = client.post("/api/media/ingest", json={"provider": "stremio", "external_id": "movie/ylk:mine",
+                                               "title": "Mi Película", "year": 1975})
+    assert r.status_code == 200 and r.json()["provider"] == "stremio"
+    assert r.json()["work_title"] == "Mi Película"
+
+    def down(name, **kw):
+        from apps.media.stremio_addon import StremioAddonError
+        raise StremioAddonError("STREMIO_ADDON_URL vacío")
+
+    monkeypatch.setattr(sources, "get_provider", down)
+    r = client.post("/api/media/ingest", json={"provider": "stremio", "external_id": "movie/ylk:mine"})
+    assert r.status_code == 409 and "STREMIO_ADDON_URL" in r.json()["detail"]

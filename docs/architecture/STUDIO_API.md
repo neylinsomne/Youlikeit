@@ -118,8 +118,9 @@ Si se cambia, se cambia aquí primero.
 ### Biblioteca
 - `GET /api/works` → `{"items": [Work]}`
 - `GET /api/assets?work_id=` → `{"items": [Asset]}`
-- `POST /api/media/search {"title": str, "year": int?, "providers": ["local", "archive_org"]?, "all_rights": false}` → `{"items": [MediaCandidate]}`
-- `POST /api/media/ingest {"provider": "archive_org|local", "external_id": str, "title": str?, "year": int?}` → `Asset`. Responde `409` si los derechos no son usables.
+- `GET /api/media/providers` → `{"items": [{"name": "local|archive_org|stremio", "available": bool, "detail": str}]}`. Sin red: solo dice qué está configurado. Del addon de Stremio solo muestra el host.
+- `POST /api/media/search {"title": str, "year": int?, "providers": ["local", "archive_org", "stremio"]?, "all_rights": false}` → `{"items": [MediaCandidate], "warnings": [str]}`. Sin `providers` busca en los disponibles. Una fuente caída no tumba la búsqueda: se salta y queda en `warnings`. `MediaCandidate.via` = `"stremio:<host>"` cuando un ítem de archive.org llegó por el addon.
+- `POST /api/media/ingest {"provider": "archive_org|local|stremio", "external_id": str, "title": str?, "year": int?}` → `Asset`. Responde `409` si los derechos no son usables o si la fuente no está disponible. Contrato del addon: [STREMIO_ADDON.md](STREMIO_ADDON.md).
 
 ### Jobs (una cola; un worker para red/GPU)
 - `POST /api/jobs {"type": ..., "params": {...}}` → `Job` (`status: queued`)
