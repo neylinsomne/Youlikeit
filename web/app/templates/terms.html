@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service — YouLikeIt{% endblock %}
+{% block content %}
+<article class="prose-legal mx-auto max-w-3xl px-5 py-14">
+  <h1 class="text-3xl font-bold md:text-4xl">Terms of Service</h1>
+  <p class="mt-2 text-sm">Last updated: {{ last_updated }}</p>
+
+  <h2>1. The service</h2>
+  <p>YouLikeIt is an educational website that helps people understand emotions and practice empathy through film. It offers guides to emotions, a library of analyzed films and a Creator Studio where creators can connect their TikTok account and send short educational videos ("lessons") to their TikTok inbox as drafts.</p>
+
+  <h2>2. Acceptance</h2>
+  <p>By using YouLikeIt you agree to these Terms and to our <a class="underline" href="/privacy">Privacy Policy</a>. If you do not agree, please do not use the service.</p>
+
+  <h2>3. Accounts and TikTok connection</h2>
+  <ul>
+    <li>You must be at least 18 years old to use the Creator Studio.</li>
+    <li>Connecting TikTok is optional. You authorize YouLikeIt to read your basic profile (display name and avatar) and to upload videos to your TikTok inbox as drafts. We never publish on your behalf.</li>
+    <li>You can disconnect at any time from the Creator Studio or from your TikTok settings.</li>
+    <li>Your use of TikTok remains subject to TikTok's own Terms of Service and Community Guidelines.</li>
+  </ul>
+
+  <h2>4. Content and rights</h2>
+  <ul>
+    <li>Our film library is built from public-domain works and footage used with permission. If you believe content on YouLikeIt infringes your rights, write to <a class="underline" href="mailto:{{ contact }}">{{ contact }}</a> and we will review and remove it promptly.</li>
+    <li>Creators are responsible for the videos they publish. You must only publish content you have the right to use, and add your own commentary and context; lessons are educational material, not re-uploads of films.</li>
+    <li>You keep the rights to your own narration and edits.</li>
+  </ul>
+
+  <h2>5. Acceptable use</h2>
+  <p>You agree not to use YouLikeIt to infringe intellectual property, harass or harm others, spread misleading content, spam, or attempt to access accounts, data or systems without authorization.</p>
+
+  <h2>6. Educational purpose</h2>
+  <p>Emotion guides and mindful pauses are educational and for general wellbeing. They are not medical or psychological advice and do not replace professional care. If you are in crisis, contact local emergency services.</p>
+
+  <h2>7. Availability and changes</h2>
+  <p>We may change, suspend or discontinue features at any time. We may update these Terms; the date above shows the latest version.</p>
+
+  <h2>8. Disclaimer and liability</h2>
+  <p>The service is provided "as is" without warranties of any kind. To the extent permitted by law, YouLikeIt is not liable for indirect or consequential damages arising from its use.</p>
+
+  <h2>9. Termination</h2>
+  <p>We may suspend access for violations of these Terms. You may stop using the service and disconnect your accounts at any time.</p>
+
+  <h2>10. Governing law and contact</h2>
+  <p>These Terms are governed by the laws of Colombia. Questions: <a class="underline" href="mailto:{{ contact }}">{{ contact }}</a>.</p>
+</article>
+{% endblock %}

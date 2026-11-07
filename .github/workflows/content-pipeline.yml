@@ -14,9 +14,9 @@
 name: Content Pipeline
 
 on:
-  schedule:
-    # Corre a las 6:00 AM UTC (1:00 AM Colombia) todos los días
-    - cron: '0 6 * * *'
+  # Cron desactivado: la vertical de películas legacy (ex04-ex18) se reemplaza por
+  # los dominios apps/media -> apps/moments -> apps/supercut (GPU local).
+  # Se deja solo el disparo manual para reproducir el flujo viejo si hace falta.
   workflow_dispatch:
     inputs:
       query:
@@ -80,7 +80,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-gpu.txt   # legacy: chromadb/whisper
+          pip install -e . --no-deps   # expone core/apps/integrations + CLI ylk
           # Whisper es opcional en CI (no hay GPU)
           # pip install openai-whisper
 
@@ -120,60 +121,47 @@ jobs:
       # ── Discovery Phase ──
       - name: "ex04: Discover movies & quotes"
         if: inputs.skip_discovery != 'true'
-        working-directory: src
-        run: python main.py ex04 --query "${{ steps.query.outputs.q }}" --max-movies ${{ inputs.max_movies || '8' }} --mode trending
+        run: python scripts/legacy/main.py ex04 --query "${{ steps.query.outputs.q }}" --max-movies ${{ inputs.max_movies || '8' }} --mode trending
 
       - name: "ex05: Download subtitles"
         if: inputs.skip_discovery != 'true'
-        working-directory: src
-        run: python main.py ex05 --max-downloads 5
+        run: python scripts/legacy/main.py ex05 --max-downloads 5
 
       - name: "ex06: Match quotes with timestamps"
-        working-directory: src
-        run: python main.py ex06 --threshold 72 --with-chroma
+        run: python scripts/legacy/main.py ex06 --threshold 72 --with-chroma
 
       # ── Classification Phase ──
       - name: "ex10: Classify quotes (Gemini)"
-        working-directory: src
-        run: python main.py ex10 --batch-size 50
+        run: python scripts/legacy/main.py ex10 --batch-size 50
 
       # ── Content Creation Phase ──
       - name: "ex07: Search scenes"
-        working-directory: src
-        run: python main.py ex07 --query "${{ steps.query.outputs.q }}" --max-results 5
+        run: python scripts/legacy/main.py ex07 --query "${{ steps.query.outputs.q }}" --max-results 5
 
       - name: "ex09: Curate groups"
-        working-directory: src
-        run: python main.py ex09 --query "${{ steps.query.outputs.q }}" --max-results 5 --group-size 3
+        run: python scripts/legacy/main.py ex09 --query "${{ steps.query.outputs.q }}" --max-results 5 --group-size 3
 
       - name: "ex08: Growth pack (hashtags + songs)"
-        working-directory: src
-        run: python main.py ex08 --query "${{ steps.query.outputs.q }}" --country-code CO
+        run: python scripts/legacy/main.py ex08 --query "${{ steps.query.outputs.q }}" --country-code CO
 
       - name: "ex18: Narration script"
-        working-directory: src
-        run: python main.py ex18 --query "${{ steps.query.outputs.q }}" --lang es --narration-style reflective
+        run: python scripts/legacy/main.py ex18 --query "${{ steps.query.outputs.q }}" --lang es --narration-style reflective
 
       - name: "ex17: Publish strategy"
-        working-directory: src
-        run: python main.py ex17 --query "${{ steps.query.outputs.q }}" --platform both --country-code CO
+        run: python scripts/legacy/main.py ex17 --query "${{ steps.query.outputs.q }}" --platform both --country-code CO
 
       # ── Learning Cycle ──
       - name: "ex31: Lesson taxonomy"
-        working-directory: src
-        run: python main.py ex31 --batch-size 50
+        run: python scripts/legacy/main.py ex31 --batch-size 50
 
       - name: "ex32: Lesson performance"
-        working-directory: src
-        run: python main.py ex32
+        run: python scripts/legacy/main.py ex32
 
       - name: "ex33: Curriculum planner"
-        working-directory: src
-        run: python main.py ex33 --plan-size 10
+        run: python scripts/legacy/main.py ex33 --plan-size 10
 
       - name: "ex35: Export data"
-        working-directory: src
-        run: python main.py ex35
+        run: python scripts/legacy/main.py ex35
 
       # ── Save artifacts ──
       - name: Upload pipeline outputs

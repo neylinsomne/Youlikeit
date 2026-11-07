@@ -1,196 +1,72 @@
-# YouLikeIt — Roadmap de Tareas
+# YouLikeIt · Roadmap
 
-> Pipeline automatizado de contenido educativo para YouTube Shorts.
-> Misión: extraer lecciones de vida del cine, manga, anime, novelas y libros.
-> Temas centrales: nihilismo → adicción → levantarse → intentarlo de nuevo.
+> Estado por fases del rework de supercuts ("aprender empatía con el cine"), rama
+> `feat/supercut-media`. Última revisión: 2026-11-04.
+> El roadmap anterior (manga, Fish Speech, personas) quedó obsoleto; su historia está en git.
 
----
+## Resumen
 
-## Estado Actual (Marzo 2026)
+| Fase | Qué | Estado |
+|---|---|---|
+| 0 | Higiene: secrets, deps base/GPU separadas, CI, esquema `cross_references` | ✅ Hecha |
+| 1 | `apps/media`: fuentes con derechos, extracción por rango, audio + planos, ASR | ✅ Hecha (falta F1 de planos con etiquetas humanas) |
+| 2 | `apps/moments`: vocabulario, señales, anclas, etiquetas LLM, búsqueda entre obras | ✅ Hecha (falta precision@5 sobre un set etiquetado a mano) |
+| 3 | `apps/supercut`: plan, guion, voz, render, preview | ✅ Hecha (TTS local pendiente de permiso de GPU) |
+| 4 | Estudio local + `apps/publish` + sitio `web/` en Railway | ✅ Código hecho · ⚠️ publicación real bloqueada por credenciales |
 
-### ✅ Completado
-- [x] Pipeline base: descubrimiento → quotes → clasificación → video → upload
-- [x] Manga vertical: MangaDex API + Fandom Wiki + OCR + camera scroll
-- [x] Frontend React: editor de Shorts, Review queue, clip library, metadata
-- [x] YouTube upload con OAuth (insomnesoul@gmail.com)
-- [x] GitHub Action (cron diario, excluye días 15-18)
-- [x] Subtítulos animados estilo Shorts (módulo animated_subs.py)
-- [x] Google Trends integrado para relevancia temporal
-- [x] Gemini Flash para narración dramática
-- [x] edge-tts como TTS temporal (Andrew EN / Gonzalo ES)
-- [x] Docker multi-container (ytlab, api, frontend, fish-speech)
+## Fase 0 · Higiene
 
-### 🔧 En Progreso
-- [ ] **Fish Speech TTS** — imagen v1.4.1 + PyTorch nightly cu128 (Blackwell RTX 5060)
-  - Modelo openaudio-s1-mini descargado
-  - Pendiente: resolver tokenizer error y probar generación de voz
-- [ ] **Git push** de todos los cambios recientes
+- [x] `tokens/` y `.claude/settings.local.json` fuera de git; `data/shorts_pipeline.db` des-versionada.
+- [x] `requirements.txt` (base, CI) y `requirements-gpu.txt` (pesado, incluye la base).
+- [x] Tabla `cross_references` en `core/db.py`.
+- [ ] Rotar la key de TMDB filtrada en el historial (acción del dueño).
 
----
+## Fase 1 · Media (Extract)
 
-## Fase 5: Voz y Personalidad
+- [x] Proveedores Internet Archive y biblioteca local con capa de derechos (`public_domain`,
+  `open_license`, `owned`; el resto no se usa).
+- [x] Extracción por rango HTTP: un clip de 10 s baja 0,36 % de un master de 11,5 GB.
+- [x] Descarga paralela del proxy, audio + cortes de plano en una sola pasada.
+- [x] ASR local (faster-whisper) o por API (Groq Whisper), con lock de GPU por PID.
+- [x] Ciclo de vida del almacenamiento: crudo de solo lectura, caché de clips con tope, análisis desechable.
+- [x] ASR real de películas completas: 96 min de audio en 75 s con Groq (corrida del 2026-11-04).
+- [ ] Cortes de plano F1 ≥ 0.9 sobre 10 min etiquetados a mano.
 
-### 5.1 Fish Speech Operativo
-- [ ] Resolver compatibilidad Fish Speech + PyTorch Blackwell
-- [ ] Probar generación de voz con texto de Berserk
-- [ ] Seleccionar 2 voces predeterminadas (una épica, una reflexiva)
-- [ ] Integrar Fish Speech al pipeline (reemplazar edge-tts)
-- [ ] Voice cloning: grabar 30s de tu voz y usarla como referencia
+## Fase 2 · Moments (Transform)
 
-### 5.2 Subtítulos Animados
-- [ ] Quemar subtítulos ASS en los videos (animated_subs.py ya existe)
-- [ ] Sincronizar con la narración de Fish Speech
-- [ ] Palabras clave resaltadas en color según emoción
-- [ ] Probar estilos: shorts (2-3 palabras), karaoke, simple
+- [x] Vocabulario controlado en `data/vocab/` (61 tropos, 13 emociones, 13 beats, 13 roles, 32 temas).
+- [x] Candidatos ajustados a planos; percentiles de audio por película.
+- [x] Anclas Wikiquote/Wikipedia con resolución por título exacto.
+- [x] Etiquetado LLM (Groq `openai/gpt-oss-120b`) validado y saneado por ítem.
+- [x] Búsqueda entre obras con MMR (`ylk moments find`).
+- [x] Corrida real: 3 películas, 1206 momentos, 199 etiquetados; `find` devuelve las 3 obras para
+  `emotion:fear`, `emotion:dread`, `emotion:shock`, `trope:the_dead_return` y `trope:monster_reveal`.
+- [ ] precision@5 por tema sobre ~50 momentos etiquetados a mano (5 obras).
 
-### 5.3 Música Trending (con cache)
-- [ ] ytmusicapi integrado — charts de YouTube Music
-- [ ] **Cache local en SQLite** — guardar charts 1x/día, no pedir a cada request
-  - Tabla `trending_songs`: title, artist, youtube_url, chart_rank, genre, fetched_at
-  - TTL de 24h: si el último fetch fue hace <24h, usar cache
-  - El pipeline y el frontend leen del cache, no de la API directamente
-- [ ] Sección en frontend para ver/seleccionar canciones trending
-- [ ] Metadata de canción sugerida por tag/emoción del Short
-- [ ] Link a YouTube para escuchar antes de elegir
+## Fase 3 · Supercut (Load)
 
----
+- [x] Planificador: una escena por obra, ≤ 60 s con tarjeta final, orden por año.
+- [x] Guion con IA (hechos solo desde la DB) y plantilla de respaldo.
+- [x] Narración con edge-tts y tiempos por palabra.
+- [x] Render 1080x1920, fondo desenfocado, rótulos, ducking, −14 LUFS.
+- [x] Primera lección real: "El miedo antes del monstruo" (3 películas, 43,5 s, render en 54 s, aprobada).
+- [ ] TTS local (Qwen3-TTS): la interfaz existe; correrlo requiere permiso explícito para usar la GPU.
 
-## Fase 6: Aprendizaje Automático (Feedback Loop)
+## Fase 4 · Estudio, publicación y sitio
 
-### 6.1 Medición Profunda
-- [ ] Retención segundo a segundo por Short (ex19/ex24 ya existe)
-- [ ] Watch time promedio vs duración total
-- [ ] CTR de thumbnails
-- [ ] Demographics detallados (edad, género, país)
-- [ ] Engagement: likes/comments/shares ratio
-- [ ] Hora y día de publicación vs performance
-- [ ] **Punto de abandono**: detectar en qué segundo la gente se va
-  - IQR (rango intercuartílico) para identificar outliers de abandono
-  - Cruzar segundo de abandono con edad, género, país
-  - Separar población: "los que se quedan" vs "los que se van"
-  - Análisis por tipo de escena en ese segundo (¿qué estaba pasando?)
+- [x] API del estudio en 127.0.0.1 con token, guardia de origen y allowlist de archivos.
+- [x] Front del estudio en español (Inicio, Biblioteca, Momentos, Editor, Revisión, Trabajos, Vocabulario).
+- [x] Sitio `web/` en Railway con Login Kit, borrador a TikTok y puente para el estudio.
+- [x] YouTube: OAuth de app instalada, tokens cifrados, subida privada con `publishAt`.
+- [ ] Llaves del Sandbox de TikTok en Railway y conectar la cuenta en `/studio` (dueño).
+- [ ] Revisión de la app de TikTok ([TIKTOK_APP_REVIEW.md](docs/operations/TIKTOK_APP_REVIEW.md)).
+- [ ] YouTube: key nueva de Google, pantalla de consentimiento "En producción" y reconectar (dueño).
+- [ ] Video del recorrido del estudio local (Playwright headless).
 
-### 6.2 Correlación (Random Forest mejorado)
-- [ ] Features: serie, emoción, tipo de escena, voz, duración, hora
-- [ ] Target: retención promedio, engagement
-- [ ] Entrenar con 50-100 videos publicados
-- [ ] Identificar: "¿qué retiene más? acción vs reflexión vs tragedia"
-- [ ] Detectar qué emociones en la voz generan más watch time
+## Siguiente
 
-### 6.3 A/B Testing Automatizado
-- [ ] Variantes por Short: mismo contenido, diferentes tratamientos
-  - Variante A: narración dramática vs Variante B: narración reflexiva
-  - Variante A: voz grave vs Variante B: voz aguda
-  - Variante A: subtítulos blancos vs Variante B: subtítulos con color
-  - Variante A: intro con pregunta vs Variante B: intro con dato
-- [ ] Publicar ambas variantes (una como unlisted, link en comunidad)
-- [ ] Comparar retención, engagement, CTR después de 48h
-- [ ] Random Forest aprende de los resultados del A/B
-- [ ] Automatizar: el pipeline genera 2 versiones, sube ambas, mide, elige
+- Más obras indexadas (meta: ≥ 5 por tema) para que el planificador tenga de dónde elegir.
+- Medir la calidad de los momentos (precision@5) antes de automatizar más.
+- Volver a conectar analítica del canal cuando haya publicaciones reales.
 
-### 6.4 Selección Inteligente de Contenido
-- [ ] Multi-armed bandit: 80% explotar lo que funciona, 20% explorar nuevo
-- [ ] Score de prioridad = f(retención, engagement, trending, misión)
-- [ ] Auto-seleccionar siguiente serie/manga/libro a usar
-- [ ] Filtrar trends por relevancia a la misión del canal:
-  - Gemini: "De estos 20 trends, ¿cuáles conectan con superación personal?"
-- [ ] Ajustar estilo de narración según lo que el público responde
-
-### 6.5 Evolución de Audiencia
-- [ ] Fase 1 (mes 1-3): Exploración — publicar diverso, medir todo
-- [ ] Fase 2 (mes 3-6): Convergencia — el modelo detecta patrones
-- [ ] Fase 3 (mes 6+): Personalidad definida — voz clonada, estilo propio
-
----
-
-## Fase 7: Verticales de Contenido
-
-### 7.1 Manga/Anime (operativo)
-- [x] Descubrimiento trending (AniList, Jikan, MangaDex)
-- [x] Wiki scraper para resúmenes reales
-- [x] Descarga de páginas por capítulo
-- [x] Camera scroll + panel detection
-- [ ] Mejorar match narración↔panel (OCR + Gemini page hints)
-- [ ] Series completas particionadas por arcos
-
-### 7.2 Películas/Series (pausado — necesita Real-Debrid o Fonti)
-- [ ] Reactivar cuando el canal genere ~$4/mes para Real-Debrid
-- [ ] O configurar Tailscale + qBittorrent en Fonti
-- [ ] ex11 corta clips exactos con timestamps de OpenSubtitles
-- [ ] Novelas colombianas viejas (Betty la fea, Pasión de gavilanes, etc.)
-
-### 7.3 Comics Occidentales
-- [ ] Marvel/DC via MangaDex o scraper dedicado
-- [ ] Webcomics (Webtoon)
-- [ ] Panel detection adaptado a formato comic (colores, layouts diferentes)
-
-### 7.4 Libros
-- [ ] Conectar con Project Gutenberg (libros de dominio público)
-- [ ] Extraer quotes icónicas de libros de filosofía, autoayuda, literatura
-- [ ] Generar Shorts con texto + imágenes generativas o stock
-- [ ] Nihilismo: Nietzsche, Camus, Dostoevsky
-- [ ] Adicción/recuperación: libros de psicología
-- [ ] Resiliencia: Viktor Frankl, Jordan Peterson, etc.
-
-### 7.5 Lyrics/Música
-- [ ] Extraer letras de canciones con significado profundo
-- [ ] Shorts con lyrics + visualización + narración reflexiva
-
----
-
-## Fase 8: Frontend y UX
-
-### 8.1 Editor de Shorts
-- [ ] Preview en tiempo real con clips del timeline
-- [ ] Drag & drop clips de la clip library
-- [ ] Configurar movimiento de cámara por clip
-- [ ] Selección de canción trending
-
-### 8.2 Review Queue
-- [x] Lista de Shorts pendientes con preview
-- [ ] Reproducción de video funcional en el browser
-- [ ] Issues con timestamp relativo a la duración del video
-- [ ] Approve → auto-upload a YouTube
-
-### 8.3 Dashboard/Analytics
-- [ ] Métricas en tiempo real via WebSocket
-- [ ] Revenue tracking (cuando haya monetización)
-- [ ] Comparación de performance por vertical
-- [ ] Calendario de publicaciones (Planner)
-
-### 8.4 Knowledge Base
-- [ ] Banco de contenido extraído (manga, libros, movies)
-- [ ] Búsqueda semántica (ChromaDB)
-- [ ] Reutilización de clips entre Shorts
-
----
-
-## Fase 9: Infraestructura
-
-### 9.1 Almacenamiento
-- [ ] Videos en E:\youlikeit-outputs (USB)
-- [ ] Sync automático al final de cada pipeline run
-- [ ] Limpieza de archivos temporales
-
-### 9.2 Descarga de Contenido
-- [ ] Windscribe VPN para torrents (cuando se active)
-- [ ] O Real-Debrid ($3-4/mes) para descarga instantánea
-- [ ] O Tailscale + Fonti como nodo de descarga
-- [ ] qBittorrent API integrada al pipeline
-
-### 9.3 CI/CD
-- [x] GitHub Action con cron (excluye días 15-18)
-- [ ] Secrets configurados en GitHub (API keys, OAuth token)
-- [ ] Pipeline manga-short completo en Action
-- [ ] Notificaciones de éxito/error
-
----
-
-## Principios
-
-1. **Zero-cost** — todo gratis o mínimo costo
-2. **Interpretable** — Random Forest, ANOVA, no cajas negras
-3. **ETL pattern** — Extract → Transform → Load en todo
-4. **Auto-mejora** — el pipeline aprende de sus resultados
-5. **Misión clara** — nihilismo → redención → crecimiento
-6. **Audiencia primero** — el contenido se adapta a quién lo ve
+Ver también: [docs/CHANGELOG.md](docs/CHANGELOG.md) y [docs/architecture/SUPERCUT_ETL.md](docs/architecture/SUPERCUT_ETL.md).

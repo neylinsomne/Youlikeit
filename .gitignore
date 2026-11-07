@@ -1,10 +1,21 @@
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
 .env
+.env.plausible
 client_secret.json
 client_secrets.json
+# Descargas de Google Cloud (client_secret_<id>.apps.googleusercontent.com.json) y respaldos
+client_secret*.json
 data/youtube_oauth_token.json
+# OAuth tokens por persona (youtube_<persona>.json, tiktok_<persona>.json)
+tokens/
+# Permisos locales de Claude Code (pueden contener comandos con credenciales)
+.claude/settings.local.json
+
+# Media cache: mezzanines por rango + proxies de análisis (regenerable)
+data/media_cache/
 
 # Clapshot runtime files
 data/clapshot/*.sock
@@ -28,6 +39,8 @@ data/.easyocr/
 *.mkv
 *.avi
 data/shorts_pipeline.db
+data/*.db-wal
+data/*.db-shm
 
 # Node
 node_modules/

@@ -1,11 +1,12 @@
+# Base liviana: lo que necesitan CI (pytest), las crons de GitHub Actions y
+# los dominios que no tocan GPU. Lo pesado (torch/whisper/OCR/vector DB/
+# navegador) vive en requirements-gpu.txt, que incluye este archivo.
+
 # Core
 python-dotenv==1.1.1
 requests==2.32.4
 rich==14.1.0
-
-# Manga pipeline
-easyocr>=1.7.0
-opencv-python-headless>=4.9.0
+typer>=0.12.0      # CLI unificado `ylk` (entry point en pyproject)
 numpy>=1.26.0
 rapidfuzz>=3.6.0
 
@@ -13,14 +14,15 @@ rapidfuzz>=3.6.0
 pysubs2>=1.7.0
 beautifulsoup4>=4.12.0
 feedparser==6.0.11
-
-# Vector search
-chromadb>=0.5.0
 networkx>=3.2.0
 
-# API + WebSocket
+# Media library indexing (apps.media): parsea "Show.S01E02.1080p.mkv" -> episodio
+guessit>=3.8.0
+
+# API + WebSocket (estudio local: apps.studio, `ylk studio`)
 fastapi>=0.115.0
 uvicorn>=0.32.0
+websockets>=12.0   # uvicorn sin [standard] no acepta upgrades a WS: /ws del estudio lo necesita
 
 # Analytics
 scipy>=1.14.0
@@ -29,18 +31,13 @@ scipy>=1.14.0
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.2.0
+cryptography>=42.0.0   # Fernet: tokens de YouTube cifrados en tokens/ (TOKEN_ENC_KEY)
 
-# TTS (free, no API key)
-edge-tts>=6.1.0
+# TTS (free, no API key) — fallback de apps.supercut.tts
+edge-tts>=7.3.1                # Microsoft cambia el protocolo: 7.2.x ya da 403
 
 # Trends
 pytrends>=4.9.0
 
-# Video download
+# Video metadata (legacy ex02/ex05/ex11)
 yt-dlp>=2025.3.0
-
-# Whisper (subtitle fallback - heavy, downloads model on first use)
-openai-whisper>=20240930
-
-# Playwright (web scraping - install browsers separately)
-playwright==1.54.0

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Creator studio — YouLikeIt{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-3xl px-5 py-14">
+  <h1 class="text-3xl font-bold md:text-4xl">Creator studio</h1>
+  <p class="mt-4 text-white/70">Connect your TikTok account to send finished empathy lessons to your TikTok inbox as <strong>drafts</strong>. Nothing is ever published automatically: you open TikTok, review the draft, add music, edit the caption and decide whether to post.</p>
+
+  {% set messages = {
+    "connected": ("Your TikTok account is connected.", "text-emerald-300"),
+    "disconnected": ("Your TikTok account was disconnected and its access token revoked.", "text-white/70"),
+    "denied": ("You cancelled the TikTok authorization. Nothing was connected.", "text-amber-300"),
+    "invalid_state": ("The authorization request expired or was invalid. Please try again.", "text-amber-300"),
+    "tiktok_error": ("TikTok could not complete the authorization. Please try again.", "text-red-300"),
+    "not_configured": ("TikTok connection is temporarily unavailable.", "text-amber-300"),
+    "connect_first": ("Connect your TikTok account first.", "text-amber-300"),
+    "reconnect": ("Your TikTok session expired. Please connect again.", "text-amber-300"),
+    "invite_only": ("The creator studio is invite-only during the beta. Your TikTok authorization was revoked and nothing was stored.", "text-amber-300")} %}
+  {% if notice and notice in messages %}
+  <p class="mt-6 rounded-xl border border-white/10 p-4 {{ messages[notice][1] }}">{{ messages[notice][0] }}</p>
+  {% endif %}
+  {% if flash %}<p class="mt-6 rounded-xl border border-red-400/30 p-4 text-red-200">{{ flash }}</p>{% endif %}
+
+  <div class="card mt-8 rounded-2xl p-6">
+    {% if account %}
+    <div class="flex items-center gap-4">
+      {% if avatar %}<img src="{{ avatar }}" alt="" class="h-14 w-14 rounded-full" referrerpolicy="no-referrer">{% endif %}
+      <div>
+        <p class="text-sm text-white/50">Connected TikTok account</p>
+        <p class="text-xl font-semibold">{{ account.display_name or "TikTok user" }}</p>
+      </div>
+    </div>
+    <p class="mt-4 text-sm text-white/60">Lessons you send will arrive in this account's TikTok inbox as drafts.</p>
+    <form method="post" action="/auth/tiktok/disconnect" class="mt-5">
+      <button class="rounded-full border border-white/15 px-5 py-2 text-sm hover:bg-white/5">Disconnect and revoke access</button>
+    </form>
+    {% else %}
+    <h2 class="text-lg font-semibold">Connect TikTok</h2>
+    <p class="mt-2 text-sm text-white/60">We will ask TikTok for these permissions only:</p>
+    <ul class="mt-3 space-y-2 text-sm">
+      <li><code class="text-brand-400">user.info.basic</code> — your display name and avatar, to show which account is connected.</li>
+      <li><code class="text-brand-400">video.upload</code> — to place a lesson in your TikTok inbox as a draft when you click "Send to TikTok".</li>
+    </ul>
+    <a href="/auth/tiktok/login" class="mt-6 inline-block rounded-full bg-brand-500 px-6 py-3 font-semibold text-ink-950 hover:bg-brand-400">Continue with TikTok</a>
+    <p class="mt-4 text-xs text-white/45">By connecting you agree to our <a class="underline" href="/terms">Terms of Service</a> and <a class="underline" href="/privacy">Privacy Policy</a>. You can disconnect at any time.</p>
+    {% endif %}
+  </div>
+
+  {% if account %}
+  <h2 class="mt-12 text-2xl font-bold">Your lessons</h2>
+  <p class="mt-2 text-white/65">Each lesson is a short vertical video built from public-domain footage, with on-screen guidance about an emotion. Sending it places it in your TikTok inbox as a <strong>draft</strong>; you finish and publish it in the TikTok app.</p>
+  <div class="mt-6 grid gap-6 sm:grid-cols-2">
+    {% for l in lessons %}
+    <div class="card rounded-2xl p-4">
+      <video src="/lessons-media/{{ l.file }}" controls playsinline preload="metadata" class="aspect-[9/16] w-full rounded-xl bg-black"></video>
+      <p class="mt-3 text-xs uppercase tracking-wide text-brand-400">{{ l.emotion }} · {{ l.duration_s }} s</p>
+      <h3 class="mt-1 font-semibold">{{ l.title }}</h3>
+      <p class="mt-1 text-sm text-white/60">{{ l.film }} ({{ l.year }}) · {{ l.rights }}</p>
+      <form method="post" action="/studio/send/{{ l.id }}" class="mt-4">
+        <button class="w-full rounded-full bg-brand-500 px-5 py-3 font-semibold text-ink-950 hover:bg-brand-400">Send to TikTok as draft</button>
+      </form>
+      <p class="mt-2 text-xs text-white/45">Uploads to the inbox of {{ account.display_name or "your account" }}. Nothing is published automatically.</p>
+    </div>
+    {% else %}
+    <p class="text-white/50">No lessons available yet.</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

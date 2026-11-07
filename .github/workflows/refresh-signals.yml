@@ -1,0 +1,130 @@
+name: Refresh Market Signals
+
+# Capa de "Data Collection" del flujo MLOps.
+# Mantiene `market_signals` fresca y regenera `persona_briefs` para que
+# el siguiente run de Content Rotation tenga briefs actualizados.
+#
+# Sin LLM en la cron principal (sin costo, determinista). Job nocturno
+# opcional con LLM para enriquecer suggested_angle.
+#
+# Ver: docs/MLOPS_FLOW.md
+
+on:
+  schedule:
+    # Cada 4h ingesta + distill sin LLM (barrido amplio, sin costo)
+    - cron: '0 */4 * * *'
+    # Diario 06:00 UTC: distill CON LLM para refrescar suggested_angle
+    - cron: '0 6 * * *'
+
+  workflow_dispatch:
+    inputs:
+      use_llm:
+        description: "Activar LLM para suggested_angle"
+        type: boolean
+        default: false
+      domains:
+        description: "Filtrar dominios (gaming, anime_manga, movies_tv, music, latam). Vacío = todos"
+        default: ""
+      sources:
+        description: "Filtrar fuentes específicas (espacio-separadas). Vacío = todas"
+        default: ""
+
+jobs:
+  refresh:
+    name: Ingest + distill
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install minimal deps
+        # No instalamos toda la stack de rendering: solo lo que necesita
+        # market_signals + signals_distiller + brief_resolver.
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests rapidfuzz python-dotenv
+          pip install -e . --no-deps   # expone core/apps (src-layout)
+
+      - name: Restore data cache
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: signals-${{ github.run_id }}
+          restore-keys: |
+            signals-
+
+      - name: Decide LLM mode
+        id: mode
+        run: |
+          # cron diario 06:00 → con LLM si key disponible
+          # cron 4h o manual default → sin LLM
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "0 6 * * *" ]; then
+            echo "use_llm=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ inputs.use_llm }}" = "true" ]; then
+            echo "use_llm=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_llm=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refresh signals
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY:   ${{ secrets.GROQ_API_KEY }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+        run: |
+          FLAGS="--json"
+          if [ "${{ steps.mode.outputs.use_llm }}" = "false" ]; then
+            FLAGS="$FLAGS --no-llm"
+          fi
+          if [ -n "${{ inputs.domains }}" ]; then
+            FLAGS="$FLAGS --domains ${{ inputs.domains }}"
+          fi
+          if [ -n "${{ inputs.sources }}" ]; then
+            FLAGS="$FLAGS --sources ${{ inputs.sources }}"
+          fi
+          mkdir -p out
+          python scripts/signals/refresh_market_signals.py $FLAGS > out/signals_report.json
+          # Verificación: si no se ingirió nada, marca el job como degraded
+          NEW=$(python -c "import json; print(json.load(open('out/signals_report.json'))['ingest']['total_new'])")
+          echo "Total signals nuevas: $NEW"
+          if [ "$NEW" -lt 1 ]; then
+            echo "::warning::0 señales nuevas — revisar scraper_health"
+          fi
+
+      - name: Sweep unresolved briefs
+        # Encola briefs que el resolver no pudo mapear al CATALOG.
+        # No falla el job; solo deja constancia.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys, sqlite3, json
+          sys.path.insert(0, str(Path("src")))
+          from apps.signals.brief_resolver import sweep_unresolved
+          from apps.production.content_rotator import CATALOG
+          conn = sqlite3.connect("data/shorts_pipeline.db")
+          conn.row_factory = sqlite3.Row
+          report = sweep_unresolved(conn, CATALOG)
+          print("unresolved per persona:", json.dumps(report))
+          PY
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signals-report-${{ github.run_id }}
+          path: out/signals_report.json
+          retention-days: 14
+
+      - name: Save data cache
+        uses: actions/cache/save@v4
+        if: success()
+        with:
+          path: data
+          key: signals-${{ github.run_id }}

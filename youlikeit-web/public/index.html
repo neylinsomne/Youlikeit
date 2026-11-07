@@ -7,6 +7,9 @@
   <meta name="theme-color" content="#0a0a0a" />
   <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
   <title>YouLikeIt — Personal short-form video studio</title>
+  <!-- Plausible Analytics — self-hosted, cookieless, no PII (see /privacy.html) -->
+  <script defer data-domain="youlikeit.vara-alta.lat" src="https://analytics.vara-alta.lat/js/script.js"></script>
+  <script defer src="/assets/analytics.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -90,7 +93,7 @@
           uploading drafts to their own TikTok and YouTube accounts.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
-          <a href="/dashboard.html" class="rounded-lg bg-white px-5 py-3 font-medium text-ink-950 hover:bg-white/90 transition">
+          <a href="/dashboard.html" data-analytics="hero_dashboard" class="rounded-lg bg-white px-5 py-3 font-medium text-ink-950 hover:bg-white/90 transition">
             See the dashboard
           </a>
           <a href="#workflow" class="rounded-lg border border-white/15 bg-white/5 px-5 py-3 font-medium text-white hover:bg-white/10 transition">
@@ -272,8 +275,8 @@
       <h2 class="text-3xl font-bold md:text-4xl">Built for one creator. Run on one machine.</h2>
       <p class="mt-3 text-white/70">YouLikeIt is a personal tool, not a SaaS. The dashboard runs on localhost. This site exists so the integrations have a real home.</p>
       <div class="mt-8 flex flex-wrap justify-center gap-3">
-        <a href="/dashboard.html" class="rounded-lg bg-white px-5 py-3 font-medium text-ink-950 hover:bg-white/90 transition">Preview the dashboard</a>
-        <a href="/terms.html" class="rounded-lg border border-white/15 bg-white/5 px-5 py-3 font-medium text-white hover:bg-white/10 transition">Read the Terms</a>
+        <a href="/dashboard.html" data-analytics="cta_dashboard" class="rounded-lg bg-white px-5 py-3 font-medium text-ink-950 hover:bg-white/90 transition">Preview the dashboard</a>
+        <a href="/terms.html" data-analytics="cta_terms" class="rounded-lg border border-white/15 bg-white/5 px-5 py-3 font-medium text-white hover:bg-white/10 transition">Read the Terms</a>
       </div>
     </div>
   </section>

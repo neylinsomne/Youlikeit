@@ -1,6 +1,24 @@
 # YouLikeIt — pasos para terminar el deploy
 
-> Este dominio es **solo** para que TikTok pase su revision de tratado de
+> **Reemplazado (2026-11-04).** El sitio vivo es `web/` (FastAPI) en Railway:
+> **https://youlikeit-web-production.up.railway.app**. Cómo se despliega: [web/README.md](../web/README.md).
+> Esta guía (nginx + túnel de Cloudflare en `youlikeit.vara-alta.lat`) queda solo como historia;
+> sus URLs **ya no** van en el Developer Portal.
+>
+> Valores vigentes para TikTok:
+>
+> | Campo | Valor |
+> |---|---|
+> | Web/Desktop URL | `https://youlikeit-web-production.up.railway.app` |
+> | Terms of Service URL | `https://youlikeit-web-production.up.railway.app/terms` |
+> | Privacy Policy URL | `https://youlikeit-web-production.up.railway.app/privacy` |
+> | Redirect URI (Login Kit) | `https://youlikeit-web-production.up.railway.app/auth/tiktok/callback` |
+>
+> YouTube ya no usa redirect web: el estudio local usa un cliente OAuth de "Aplicación de escritorio"
+> con redirect `http://127.0.0.1:8001/api/publish/youtube/callback`. Revisión de TikTok:
+> [docs/operations/TIKTOK_APP_REVIEW.md](../docs/operations/TIKTOK_APP_REVIEW.md).
+
+> (Texto original) Este dominio es **solo** para que TikTok pase su revision de tratado de
 > datos. No se va a desplegar nada mas aqui.
 
 Estado actual:
@@ -55,6 +73,8 @@ Probar tambien:
 
 ## 2. Pegar las URLs en TikTok Developer Portal
 
+> Histórico: estas URLs ya no son válidas. Usa la tabla del inicio de este archivo.
+
 Abrir **https://developers.tiktok.com/apps** → tu app → **Edit basic info**:
 
 | Campo del formulario | Valor a pegar |
@@ -71,6 +91,9 @@ TikTok te pida — si te pide subir `tiktok-developers-site-verification.txt`
 ---
 
 ## 3. Pegar las URLs en Google Cloud Console (cuando lo necesites)
+
+> Histórico: el estudio usa un cliente OAuth de escritorio con redirect loopback
+> (`http://127.0.0.1:8001/api/publish/youtube/callback`); no hace falta redirect web.
 
 Para YouTube OAuth (Nico Flor / oh_tarab / Oh Que Sera) — solo cuando crees
 un nuevo proyecto OAuth, los actuales ya estan corriendo con el redirect

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ emo.name }} — Explore by emotion — YouLikeIt{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-4xl px-5 py-14">
+  <a href="/explore" class="text-sm text-white/50 hover:text-white">← All emotions</a>
+  <span class="mt-6 block h-2 w-16 rounded-full" style="background: {{ emo.color }}"></span>
+  <h1 class="mt-4 text-4xl font-bold md:text-5xl">{{ emo.name }} <span class="font-normal text-white/40">· {{ emo.es }}</span></h1>
+
+  <div class="mt-8 grid gap-5">
+    <div class="card rounded-2xl p-6">
+      <h2 class="text-sm uppercase tracking-wide text-brand-400">What it is</h2>
+      <p class="mt-2 text-lg">{{ emo.what }}</p>
+    </div>
+    <div class="card rounded-2xl p-6">
+      <h2 class="text-sm uppercase tracking-wide text-brand-400">How film shows it</h2>
+      <p class="mt-2 text-white/80">{{ emo.film }}</p>
+    </div>
+    <div class="card rounded-2xl p-6" style="border-color: {{ emo.color }}55">
+      <h2 class="text-sm uppercase tracking-wide" style="color: {{ emo.color }}">Mindful pause</h2>
+      <p class="mt-2 text-white/80">{{ emo.pause }}</p>
+    </div>
+  </div>
+
+  <h2 class="mt-12 text-2xl font-bold">Story situations where it appears</h2>
+  <div class="mt-4 grid gap-3 sm:grid-cols-2">
+    {% for t in emo.tropes %}{% set tr = tropes.get(t) %}{% if tr %}
+    <div class="card rounded-xl p-4">
+      <p class="font-semibold">{{ tr.en }} <span class="font-normal text-white/45">· {{ tr.es }}</span></p>
+      <p class="mt-1 text-sm text-white/60">{{ tr.desc_en }}</p>
+    </div>
+    {% endif %}{% endfor %}
+  </div>
+
+  {% if emo_lessons %}
+  <h2 class="mt-12 text-2xl font-bold">Example lesson</h2>
+  <div class="mt-4 grid gap-6 sm:grid-cols-2">
+    {% for l in emo_lessons %}
+    <div class="card rounded-2xl p-4">
+      <video src="/lessons-media/{{ l.file }}" controls playsinline preload="metadata" class="aspect-[9/16] w-full rounded-xl bg-black"></video>
+      <h3 class="mt-3 font-semibold">{{ l.title }}</h3>
+      <p class="mt-1 text-sm text-white/60">{{ l.summary }}</p>
+      <p class="mt-1 text-xs text-white/45">{{ l.film }} ({{ l.year }}) · {{ l.rights }} · <a class="underline" href="{{ l.source_url }}" target="_blank" rel="noopener">source</a></p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <h2 class="mt-12 text-2xl font-bold">Films in the library</h2>
+  {% if emo_films %}
+  <ul class="mt-4 space-y-2">
+    {% for f in emo_films %}<li class="card rounded-xl p-4">{{ f.title }}{% if f.year %} ({{ f.year }}){% endif %} · <span class="text-white/55">{{ f.moments }} key moments</span></li>{% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-3 text-white/50">We are still analyzing films for this emotion. Check back soon.</p>
+  {% endif %}
+</section>
+{% endblock %}

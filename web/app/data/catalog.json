@@ -1,0 +1,390 @@
+{
+ "tropes": {
+  "mentor_betrayal": {
+   "en": "The mentor betrays",
+   "es": "El mentor traiciona",
+   "desc_en": "The guide or protector turns out to be working against the hero.",
+   "desc_es": "Quien guiaba o protegía al protagonista resulta estar en su contra."
+  },
+  "mentor_death": {
+   "en": "Death of the mentor",
+   "es": "La muerte del mentor",
+   "desc_en": "The guide dies and the hero must go on alone.",
+   "desc_es": "El guía muere y el protagonista debe seguir solo."
+  },
+  "refusal_of_the_call": {
+   "en": "Refusal of the call",
+   "es": "El héroe rechaza el llamado",
+   "desc_en": "The hero declines the mission or the risk.",
+   "desc_es": "El protagonista se niega a asumir la misión o el riesgo."
+  },
+  "call_to_adventure": {
+   "en": "The call to adventure",
+   "es": "El llamado a la aventura",
+   "desc_en": "News, a request or an event breaks ordinary life.",
+   "desc_es": "Llega la noticia, la petición o el evento que rompe la vida normal."
+  },
+  "villain_monologue": {
+   "en": "Villain monologue",
+   "es": "El monólogo del villano",
+   "desc_en": "The antagonist lays out his vision, plan or contempt.",
+   "desc_es": "El antagonista explica su visión, su plan o su desprecio."
+  },
+  "heroic_sacrifice": {
+   "en": "Heroic sacrifice",
+   "es": "El sacrificio heroico",
+   "desc_en": "Someone gives up their life or what they love most to save others.",
+   "desc_es": "Alguien entrega su vida o lo que más quiere para salvar a otros."
+  },
+  "last_stand": {
+   "en": "The last stand",
+   "es": "La última resistencia",
+   "desc_en": "A few hold out against many, knowing they may not survive.",
+   "desc_es": "Pocos resisten contra muchos sabiendo que quizá no sobrevivan."
+  },
+  "betrayal_by_ally": {
+   "en": "Betrayal by an ally",
+   "es": "La traición de un aliado",
+   "desc_en": "A companion switches sides or sells out the group.",
+   "desc_es": "Un compañero cambia de bando o entrega al grupo."
+  },
+  "double_cross": {
+   "en": "The double cross",
+   "es": "La doble traición",
+   "desc_en": "A deal collapses at the last moment: the partner takes everything.",
+   "desc_es": "Un trato se rompe en el último momento: el socio se queda con todo."
+  },
+  "revenge_vow": {
+   "en": "Vow of revenge",
+   "es": "El juramento de venganza",
+   "desc_en": "After a loss, someone swears the culprit will pay.",
+   "desc_es": "Tras una pérdida, alguien jura hacer pagar al responsable."
+  },
+  "the_reveal": {
+   "en": "The big reveal",
+   "es": "La gran revelación",
+   "desc_en": "A hidden truth comes out and recontextualizes everything.",
+   "desc_es": "Se descubre una verdad oculta que cambia todo lo visto."
+  },
+  "family_secret": {
+   "en": "Family secret revealed",
+   "es": "El secreto familiar",
+   "desc_en": "A blood tie or hidden family past is revealed.",
+   "desc_es": "Se revela un vínculo de sangre o un pasado familiar escondido."
+  },
+  "redemption": {
+   "en": "Moment of redemption",
+   "es": "El momento de redención",
+   "desc_en": "Someone who did harm chooses to do right, whatever it costs.",
+   "desc_es": "Alguien que hizo daño elige hacer lo correcto, aunque le cueste."
+  },
+  "final_showdown": {
+   "en": "Final showdown",
+   "es": "El duelo final",
+   "desc_en": "Hero and antagonist face each other at the end.",
+   "desc_es": "Héroe y antagonista se enfrentan cara a cara al final."
+  },
+  "standoff": {
+   "en": "The standoff",
+   "es": "El enfrentamiento a punta de pistola",
+   "desc_en": "Several people hold each other at gunpoint; nobody can move first.",
+   "desc_es": "Varios se apuntan a la vez; nadie puede moverse primero."
+  },
+  "rousing_speech": {
+   "en": "Rousing speech",
+   "es": "El discurso que inspira",
+   "desc_en": "A character convinces the group to fight or not give up.",
+   "desc_es": "Un personaje convence al grupo de luchar o de no rendirse."
+  },
+  "dying_words": {
+   "en": "Last words",
+   "es": "Las últimas palabras",
+   "desc_en": "Someone dies leaving a message, a confession or a task.",
+   "desc_es": "Alguien muere dejando un mensaje, una confesión o un encargo."
+  },
+  "love_confession": {
+   "en": "Love confession",
+   "es": "La confesión de amor",
+   "desc_en": "Someone declares their feelings, often at the worst moment.",
+   "desc_es": "Alguien declara lo que siente, a menudo en el peor momento."
+  },
+  "farewell": {
+   "en": "The farewell",
+   "es": "La despedida",
+   "desc_en": "Two characters part knowing they may never meet again.",
+   "desc_es": "Dos personajes se separan sabiendo que quizá no se vuelvan a ver."
+  },
+  "impossible_choice": {
+   "en": "The impossible choice",
+   "es": "La elección imposible",
+   "desc_en": "A choice between two losses; every option hurts.",
+   "desc_es": "Hay que elegir entre dos pérdidas; cualquier opción duele."
+  },
+  "corrupted_by_power": {
+   "en": "Corrupted by power",
+   "es": "Corrompido por el poder",
+   "desc_en": "Someone with ideals abandons them once they taste power.",
+   "desc_es": "Alguien que tenía ideales los abandona al probar el poder."
+  },
+  "hubris": {
+   "en": "Hubris and downfall",
+   "es": "La caída por soberbia",
+   "desc_en": "Overconfidence leads the character to ruin.",
+   "desc_es": "El exceso de confianza lleva al personaje a su ruina."
+  },
+  "unheeded_warning": {
+   "en": "The unheeded warning",
+   "es": "La advertencia ignorada",
+   "desc_en": "Someone warns of danger and nobody believes them.",
+   "desc_es": "Alguien avisa del peligro y nadie le cree."
+  },
+  "paranoia": {
+   "en": "Trust no one",
+   "es": "No confíes en nadie",
+   "desc_en": "Suspicion spreads: anyone could be the enemy.",
+   "desc_es": "La sospecha se extiende: cualquiera puede ser el enemigo."
+  },
+  "ticking_clock": {
+   "en": "Race against time",
+   "es": "Contra reloj",
+   "desc_en": "There is a deadline and every second counts.",
+   "desc_es": "Hay un plazo y cada segundo cuenta."
+  },
+  "escape": {
+   "en": "The escape",
+   "es": "La huida",
+   "desc_en": "The characters try to get out of a place or away from a threat.",
+   "desc_es": "Los personajes intentan salir de un lugar o de una amenaza."
+  },
+  "siege": {
+   "en": "Trapped together",
+   "es": "Encerrados juntos",
+   "desc_en": "A group barricades itself inside while something tries to get in.",
+   "desc_es": "Un grupo se atrinchera en un lugar mientras algo intenta entrar."
+  },
+  "monster_reveal": {
+   "en": "The monster appears",
+   "es": "Aparece el monstruo",
+   "desc_en": "The first clear look at the threat.",
+   "desc_es": "Primera vez que se ve claramente la amenaza."
+  },
+  "its_behind_you": {
+   "en": "It's behind you",
+   "es": "Está detrás de ti",
+   "desc_en": "The audience sees the threat before the character does.",
+   "desc_es": "El público ve la amenaza antes que el personaje."
+  },
+  "dont_go_in_there": {
+   "en": "Don't go in there",
+   "es": "No entres ahí",
+   "desc_en": "A character enters a dark or forbidden place despite the danger.",
+   "desc_es": "Un personaje entra a un lugar oscuro o prohibido pese al peligro."
+  },
+  "final_survivor": {
+   "en": "The final survivor",
+   "es": "La última superviviente",
+   "desc_en": "Only one person is left standing against the threat.",
+   "desc_es": "Queda una sola persona en pie frente a la amenaza."
+  },
+  "mad_scientist": {
+   "en": "The mad scientist",
+   "es": "El científico loco",
+   "desc_en": "Scientific ambition ignores every ethical limit.",
+   "desc_es": "La ambición científica ignora todo límite ético."
+  },
+  "playing_god": {
+   "en": "Playing God",
+   "es": "Jugar a ser Dios",
+   "desc_en": "Someone creates or restores life and loses control of it.",
+   "desc_es": "Alguien crea o devuelve la vida y pierde el control."
+  },
+  "infected_ally": {
+   "en": "The infected ally",
+   "es": "El aliado infectado",
+   "desc_en": "A companion has been bitten or contaminated and the group must decide.",
+   "desc_es": "Un compañero ha sido mordido o contaminado y el grupo debe decidir."
+  },
+  "the_dead_return": {
+   "en": "The dead return",
+   "es": "Los muertos regresan",
+   "desc_en": "What was dead moves again.",
+   "desc_es": "Lo que estaba muerto vuelve a moverse."
+  },
+  "possession": {
+   "en": "Possession",
+   "es": "La posesión",
+   "desc_en": "An outside force takes over someone's body or mind.",
+   "desc_es": "Una fuerza ajena toma el cuerpo o la mente de alguien."
+  },
+  "creepy_child": {
+   "en": "The creepy child",
+   "es": "El niño siniestro",
+   "desc_en": "A child, a symbol of innocence, becomes the threat.",
+   "desc_es": "Un niño, símbolo de inocencia, se vuelve fuente de amenaza."
+  },
+  "angry_mob": {
+   "en": "The angry mob",
+   "es": "La turba enfurecida",
+   "desc_en": "The crowd, driven by fear, becomes a violent force.",
+   "desc_es": "La multitud, por miedo, se convierte en una fuerza violenta."
+  },
+  "humans_are_the_monsters": {
+   "en": "Humans are the real monsters",
+   "es": "El verdadero monstruo es el humano",
+   "desc_en": "The worst threat turns out to be the characters' own cruelty.",
+   "desc_es": "La amenaza peor resulta ser la crueldad de los propios personajes."
+  },
+  "end_of_the_world": {
+   "en": "End of the world",
+   "es": "El fin del mundo",
+   "desc_en": "The characters realize the world as they knew it is over.",
+   "desc_es": "Los personajes comprenden que el mundo tal como era se acabó."
+  },
+  "first_contact": {
+   "en": "First contact",
+   "es": "Primer contacto",
+   "desc_en": "An encounter with a non-human intelligence.",
+   "desc_es": "Encuentro con una inteligencia que no es humana."
+  },
+  "machine_rebellion": {
+   "en": "The machine turns on its maker",
+   "es": "La máquina se rebela",
+   "desc_en": "An artificial creation disobeys or attacks its creator.",
+   "desc_es": "Una creación artificial desobedece o ataca a quien la hizo."
+  },
+  "master_lesson": {
+   "en": "The master's lesson",
+   "es": "La lección del maestro",
+   "desc_en": "The master passes on a lesson the student will only later understand.",
+   "desc_es": "El maestro transmite una enseñanza que el alumno entenderá después."
+  },
+  "student_surpasses_master": {
+   "en": "The student surpasses the master",
+   "es": "El alumno supera al maestro",
+   "desc_en": "The apprentice proves they no longer need their teacher.",
+   "desc_es": "El aprendiz demuestra que ya no necesita a quien lo formó."
+  },
+  "honor_duel": {
+   "en": "Duel of honor",
+   "es": "El duelo de honor",
+   "desc_en": "Two rivals face off under rules, for pride or a debt.",
+   "desc_es": "Dos rivales se enfrentan bajo reglas, por orgullo o por deuda."
+  },
+  "outlaw_code": {
+   "en": "Honor among thieves",
+   "es": "El código del forajido",
+   "desc_en": "Outside the law, the character keeps a code of their own.",
+   "desc_es": "Fuera de la ley, el personaje respeta un código propio."
+  },
+  "heist_plan": {
+   "en": "The plan",
+   "es": "El plan del golpe",
+   "desc_en": "A risky plan is laid out step by step.",
+   "desc_es": "Se explica paso a paso un plan arriesgado."
+  },
+  "interrogation": {
+   "en": "The interrogation",
+   "es": "El interrogatorio",
+   "desc_en": "Someone is pressured to confess or talk.",
+   "desc_es": "Alguien es presionado para que confiese o hable."
+  },
+  "wrongly_accused": {
+   "en": "Wrongly accused",
+   "es": "Acusado injustamente",
+   "desc_en": "The character is blamed for something they didn't do.",
+   "desc_es": "Culpan al personaje de algo que no hizo."
+  },
+  "corrupt_authority": {
+   "en": "Corrupt authority",
+   "es": "La autoridad corrupta",
+   "desc_en": "Those who should protect (police, sheriff, government) are part of the problem.",
+   "desc_es": "Quien debería proteger (policía, sheriff, gobierno) es parte del problema."
+  },
+  "lone_hero_vs_town": {
+   "en": "The lone hero",
+   "es": "El héroe solitario",
+   "desc_en": "One person faces what everyone else won't.",
+   "desc_es": "Uno solo enfrenta lo que el resto no se atreve."
+  },
+  "riding_into_the_sunset": {
+   "en": "Riding into the sunset",
+   "es": "Partir hacia el horizonte",
+   "desc_en": "Mission done, the character leaves.",
+   "desc_es": "Cumplida la misión, el personaje se va."
+  },
+  "pyrrhic_victory": {
+   "en": "Pyrrhic victory",
+   "es": "La victoria pírrica",
+   "desc_en": "They win, but at such a cost it feels like defeat.",
+   "desc_es": "Se gana, pero a un costo tan alto que parece derrota."
+  },
+  "descent_into_madness": {
+   "en": "Descent into madness",
+   "es": "El descenso a la locura",
+   "desc_en": "The character's mind slowly breaks.",
+   "desc_es": "La mente del personaje se quiebra poco a poco."
+  },
+  "obsession": {
+   "en": "Obsession",
+   "es": "La obsesión",
+   "desc_en": "A fixed idea consumes the character and those around them.",
+   "desc_es": "Una idea fija consume al personaje y a quienes lo rodean."
+  },
+  "who_am_i": {
+   "en": "Who am I?",
+   "es": "¿Quién soy?",
+   "desc_en": "The character doubts their identity or finds out they are not who they thought.",
+   "desc_es": "El personaje duda de su identidad o descubre que no es quien creía."
+  },
+  "dream_or_reality": {
+   "en": "Dream or reality?",
+   "es": "¿Sueño o realidad?",
+   "desc_en": "The line between what happens and what is imagined blurs.",
+   "desc_es": "Se borra la frontera entre lo que pasa y lo que se imagina."
+  },
+  "fate": {
+   "en": "Fate versus free will",
+   "es": "Destino contra libre albedrío",
+   "desc_en": "The character tries to escape what seems already written.",
+   "desc_es": "El personaje intenta escapar de lo que parece escrito."
+  },
+  "sacrificial_lamb": {
+   "en": "The sacrificial lamb",
+   "es": "El cordero sacrificado",
+   "desc_en": "An innocent character dies early, proving no one is safe.",
+   "desc_es": "Un personaje inocente muere temprano y demuestra que nadie está a salvo."
+  },
+  "bittersweet_ending": {
+   "en": "Bittersweet ending",
+   "es": "El final agridulce",
+   "desc_en": "The ending mixes relief and loss.",
+   "desc_es": "El cierre mezcla alivio y pérdida."
+  },
+  "cruel_twist_ending": {
+   "en": "Cruel twist ending",
+   "es": "El giro cruel del final",
+   "desc_en": "Just when everything seems resolved, the ending strikes again.",
+   "desc_es": "Cuando todo parece resuelto, el final golpea de nuevo."
+  }
+ },
+ "films": [
+  {
+   "title": "Night of the Living Dead",
+   "year": 1968,
+   "rights": "public_domain",
+   "rights_label": "Public domain",
+   "moments": 40,
+   "emotions": [],
+   "source_url": "https://archive.org/details/Night.Of.The.Living.Dead_1080p"
+  },
+  {
+   "title": "Horror Express",
+   "year": 1972,
+   "rights": "public_domain",
+   "rights_label": "Public domain",
+   "moments": 38,
+   "emotions": [],
+   "source_url": "https://archive.org/details/HorrorExpress1972"
+  }
+ ]
+}

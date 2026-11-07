@@ -1,0 +1,111 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "youlikeit"
+version = "0.1.0"
+description = "Pipeline algorítmico de short-form content con MLOps end-to-end"
+requires-python = ">=3.11"
+
+# CLI unificado. Las deps de runtime viven en requirements.txt (fuente de
+# verdad para Docker); el editable install se hace con `pip install -e . --no-deps`.
+[project.scripts]
+ylk = "cli.main:main"
+
+# src-layout: los paquetes (core, utils, apps.*, integrations, cli) viven bajo src/.
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ────────────────────────────────────────────────────────────────────
+# pytest config
+# ────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+python_classes = ["Test*"]
+
+# Markers para segmentar suites:
+#   unit         → puro Python, sin I/O, deterministic, <50ms cada uno
+#   integration  → toca DB sqlite temp + mocks de HTTP, <2s cada uno
+#   e2e          → corre un pipeline completo (puede ser lento)
+#   network      → hace llamadas reales (skip por default)
+#   gpu          → necesita GPU (skip en CI)
+markers = [
+    "unit: tests unitarios (puro Python, sin I/O)",
+    "integration: tests con SQLite temp + mocks HTTP",
+    "e2e: pipeline completo de punta a punta",
+    "network: requiere internet real (skip por default)",
+    "gpu: requiere GPU (skip en CI sin runner GPU)",
+    "slow: tarda >2s, excluir en watch-mode",
+]
+
+# Default: corre todo excepto network y gpu (use -m network para forzar)
+addopts = [
+    "-ra",                             # resumen de skips/xfails
+    "--strict-markers",
+    "--strict-config",
+    "-m", "not network and not gpu",
+    "--tb=short",
+    "--showlocals",
+]
+
+# Trata warnings como errores (excepto algunos típicos que no podemos arreglar)
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:pytrends.*",
+    "ignore::DeprecationWarning:google.*",
+    "ignore::UserWarning:rapidfuzz.*",
+    "ignore:datetime.datetime.utcnow.*:DeprecationWarning",
+]
+
+# pytest-asyncio
+asyncio_mode = "auto"
+# Explícito: pytest-asyncio >=1.4.1 emite PytestDeprecationWarning si falta, y
+# filterwarnings="error" la vuelve INTERNALERROR (rompía el job de CI en un venv limpio).
+asyncio_default_fixture_loop_scope = "function"
+
+# ────────────────────────────────────────────────────────────────────
+# Coverage
+# ────────────────────────────────────────────────────────────────────
+[tool.coverage.run]
+source = ["src/core", "src/utils", "src/apps", "src/integrations"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "scripts/legacy/*",                           # exercises legacy, no testeamos
+    "src/apps/production/manga_camera.py",         # heavy CV, fuera de scope flujo info
+    "src/apps/production/parallax_2d5.py",         # idem
+    "src/integrations/local_transcriber.py",       # idem (whisper)
+]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "\\.\\.\\.",
+]
+
+# ────────────────────────────────────────────────────────────────────
+# Ruff (linter — opcional; no bloquea CI por ahora)
+# ────────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Empezamos suave; subir el corsé después.
+select = ["E", "F", "W", "B", "UP"]
+ignore = [
+    "E501",   # line-too-long (vivimos con esto un rato)
+    "B008",   # function-call-in-default-argument (pytest fixtures)
+]

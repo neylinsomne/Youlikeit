@@ -1,151 +1,109 @@
-# YouTube Automatizacion - Ejercicios
+# YouLikeIt
 
-Base de trabajo para practicar automatizacion de tareas de YouTube en Python.
+**Aprender empatía con el cine.** YouLikeIt encuentra los momentos clave de películas de dominio
+público o con licencia (Internet Archive y la biblioteca local `MOVIES_DIR`), los clasifica con un
+vocabulario controlado (61 tropos, 13 emociones, beats, roles y temas) y arma **lecciones verticales
+cortas (≤ 60 s)** con escenas de **obras distintas**, con texto en pantalla y narración opcional.
+Cada lección se revisa a mano y se publica: en TikTok como **borrador** y en YouTube como video privado.
 
-## Objetivo
+- La música **no se mezcla**: se elige dentro de TikTok o YouTube.
+- Solo fuentes legítimas. El conector Torrentio/qBittorrent (`src/apps/content/movie_source.py`) queda
+  congelado y los dominios nuevos no lo usan ([ADR 0004](docs/architecture/DECISIONS/0004-legit-sources-only.md)).
 
-Este proyecto organiza ejercicios progresivos para:
+## Dos superficies
 
-- Navegacion automatizada (Playwright)
-- Extraccion de metadata (yt-dlp)
-- Monitoreo de canales (RSS)
-- Uso de variables de entorno (.env)
-- Manejo de datos y salidas por carpetas
+| Superficie | Dónde corre | Para qué |
+|---|---|---|
+| **Sitio público** `web/` | Railway: <https://youlikeit-web-production.up.railway.app> | Explorar películas por emoción, términos y privacidad, TikTok Login Kit (`user.info.basic` + `video.upload`), "Send to TikTok as draft", archivos de verificación de URL y el **puente** `/api/studio/*` que usa el estudio. Ver [web/README.md](web/README.md). |
+| **Estudio local** | Tu PC, solo `127.0.0.1` | API `src/apps/studio` en `:8001` (`ylk studio`, Bearer `STUDIO_TOKEN`) y front `frontend-react` (Vite) en `:5180`. Biblioteca, momentos, editor de lecciones, render, revisión y publicación. Ver [STUDIO_API.md](docs/architecture/STUDIO_API.md) y [frontend-react/README.md](frontend-react/README.md). |
 
-## Estructura
+El video nunca pasa por Railway: el estudio pide al puente un `upload_url` y sube los bytes directo
+de tu PC a TikTok. El token de TikTok nunca sale de Railway.
 
-- `src/exercises/ex01_search_and_open.py`: busqueda automatizada y captura de pantalla
-- `src/exercises/ex02_video_metadata.py`: extrae metadata de un video
-- `src/exercises/ex03_channel_rss_monitor.py`: revisa feed RSS de un canal
-- `src/main.py`: lanzador de ejercicios
-- `data/`: datos de entrada/salida para ejercicios
-- `outputs/`: logs y capturas
+## El ETL, en una línea
 
-## Requisitos
-
-- Python 3.11+
-- PowerShell
-
-## Setup rapido (Windows)
-
-```powershell
-cd D:\Youlikeit\youtube-automatizacion-ejercicios
-.\setup.ps1
+```
+media (fuentes con derechos → rango HTTP → audio + planos → ASR por palabra)
+  → moments (candidatos ajustados a planos → señales por película → anclas Wikiquote/Wikipedia
+             → etiquetas LLM validadas contra el vocabulario → búsqueda entre obras con MMR)
+  → supercut (plan ≤ 60 s → guion IA o plantilla → voz edge-tts → render 1080x1920, −14 LUFS)
+  → revisión humana en el estudio
+  → publish (TikTok borrador vía puente · YouTube privado con publishAt opcional)
 ```
 
-## Setup recomendado (Docker)
+Detalle por etapa: [docs/architecture/SUPERCUT_ETL.md](docs/architecture/SUPERCUT_ETL.md).
 
-Si tu Python local no esta disponible, usa este flujo:
-
-```powershell
-cd D:\Youlikeit\youtube-automatizacion-ejercicios
-.\docker-setup.ps1
-```
-
-Despues ejecuta ejercicios con:
+## Inicio rápido (Windows, PowerShell)
 
 ```powershell
-.\run-exercise.ps1 -Exercise ex00
+python -m pip install -r requirements.txt        # base: estudio, ETL por API (Groq), tests
+python -m pip install -r requirements-gpu.txt    # opcional: ASR local (faster-whisper), OCR, PySceneDetect
+python -m pip install -r requirements-dev.txt    # pytest y herramientas de desarrollo
+python -m pip install -e .                       # instala el paquete y el CLI `ylk`
+
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }   # y llena las keys (SETUP_CUENTAS.md)
+ylk doctor                                       # estado de keys, tokens y stack, sin mostrar valores
+
+.\scripts\ops\studio.ps1                         # API + front en 127.0.0.1 y abre http://127.0.0.1:5180
+.\scripts\ops\install-studio-shortcut.ps1        # una vez: ícono "YouLikeIt Studio" en Escritorio e Inicio
 ```
 
-## Configuracion de entorno
+`studio.ps1` revisa los requisitos (ylk, Node.js, ffmpeg, `STUDIO_TOKEN` en `.env`, puertos libres),
+corre `npm install` la primera vez y arranca todo. `-Check` solo revisa y `-Stop` lo apaga.
 
-1. Copia `.env.example` a `.env`
-2. Ajusta variables segun tu caso
+**Como aplicativo:** el ícono "YouLikeIt Studio" corre `studio.ps1 -App`. Arranca la API y el front
+ocultos y abre el estudio en una ventana propia de Edge (sin barra de direcciones, perfil aparte y sin
+sincronizar). Al **cerrar la ventana se apaga todo**. Un segundo doble clic no duplica los servidores.
+Si algo falla aparece un mensaje; el detalle queda en `%TEMP%\youlikeit-studio\app.log`.
 
-## Uso
+Indexar una película de punta a punta (CLI o UI): [docs/operations/INDEX_A_FILM.md](docs/operations/INDEX_A_FILM.md).
 
-```powershell
-# Activa el entorno (si no lo tienes activo)
-.\.venv\Scripts\Activate.ps1
+## Por dónde empezar
 
-# Lista ejercicios disponibles
-python src\main.py --list
+| Si vas a... | Lee |
+|---|---|
+| Entender el ETL de lecciones | [docs/architecture/SUPERCUT_ETL.md](docs/architecture/SUPERCUT_ETL.md) |
+| Ver el índice de la documentación | [docs/README.md](docs/README.md) |
+| Configurar cuentas y keys | [SETUP_CUENTAS.md](SETUP_CUENTAS.md) |
+| Publicar en TikTok o YouTube | [docs/operations/UPLOADS.md](docs/operations/UPLOADS.md) |
+| Operar o resolver un incidente | [docs/operations/RUNBOOK.md](docs/operations/RUNBOOK.md) |
+| Secrets y modelo de amenazas | [docs/operations/SECURITY.md](docs/operations/SECURITY.md) |
+| Ver el estado por fases | [ROADMAP.md](ROADMAP.md) |
+| Conocer la misión y la voz del canal | [MANIFIESTO.md](MANIFIESTO.md) |
 
-# Ejecuta ejercicio 1
-python src\main.py ex01 --query "python automation"
+## Estructura del repo
 
-# Ejecuta ejercicio 2
-python src\main.py ex02 --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-
-# Ejecuta ejercicio 3
-python src\main.py ex03 --channel-id "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+```
+src/
+├── core/          config + db (SQLite WAL, esquema completo en get_db)
+├── utils/         logger, ffmpeg, websocket_hub, gpu_lock
+├── apps/
+│   ├── media/     Extract: fuentes, rangos HTTP, audio + planos, ASR, almacenamiento
+│   ├── moments/   Transform: candidatos, señales, anclas, etiquetas, búsqueda entre obras
+│   ├── supercut/  Load: plan, guion, voz, render y preview de lecciones
+│   ├── publish/   TikTok (puente de web/) y YouTube (OAuth de app instalada)
+│   ├── studio/    API FastAPI del estudio local + cola de jobs
+│   └── signals/ production/ scoring/ analytics/ content/   producto anterior (personas)
+├── integrations/  ai/ (ASR + LLM intercambiables), credentials_check (ylk doctor), clientes externos
+└── cli/           `ylk` (media, moments, studio, doctor, signals, analytics, …)
+web/               sitio público (FastAPI + Jinja) desplegado en Railway
+frontend-react/    UI del estudio local (Vite + React, en español)
+data/vocab/        vocabulario controlado (tropos, taxonomía, pesos de importancia)
+scripts/ops/       studio.ps1 y demás .ps1 de operación
+scripts/web/       export_catalog.py y make_demo_lesson.py (contenido del sitio)
+scripts/legacy/    ejercicios ex00–ex40, incluidos ex15/ex28/ex29 (solo referencia)
+tests/<dominio>/   pytest por dominio; web/tests corre en el job "web" de CI
+docs/              documentación (entrar por docs/README.md)
 ```
 
-### Flujo sugerido de ejercicios
+## Producto anterior (legacy)
 
-1. `ex00` valida conexiones y llaves del `.env`
-2. `ex01` prueba automatizacion browser (captura de pantalla)
-3. `ex02` extrae metadata de un video
-4. `ex03` monitorea publicaciones de canal por RSS
-5. `ex04` descubre peliculas y frases para materia prima
-6. `ex05` descarga subtitulos
-7. `ex06` asigna timestamps a frases
-8. `ex07` busca escenas por tematica
-9. `ex09` rankea matches y sugiere grupos antes de edicion
-10. `ex08` genera pack de crecimiento (hashtags + canciones TikTok + checklist)
-
-## Ex08: Metadata de publicacion
-
-Genera automaticamente:
-
-- Hashtags sugeridos para YouTube Shorts
-- Hashtags sugeridos para TikTok
-- Candidatos de canciones trending de TikTok (fuente publica)
-- Plantillas de titulo/caption y checklist de subida
-
-Ejemplo:
-
-```powershell
-python src\main.py ex08 --query "villain monologue" --country-code CO --period-days 7
-```
-
-## Ex09: Curacion y agrupacion antes de editar
-
-Muestra los mejores matches para una query y propone grupos de clips.
-
-```powershell
-python src\main.py ex09 --query "villain monologue" --max-results 20 --group-size 3
-```
+Los dominios `signals`, `production`, `scoring` y `analytics` (shorts multi-persona sobre manga y
+anime) siguen en el repo y con tests, pero no son el foco. La API ex29 y su contenedor se retiraron de
+`docker-compose.yml` por inseguros (token admin sin contraseña y `/api/files` servía `.env`). ex15,
+ex28 y ex29 quedan solo en `scripts/legacy/`.
 
 ## Notas
 
-- Usa esta base con fines educativos.
-- Revisa los Terminos de Servicio de YouTube antes de automatizar flujos en produccion.
-
-## YouTube vs TikTok: costos y acceso a metricas
-
-### YouTube
-
-- Para este proyecto puedes empezar gratis con YouTube Data API v3.
-- Google da cuota diaria gratuita (normalmente 10,000 unidades por proyecto/dia).
-- El costo aparece si superas cuota de forma recurrente y necesitas ampliacion para produccion.
-- Para ejercicios de descubrimiento/metadata normalmente no deberias pagar.
-
-### TikTok
-
-- Cambiar a cuenta Business es gratis.
-- Lo que cuesta en TikTok es pautar anuncios, no la cuenta empresarial en si.
-- Para tendencias (hashtags/canciones), Creative Center suele ser la fuente mas practica.
-- No siempre existe una API publica simple para todo el bloque de trends; depende de permisos y producto.
-
-### Recomendacion para este repo
-
-1. YouTube: usar API oficial para discovery/metadata.
-2. TikTok: usar Creative Center para detectar trends y validar audio permitido para uso comercial.
-3. Medir resultados con tus publicaciones y ajustar hashtags/audio por retencion.
-
-Guia completa: ver [GUIA_APIS_YOUTUBE_TIKTOK.md](GUIA_APIS_YOUTUBE_TIKTOK.md).
-Guia de edicion: ver [GUIA_EDICION_VIDEO.md](GUIA_EDICION_VIDEO.md).
-Metodo DaVinci: ver [METODOLOGIA_EDICION_DAVINCI.md](METODOLOGIA_EDICION_DAVINCI.md).
-Diagrama visual: ver [DIAGRAMA_FLUJO_EDICION.md](DIAGRAMA_FLUJO_EDICION.md).
-
-## Automatizacion cada 3 dias
-
-Scripts incluidos:
-
-- `run-content-flow.ps1`: ejecuta pipeline ex00 -> ex08 en orden.
-- `schedule-flow-every-3-days.ps1`: crea tarea programada en Windows cada 3 dias.
-- `unschedule-flow.ps1`: elimina la tarea programada.
-
-Guia operativa: ver [FLUJO_PUBLICACION_CADA_3_DIAS.md](FLUJO_PUBLICACION_CADA_3_DIAS.md).
+- Uso educativo. Solo material de dominio público, con licencia abierta o copias propias.
+- Las métricas son solo las del canal propio.

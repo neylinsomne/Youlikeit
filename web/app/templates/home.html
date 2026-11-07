@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="glow">
+  <div class="mx-auto max-w-6xl px-5 pb-16 pt-20">
+    <p class="mb-4 text-sm uppercase tracking-widest text-brand-400">Emotional literacy · Empathy · Film</p>
+    <h1 class="max-w-3xl text-4xl font-bold leading-tight md:text-6xl">Understand what you feel, through the scenes that made you feel it.</h1>
+    <p class="mt-6 max-w-2xl text-lg text-white/70">YouLikeIt organizes films by the emotions they explore — fear, grief, hope, anger, awe — and turns key scenes into short lessons that help people name their emotions, pause, and understand others.</p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a href="/explore" class="rounded-full bg-brand-500 px-6 py-3 font-semibold text-ink-950 hover:bg-brand-400">Explore films by emotion</a>
+      <a href="/studio" class="rounded-full border border-white/15 px-6 py-3 font-semibold hover:bg-white/5">I'm a creator</a>
+    </div>
+  </div>
+</section>
+
+<section class="mx-auto max-w-6xl px-5 py-14">
+  <h2 class="text-2xl font-bold md:text-3xl">How it works</h2>
+  <div class="mt-8 grid gap-5 md:grid-cols-3">
+    <div class="card rounded-2xl p-6">
+      <p class="text-sm text-brand-400">1 · Explore</p>
+      <h3 class="mt-2 text-lg font-semibold">Find films by what they make you feel</h3>
+      <p class="mt-2 text-white/65">Each emotion has a short guide: what it is, how cinema shows it, and a mindful pause to notice it in yourself.</p>
+    </div>
+    <div class="card rounded-2xl p-6">
+      <p class="text-sm text-brand-400">2 · Understand</p>
+      <h3 class="mt-2 text-lg font-semibold">See the same feeling across many stories</h3>
+      <p class="mt-2 text-white/65">We connect key scenes from different films that express the same emotion or situation — a farewell, a betrayal, a moment of hope — so patterns become visible.</p>
+    </div>
+    <div class="card rounded-2xl p-6">
+      <p class="text-sm text-brand-400">3 · Share</p>
+      <h3 class="mt-2 text-lg font-semibold">Creators turn scenes into short lessons</h3>
+      <p class="mt-2 text-white/65">Creators prepare narrated vertical lessons from public-domain or properly licensed footage and send them to TikTok as drafts, where they review and decide what to publish.</p>
+    </div>
+  </div>
+</section>
+
+<section class="mx-auto max-w-6xl px-5 pb-16">
+  <div class="flex items-end justify-between gap-4">
+    <h2 class="text-2xl font-bold md:text-3xl">Start with an emotion</h2>
+    <a href="/explore" class="text-sm text-brand-400 hover:underline">See all {{ emotions|length }} →</a>
+  </div>
+  <div class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+    {% for e in emotions[:8] %}
+    <a href="/explore/{{ e.id }}" class="card rounded-xl p-4 hover:border-white/20">
+      <span class="mb-2 block h-1.5 w-10 rounded-full" style="background: {{ e.color }}"></span>
+      <p class="font-semibold">{{ e.name }} <span class="text-white/45 font-normal">· {{ e.es }}</span></p>
+      <p class="mt-1 line-clamp-2 text-sm text-white/60">{{ e.what }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mx-auto max-w-6xl px-5 pb-20">
+  <div class="card rounded-2xl p-6 md:p-8">
+    <h2 class="text-xl font-bold">Why film?</h2>
+    <p class="mt-3 max-w-3xl text-white/70">Stories let us rehearse emotions at a safe distance. Watching how characters face loss, fear or betrayal gives us words for our own experience — and helps us recognize the same feelings in the people around us. That is empathy: understanding from the inside.</p>
+    <p class="mt-3 max-w-3xl text-sm text-white/50">Our library is built from public-domain films and footage that creators are licensed to use. See our <a class="underline" href="/terms">Terms of Service</a> for content rules.</p>
+  </div>
+</section>
+{% endblock %}

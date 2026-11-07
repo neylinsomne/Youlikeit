@@ -1,0 +1,48 @@
+{
+  "_doc": "Dimensiones de clasificación de momentos (además de tropos y temas). `pos` = rango típico de posición narrativa (0 = inicio, 1 = final), usado como prior suave.",
+  "beat": [
+    {"id": "ordinary_world", "en": "Ordinary world", "es": "El mundo ordinario", "pos": [0.0, 0.1]},
+    {"id": "inciting_incident", "en": "Inciting incident", "es": "El detonante", "pos": [0.05, 0.15]},
+    {"id": "call_to_adventure", "en": "Call to adventure", "es": "El llamado", "pos": [0.05, 0.2]},
+    {"id": "refusal", "en": "Refusal of the call", "es": "El rechazo", "pos": [0.08, 0.22]},
+    {"id": "meeting_the_mentor", "en": "Meeting the mentor", "es": "El encuentro con el mentor", "pos": [0.1, 0.3]},
+    {"id": "crossing_the_threshold", "en": "Crossing the threshold", "es": "Cruzar el umbral", "pos": [0.2, 0.3]},
+    {"id": "tests_allies_enemies", "en": "Tests, allies, enemies", "es": "Pruebas, aliados y enemigos", "pos": [0.25, 0.5]},
+    {"id": "midpoint", "en": "Midpoint twist", "es": "El giro del medio", "pos": [0.45, 0.55]},
+    {"id": "ordeal", "en": "The ordeal", "es": "La prueba suprema", "pos": [0.5, 0.75]},
+    {"id": "all_is_lost", "en": "All is lost", "es": "Todo está perdido", "pos": [0.7, 0.82]},
+    {"id": "climax", "en": "Climax", "es": "El clímax", "pos": [0.8, 0.95]},
+    {"id": "resolution", "en": "Resolution", "es": "La resolución", "pos": [0.9, 1.0]},
+    {"id": "none", "en": "No clear beat", "es": "Sin beat claro", "pos": [0.0, 1.0]}
+  ],
+  "emotion": [
+    {"id": "fear", "en": "Fear", "es": "Miedo", "legacy": ["fear", "dark"]},
+    {"id": "dread", "en": "Dread", "es": "Angustia", "legacy": ["dark"]},
+    {"id": "shock", "en": "Shock", "es": "Impacto", "legacy": ["shock", "surprise"]},
+    {"id": "tension", "en": "Tension", "es": "Tensión", "legacy": []},
+    {"id": "anger", "en": "Anger", "es": "Ira", "legacy": ["anger"]},
+    {"id": "grief", "en": "Grief", "es": "Duelo", "legacy": ["tragic", "sadness"]},
+    {"id": "sadness", "en": "Sadness", "es": "Tristeza", "legacy": ["sadness", "tragic"]},
+    {"id": "hope", "en": "Hope", "es": "Esperanza", "legacy": ["hopeful"]},
+    {"id": "triumph", "en": "Triumph", "es": "Triunfo", "legacy": ["epic", "joy"]},
+    {"id": "tenderness", "en": "Tenderness", "es": "Ternura", "legacy": ["joy"]},
+    {"id": "awe", "en": "Awe", "es": "Asombro", "legacy": ["epic", "surprise"]},
+    {"id": "disgust", "en": "Disgust", "es": "Repulsión", "legacy": ["disgust"]},
+    {"id": "humor", "en": "Humor", "es": "Humor", "legacy": ["joy"]}
+  ],
+  "role": [
+    {"id": "hero", "en": "Hero", "es": "Héroe"},
+    {"id": "mentor", "en": "Mentor", "es": "Mentor"},
+    {"id": "herald", "en": "Herald", "es": "Heraldo"},
+    {"id": "threshold_guardian", "en": "Threshold guardian", "es": "Guardián del umbral"},
+    {"id": "shapeshifter", "en": "Shapeshifter", "es": "Cambiante"},
+    {"id": "villain", "en": "Villain", "es": "Villano"},
+    {"id": "trickster", "en": "Trickster", "es": "Embaucador"},
+    {"id": "ally", "en": "Ally", "es": "Aliado"},
+    {"id": "betrayer", "en": "Betrayer", "es": "Traidor"},
+    {"id": "victim", "en": "Victim", "es": "Víctima"},
+    {"id": "love_interest", "en": "Love interest", "es": "Interés amoroso"},
+    {"id": "monster", "en": "Monster", "es": "Monstruo"},
+    {"id": "authority", "en": "Authority", "es": "Autoridad"}
+  ]
+}

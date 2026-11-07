@@ -1,0 +1,149 @@
+{
+ "metadata": {
+  "identifier": "Night.Of.The.Living.Dead_1080p",
+  "title": "Night of the Living Dead",
+  "year": "1968",
+  "date": "1968",
+  "licenseurl": "http://creativecommons.org/licenses/publicdomain/",
+  "rights": "Public Domain",
+  "runtime": "01:35:06",
+  "collection": [
+   "film_scifi",
+   "feature_films",
+   "moviesandfilms"
+  ],
+  "mediatype": "movies",
+  "language": "English"
+ },
+ "files": [
+  {
+   "name": "NightOfTheLivingDead.m2ts",
+   "source": "original",
+   "format": "h.264 MPEG4",
+   "size": "17487126528",
+   "length": "5752.82",
+   "height": "1080",
+   "width": "1920"
+  },
+  {
+   "name": "NightOfTheLivingDead.mp4",
+   "source": "derivative",
+   "format": "h.264",
+   "size": "596808390",
+   "length": "5753.46",
+   "height": "360",
+   "width": "640",
+   "original": "NightOfTheLivingDead.m2ts"
+  },
+  {
+   "name": "NightOfTheLivingDead.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "425336522",
+   "length": "5753.33",
+   "height": "300",
+   "width": "533",
+   "original": "NightOfTheLivingDead.m2ts"
+  },
+  {
+   "name": "NightOfTheLivingDead_1080p.mkv",
+   "source": "original",
+   "format": "h.264 MPEG4",
+   "size": "11523767255",
+   "length": "5752.8",
+   "height": "1080",
+   "width": "1440"
+  },
+  {
+   "name": "NightOfTheLivingDead_1080p.mp4",
+   "source": "derivative",
+   "format": "h.264",
+   "size": "597585042",
+   "length": "5752.8",
+   "height": "480",
+   "width": "640",
+   "original": "NightOfTheLivingDead_1080p.mkv"
+  },
+  {
+   "name": "NightOfTheLivingDead_1080p.ogv",
+   "source": "derivative",
+   "format": "Ogg Video",
+   "size": "487835300",
+   "length": "5752.77",
+   "height": "304",
+   "width": "400",
+   "original": "NightOfTheLivingDead_1080p.mkv"
+  },
+  {
+   "name": "NightOfTheLivingDead_1080p_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "406935466",
+   "length": "5752.7",
+   "height": "240",
+   "width": "320",
+   "original": "NightOfTheLivingDead_1080p.mkv"
+  },
+  {
+   "name": "NightOfTheLivingDead_DVD5.asr.srt",
+   "source": "original",
+   "format": "SubRip",
+   "size": "54216"
+  },
+  {
+   "name": "NightOfTheLivingDead_DVD5.gif",
+   "source": "derivative",
+   "format": "Animated GIF",
+   "size": "334640",
+   "original": "NightOfTheLivingDead_DVD5.mpg"
+  },
+  {
+   "name": "NightOfTheLivingDead_DVD5.mp3",
+   "source": "derivative",
+   "format": "MP3",
+   "size": "69091668",
+   "length": "95:51",
+   "height": "0",
+   "width": "0",
+   "original": "NightOfTheLivingDead_DVD5.mpg"
+  },
+  {
+   "name": "NightOfTheLivingDead_DVD5.mpg",
+   "source": "original",
+   "format": "MPEG2",
+   "size": "3989194752",
+   "length": "5752.12",
+   "height": "480",
+   "width": "640"
+  },
+  {
+   "name": "NightOfTheLivingDead_DVD5_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "333938666",
+   "length": "5752.11",
+   "height": "240",
+   "width": "320",
+   "original": "NightOfTheLivingDead_DVD5.mpg"
+  },
+  {
+   "name": "NightOfTheLivingDead_PS3.mp4",
+   "source": "original",
+   "format": "h.264 MPEG4",
+   "size": "1862510336",
+   "length": "5752.81",
+   "height": "1080",
+   "width": "1920"
+  },
+  {
+   "name": "NightOfTheLivingDead_PS3_512kb.mp4",
+   "source": "derivative",
+   "format": "512Kb MPEG4",
+   "size": "435564960",
+   "length": "5752.81",
+   "height": "240",
+   "width": "427",
+   "original": "NightOfTheLivingDead_PS3.mp4"
+  }
+ ]
+}

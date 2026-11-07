@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- Reduce Clickhouse logging + disk churn for the Plausible event store.
+     Mirrors the upstream Plausible community-edition recommended config.
+     Ref: https://github.com/plausible/community-edition -->
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <console>true</console>
+    </logger>
+    <!-- Stop unnecessary logging tables from growing unbounded on a tiny host -->
+    <query_thread_log remove="remove"/>
+    <query_log remove="remove"/>
+    <text_log remove="remove"/>
+    <trace_log remove="remove"/>
+    <metric_log remove="remove"/>
+    <asynchronous_metric_log remove="remove"/>
+    <session_log remove="remove"/>
+    <part_log remove="remove"/>
+</clickhouse>

@@ -56,9 +56,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-gpu.txt   # legacy: easyocr/opencv/chromadb
           pip install easyocr opencv-python-headless edge-tts ytmusicapi manga-ocr rapidfuzz
           pip install google-api-python-client google-auth-oauthlib google-auth-httplib2
+          pip install -e . --no-deps   # expone core/apps/integrations + CLI ylk
 
       - name: Create directories
         run: mkdir -p data outputs/logs outputs/manga outputs/metadata outputs/publish
@@ -95,20 +96,17 @@ jobs:
       # ========================================
       - name: "Discover trending manga/anime"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
-        working-directory: src
-        run: python main.py ex36 --media-type all --max-movies 15
+        run: python scripts/legacy/main.py ex36 --media-type all --max-movies 15
 
       - name: "Classify manga quotes"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
-        working-directory: src
-        run: python main.py ex37 --provider auto --batch-size 50
+        run: python scripts/legacy/main.py ex37 --provider auto --batch-size 50
 
       - name: "Growth pack + publish strategy"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'manga'
-        working-directory: src
         run: |
-          python main.py ex08 --query "anime manga trending" --country-code CO
-          python main.py ex17 --query "anime manga trending" --platform both --country-code CO --lang en
+          python scripts/legacy/main.py ex08 --query "anime manga trending" --country-code CO
+          python scripts/legacy/main.py ex17 --query "anime manga trending" --platform both --country-code CO --lang en
 
       # ========================================
       # FULL MANGA SHORT PRODUCTION
@@ -119,13 +117,13 @@ jobs:
 
       - name: "Generate manga Short series"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'full-manga-short'
-        working-directory: src
         run: |
           python -c "
           import sys, os, json, re, requests, time, subprocess, asyncio, glob
-          sys.path.insert(0, '.')
+          sys.path.insert(0, 'src')
+          sys.path.insert(0, 'scripts/legacy')
           from exercises.ex38_manga_panels import _detect_panels
-          from common.manga_camera import render_manga_short, classify_page
+          from apps.production.manga_camera import render_manga_short, classify_page
 
           SERIES = '${{ steps.config.outputs.series }}' or 'Berserk'
           MAX_EPS = int('${{ steps.config.outputs.max_eps }}' or '3')
@@ -134,7 +132,7 @@ jobs:
           print(f'=== Generating Short for {SERIES} ===')
 
           # 1. Get wiki summaries
-          import common.http_client as hc
+          import utils.http_client as hc
           subdomain_map = {'berserk':'berserk','one piece':'onepiece','naruto':'naruto','death note':'deathnote'}
           subdomain = subdomain_map.get(SERIES.lower(), SERIES.lower().replace(' ',''))
 
@@ -180,8 +178,8 @@ jobs:
               text = re.sub(r'\`\`\`json?\s*', '', text).strip().rstrip('\`')
               scripts.append(json.loads(text))
 
-          os.makedirs('../outputs/manga/series_output', exist_ok=True)
-          with open('../outputs/manga/series_output/scripts.json','w') as f:
+          os.makedirs('outputs/manga/series_output', exist_ok=True)
+          with open('outputs/manga/series_output/scripts.json','w') as f:
               json.dump(scripts, f, indent=2)
 
           print(f'Generated {len(scripts)} narration scripts')
@@ -194,7 +192,6 @@ jobs:
 
       - name: "Upload to YouTube"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'full-manga-short' && steps.config.outputs.upload != 'false'
-        working-directory: src
         run: |
           python -c "
           import os, json, glob
@@ -203,7 +200,7 @@ jobs:
           from googleapiclient.http import MediaFileUpload
           from pathlib import Path
 
-          token = Path('../data/youtube_oauth_token.json')
+          token = Path('data/youtube_oauth_token.json')
           if not token.exists():
               print('No OAuth token, skipping upload')
               exit(0)
@@ -212,7 +209,7 @@ jobs:
           youtube = build('youtube', 'v3', credentials=creds)
 
           privacy = '${{ steps.config.outputs.upload }}'
-          videos = sorted(glob.glob('../outputs/manga/series_output/*.mp4'))
+          videos = sorted(glob.glob('outputs/manga/series_output/*.mp4'))
 
           for vf in videos:
               name = Path(vf).stem
@@ -241,11 +238,10 @@ jobs:
       # ========================================
       - name: "Learning cycle"
         if: steps.check_date.outputs.skip != 'true' && steps.config.outputs.pipeline == 'learn'
-        working-directory: src
         run: |
-          python main.py ex31 --batch-size 50
-          python main.py ex32
-          python main.py ex33 --plan-size 10
+          python scripts/legacy/main.py ex31 --batch-size 50
+          python scripts/legacy/main.py ex32
+          python scripts/legacy/main.py ex33 --plan-size 10
 
       # ========================================
       # ARTIFACTS

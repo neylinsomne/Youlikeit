@@ -1,5 +1,23 @@
 # YouLikeIt — landing site (review-only)
 
+> **Superseded (2026-11-04).** The live public site is the FastAPI app in [`web/`](../web/README.md),
+> deployed on Railway at **https://youlikeit-web-production.up.railway.app**. That site hosts the
+> terms, privacy policy, TikTok Login Kit, "Send to TikTok as draft" and the studio bridge.
+> This static nginx site is kept for history only; do not use its URLs in developer dashboards.
+>
+> Current values for TikTok / Google:
+>
+> | Field | Value |
+> |---|---|
+> | Website URL | `https://youlikeit-web-production.up.railway.app` |
+> | Terms of Service | `https://youlikeit-web-production.up.railway.app/terms` |
+> | Privacy Policy | `https://youlikeit-web-production.up.railway.app/privacy` |
+> | TikTok Redirect URI | `https://youlikeit-web-production.up.railway.app/auth/tiktok/callback` |
+>
+> YouTube does not use a web redirect anymore: the local studio uses an installed-app OAuth client
+> with the loopback redirect `http://127.0.0.1:8001/api/publish/youtube/callback`
+> (see [docs/operations/UPLOADS.md](../docs/operations/UPLOADS.md)).
+
 Static landing site whose **only purpose** is to host the public-facing pages
 required to pass TikTok's data treatment / app review:
 
@@ -155,7 +173,7 @@ dashboard — the subdomain stops resolving immediately.
 
 ## URLs to plug into developer dashboards
 
-These are the values to copy into TikTok / Google Cloud Console:
+Historical values (no longer valid; use the table at the top of this file):
 
 | Dashboard field | URL |
 |---|---|
